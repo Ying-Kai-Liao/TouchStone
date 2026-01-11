@@ -10,9 +10,22 @@
 		6D31B5792F129914001FC9D3 /* TouchStone.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TouchStone.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		6D31B5C92F135002001FC9D3 /* Exceptions for "TouchStone" folder in "TouchStone" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 6D31B5782F129914001FC9D3 /* TouchStone */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		6D31B57B2F129914001FC9D3 /* TouchStone */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				6D31B5C92F135002001FC9D3 /* Exceptions for "TouchStone" folder in "TouchStone" target */,
+			);
 			path = TouchStone;
 			sourceTree = "<group>";
 		};
@@ -253,6 +266,11 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TouchStone/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "TouchStone needs microphone access to hear your voice when adding";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "TouchStone uses speech recognition to let you add events by voice.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -284,6 +302,11 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TouchStone/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "TouchStone needs microphone access to hear your voice when adding";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "TouchStone uses speech recognition to let you add events by voice.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

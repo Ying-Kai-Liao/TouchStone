@@ -1,10 +1,3 @@
-//
-//  TouchStoneApp.swift
-//  TouchStone
-//
-//  Created by KaiMac on 11/1/2026.
-//
-
 import SwiftUI
 import SwiftData
 
@@ -12,9 +5,17 @@ import SwiftData
 struct TouchStoneApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            Project.self,
+            ProjectPhase.self,
+            PlannedSession.self,
+            StoneEvent.self,
+            TouchLog.self,
+            FocusSession.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false
+        )
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
