@@ -29,6 +29,11 @@
 			path = TouchStone;
 			sourceTree = "<group>";
 		};
+		6D31B5E82F1526BB001FC9D3 /* docs */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = docs;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +50,7 @@
 		6D31B5702F129914001FC9D3 = {
 			isa = PBXGroup;
 			children = (
+				6D31B5E82F1526BB001FC9D3 /* docs */,
 				6D31B57B2F129914001FC9D3 /* TouchStone */,
 				6D31B57A2F129914001FC9D3 /* Products */,
 			);
@@ -75,6 +81,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				6D31B57B2F129914001FC9D3 /* TouchStone */,
+				6D31B5E82F1526BB001FC9D3 /* docs */,
 			);
 			name = TouchStone;
 			packageProductDependencies = (

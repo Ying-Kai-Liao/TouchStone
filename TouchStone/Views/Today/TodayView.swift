@@ -17,8 +17,6 @@ struct TodayView: View {
     @State private var focusProject: Project?
     @State private var showAddStone = false
     @State private var showSpeechInput = false
-    @State private var showSessionLog = false
-    @State private var selectedProject: Project?
 
     var body: some View {
         NavigationStack {
@@ -52,24 +50,6 @@ struct TodayView: View {
             }
             .sheet(isPresented: $showSpeechInput) {
                 SpeechStoneInputView()
-            }
-            .sheet(isPresented: $showSessionLog) {
-                if let project = selectedProject {
-                    PhasedSessionLogSheet(project: project) { touch in
-                        modelContext.insert(touch)
-                        lastTouch = touch
-                        withAnimation {
-                            showUndoToast = true
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                            withAnimation {
-                                if lastTouch?.id == touch.id {
-                                    showUndoToast = false
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -187,12 +167,8 @@ struct TodayView: View {
                 VStack(spacing: 8) {
                     ForEach(activeProjects) { project in
                         ProjectTouchRow(project: project) {
-                            if project.hasStrategicPlan {
-                                selectedProject = project
-                                showSessionLog = true
-                            } else {
-                                touchProject(project)
-                            }
+                            // All touches are instant (< 2 sec) - per guardrails
+                            touchProject(project)
                         } onFocus: {
                             startFocus(project)
                         }
@@ -315,108 +291,67 @@ struct ProjectTouchRow: View {
     let onFocus: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Top row: title and touch button
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(project.title)
-                            .font(.body)
-                            .fontWeight(.medium)
+        HStack(spacing: 12) {
+            // Project info (simplified)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(project.title)
+                        .font(.body)
+                        .fontWeight(.medium)
 
-                        if project.hasStrategicPlan, let archetype = project.archetype {
-                            Text(archetype.displayName)
-                                .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.purple.opacity(0.15))
-                                .clipShape(Capsule())
-                        }
-                    }
-
-                    // Phase info for strategic projects
-                    if project.hasStrategicPlan {
-                        if let phase = project.activePhase {
-                            Text("Phase: \(phase.title) (\(phase.progressString))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } else if let phase = project.currentPhase {
-                        Text(phase)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Spacer()
-
-                if project.touchCountToday > 0 {
-                    Text("Touched \(project.touchCountToday)x")
-                        .font(.caption)
-                        .foregroundStyle(.green)
-                }
-
-                Menu {
-                    Button {
-                        onTouch()
-                    } label: {
-                        Label("Log Touch", systemImage: "hand.tap")
-                    }
-
-                    Button {
-                        onFocus()
-                    } label: {
-                        Label("Focus Mode", systemImage: "scope")
-                    }
-                } label: {
-                    Image(systemName: "hand.tap.fill")
-                        .font(.title3)
-                        .foregroundStyle(.blue)
-                        .padding(8)
-                        .background(Color.blue.opacity(0.1))
-                        .clipShape(Circle())
-                }
-            }
-
-            // Next session info for strategic projects
-            if project.hasStrategicPlan, let nextSession = project.nextPlannedSession {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Image(systemName: "arrow.right.circle")
-                            .font(.caption)
-                            .foregroundStyle(.purple)
-                        Text("Next: \(nextSession.title)")
-                            .font(.caption)
-                            .foregroundStyle(.primary)
-                        Text(nextSession.formattedDuration)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if let mentalRule = nextSession.mentalRule {
-                        Text("\"\(mentalRule)\"")
+                    if project.hasStrategicPlan, let archetype = project.archetype {
+                        Text(archetype.displayName)
                             .font(.caption2)
-                            .italic()
-                            .foregroundStyle(.purple.opacity(0.8))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.purple.opacity(0.15))
+                            .clipShape(Capsule())
                     }
+                }
 
-                    if let goal = nextSession.goal {
-                        Text("Goal: \(goal)")
+                // Phase name only (no progress tracking - per guardrails)
+                if project.hasStrategicPlan {
+                    if let phase = project.activePhase {
+                        Text(phase.title)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                } else if let phase = project.currentPhase {
+                    Text(phase)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .padding(.top, 4)
             }
 
-            // Progress bar for strategic projects
-            if project.hasStrategicPlan && project.totalSessionCount > 0 {
-                ProgressView(value: project.progress)
-                    .tint(.purple)
+            Spacer()
 
-                Text(project.progressString)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            // Touch count
+            if project.touchCountToday > 0 {
+                Text("\(project.touchCountToday)x")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+            }
+
+            // Action menu
+            Menu {
+                Button {
+                    onTouch()
+                } label: {
+                    Label("Log Touch", systemImage: "hand.tap")
+                }
+
+                Button {
+                    onFocus()
+                } label: {
+                    Label("Focus Mode", systemImage: "scope")
+                }
+            } label: {
+                Image(systemName: "hand.tap.fill")
+                    .font(.title3)
+                    .foregroundStyle(.blue)
+                    .padding(8)
+                    .background(Color.blue.opacity(0.1))
+                    .clipShape(Circle())
             }
         }
         .padding()

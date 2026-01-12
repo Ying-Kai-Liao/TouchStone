@@ -180,6 +180,16 @@ enum DeadlineStatus {
     case passed        // Past deadline
 }
 
+// MARK: - Phase Template
+
+/// Template for a phase within an archetype, including default time allocation
+struct PhaseTemplate {
+    let name: String
+    let type: PhaseType
+    let rule: String
+    let defaultPercent: Int  // Default % of total time
+}
+
 // MARK: - Archetype
 
 enum Archetype: String, Codable, CaseIterable {
@@ -206,6 +216,20 @@ enum Archetype: String, Codable, CaseIterable {
         }
     }
 
+    /// Detailed description with failure mode
+    var detailedDescription: String {
+        switch self {
+        case .lab:
+            return "Creative work requiring exploration then synthesis. Failure mode: Getting stuck in research forever."
+        case .hunt:
+            return "Bureaucratic tasks with gatekeepers. Failure mode: Missing one document and getting blocked."
+        case .spiral:
+            return "Skill acquisition requiring practice loops. Failure mode: Passive consumption without doing."
+        case .build:
+            return "Construction with dependencies. Failure mode: Starting before materials ready."
+        }
+    }
+
     var icon: String {
         switch self {
         case .lab: return "flask"
@@ -215,34 +239,65 @@ enum Archetype: String, Codable, CaseIterable {
         }
     }
 
-    /// Default phases for this archetype
-    var defaultPhases: [(name: String, type: PhaseType, rule: String)] {
+    /// Phase structure for this archetype with default time allocations
+    var phaseStructure: [PhaseTemplate] {
         switch self {
         case .lab:
             return [
-                ("Research", .divergent, "Explore widely, no conclusions yet"),
-                ("Synthesis", .convergent, "Focus and decide, narrow down"),
-                ("Output", .output, "Produce final deliverable")
+                PhaseTemplate(name: "Exploration", type: .divergent,
+                    rule: "Explore widely, no conclusions yet",
+                    defaultPercent: 25),
+                PhaseTemplate(name: "Bricklaying", type: .execution,
+                    rule: "Hermit mode: no new inputs, no editing worry, just produce",
+                    defaultPercent: 50),
+                PhaseTemplate(name: "Refining", type: .convergent,
+                    rule: "No new research, only polish and perfect",
+                    defaultPercent: 25)
             ]
         case .hunt:
             return [
-                ("Audit", .input, "Assess what needs to be done"),
-                ("Gather", .execution, "Collect required materials"),
-                ("Execute", .output, "Complete the paperwork")
+                PhaseTemplate(name: "Audit", type: .input,
+                    rule: "List everything needed, don't start gathering yet",
+                    defaultPercent: 20),
+                PhaseTemplate(name: "Gathering", type: .execution,
+                    rule: "Scavenge all assets, do NOT start execution until complete",
+                    defaultPercent: 40),
+                PhaseTemplate(name: "Execution", type: .output,
+                    rule: "Batch similar tasks, no new gathering",
+                    defaultPercent: 40)
             ]
         case .spiral:
             return [
-                ("Input", .input, "Absorb new information"),
-                ("Practice", .output, "Apply what you learned"),
-                ("Reflection", .reflection, "Review and consolidate")
+                PhaseTemplate(name: "Input", type: .input,
+                    rule: "Absorb theory and examples",
+                    defaultPercent: 30),
+                PhaseTemplate(name: "Output", type: .output,
+                    rule: "Struggle and practice WITHOUT help",
+                    defaultPercent: 50),
+                PhaseTemplate(name: "Reflection", type: .reflection,
+                    rule: "Review what worked and what didn't",
+                    defaultPercent: 20)
             ]
         case .build:
             return [
-                ("Spec", .convergent, "Define requirements clearly"),
-                ("Dependencies", .execution, "Gather tools and resources"),
-                ("Assembly", .output, "Build the thing"),
-                ("Testing", .reflection, "Verify it works")
+                PhaseTemplate(name: "Spec", type: .convergent,
+                    rule: "Define requirements clearly, no building yet",
+                    defaultPercent: 15),
+                PhaseTemplate(name: "Dependencies", type: .execution,
+                    rule: "Gather tools and resources, verify availability",
+                    defaultPercent: 20),
+                PhaseTemplate(name: "Assembly", type: .output,
+                    rule: "Build following spec, no scope creep",
+                    defaultPercent: 50),
+                PhaseTemplate(name: "Testing", type: .reflection,
+                    rule: "Verify it works, document issues",
+                    defaultPercent: 15)
             ]
         }
+    }
+
+    /// Default phases for this archetype (legacy compatibility)
+    var defaultPhases: [(name: String, type: PhaseType, rule: String)] {
+        phaseStructure.map { ($0.name, $0.type, $0.rule) }
     }
 }

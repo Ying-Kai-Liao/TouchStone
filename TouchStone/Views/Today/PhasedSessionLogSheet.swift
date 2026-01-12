@@ -75,7 +75,7 @@ struct PhasedSessionLogSheet: View {
             if let phase = project.activePhase {
                 HStack {
                     Image(systemName: phase.phaseType.icon)
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(Color.purple)
                     Text("Phase: \(phase.title)")
                         .foregroundStyle(.secondary)
                     Text("(\(phase.progressString))")
@@ -93,7 +93,7 @@ struct PhasedSessionLogSheet: View {
             // Session title
             HStack {
                 Image(systemName: "target")
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(Color.purple)
                 Text(session.title)
                     .font(.headline)
             }
@@ -102,10 +102,10 @@ struct PhasedSessionLogSheet: View {
             if let rule = session.mentalRule {
                 HStack(alignment: .top) {
                     Image(systemName: "brain.head.profile")
-                        .foregroundStyle(.purple.opacity(0.7))
+                        .foregroundStyle(Color.purple.opacity(0.7))
                     Text("\"\(rule)\"")
                         .italic()
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(Color.purple)
                 }
                 .font(.subheadline)
             }

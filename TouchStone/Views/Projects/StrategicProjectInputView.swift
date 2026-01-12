@@ -47,7 +47,7 @@ struct StrategicProjectInputView: View {
             VStack(spacing: 12) {
                 Image(systemName: "brain.head.profile")
                     .font(.system(size: 50))
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(Color.purple)
 
                 Text("What do you want to accomplish?")
                     .font(.title3)
@@ -263,7 +263,7 @@ struct PhaseReviewCard: View {
             Text("\"\(phase.mentalRule)\"")
                 .font(.caption)
                 .italic()
-                .foregroundStyle(.purple)
+                .foregroundStyle(Color.purple)
 
             // Sessions
             if isExpanded {
