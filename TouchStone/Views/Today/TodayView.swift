@@ -17,8 +17,6 @@ struct TodayView: View {
     @State private var focusProject: Project?
     @State private var showAddStone = false
     @State private var showSpeechInput = false
-    @State private var showSessionLog = false
-    @State private var selectedProject: Project?
 
     var body: some View {
         NavigationStack {
@@ -52,24 +50,6 @@ struct TodayView: View {
             }
             .sheet(isPresented: $showSpeechInput) {
                 SpeechStoneInputView()
-            }
-            .sheet(isPresented: $showSessionLog) {
-                if let project = selectedProject {
-                    PhasedSessionLogSheet(project: project) { touch in
-                        modelContext.insert(touch)
-                        lastTouch = touch
-                        withAnimation {
-                            showUndoToast = true
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                            withAnimation {
-                                if lastTouch?.id == touch.id {
-                                    showUndoToast = false
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -187,12 +167,8 @@ struct TodayView: View {
                 VStack(spacing: 8) {
                     ForEach(activeProjects) { project in
                         ProjectTouchRow(project: project) {
-                            if project.hasStrategicPlan {
-                                selectedProject = project
-                                showSessionLog = true
-                            } else {
-                                touchProject(project)
-                            }
+                            // All touches are instant (< 2 sec) - per guardrails
+                            touchProject(project)
                         } onFocus: {
                             startFocus(project)
                         }
@@ -333,24 +309,12 @@ struct ProjectTouchRow: View {
                     }
                 }
 
-                // Phase name and progress only
+                // Phase name only (no progress tracking - per guardrails)
                 if project.hasStrategicPlan {
                     if let phase = project.activePhase {
-                        HStack(spacing: 8) {
-                            Text(phase.title)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-
-                            Text(project.progressString)
-                                .font(.caption)
-                                .foregroundStyle(Color.purple)
-                        }
-                    }
-
-                    // Simple progress bar
-                    if project.totalSessionCount > 0 {
-                        ProgressView(value: project.progress)
-                            .tint(.purple)
+                        Text(phase.title)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 } else if let phase = project.currentPhase {
                     Text(phase)
