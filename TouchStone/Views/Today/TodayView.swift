@@ -343,7 +343,7 @@ struct ProjectTouchRow: View {
 
                             Text(project.progressString)
                                 .font(.caption)
-                                .foregroundStyle(.purple)
+                                .foregroundStyle(Color.purple)
                         }
                     }
 

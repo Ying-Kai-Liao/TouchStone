@@ -28,7 +28,7 @@ struct PhaseAllocationCard: View {
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: phaseType.icon)
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(Color.purple)
                     Text("\(index + 1). \(phaseName)")
                         .font(.headline)
                 }
@@ -104,12 +104,12 @@ struct PhaseAllocationCard: View {
             // Mental rule
             HStack(alignment: .top, spacing: 6) {
                 Image(systemName: "brain.head.profile")
-                    .foregroundStyle(.purple.opacity(0.7))
+                    .foregroundStyle(Color.purple.opacity(0.7))
                     .font(.caption)
                 Text("\"\(mentalRule)\"")
                     .font(.caption)
                     .italic()
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(Color.purple)
             }
         }
         .padding()

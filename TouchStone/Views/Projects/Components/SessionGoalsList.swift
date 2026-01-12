@@ -20,7 +20,7 @@ struct SessionGoalsList: View {
             HStack {
                 if index < phaseStructure.count {
                     Image(systemName: phaseStructure[index].type.icon)
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(Color.purple)
                 }
                 Text("Phase \(index + 1): \(phasePlan.name)")
                     .font(.headline)

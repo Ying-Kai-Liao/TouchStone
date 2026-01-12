@@ -120,7 +120,7 @@ struct ProjectRow: View {
                         }
                         Text(project.progressString)
                             .font(.caption)
-                            .foregroundStyle(.purple)
+                            .foregroundStyle(Color.purple)
                     } else if let phase = project.currentPhase {
                         Text(phase)
                             .font(.caption)

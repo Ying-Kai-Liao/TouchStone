@@ -62,7 +62,7 @@ struct NewProjectChoiceView: View {
                         HStack(spacing: 16) {
                             Image(systemName: "brain.head.profile")
                                 .font(.title2)
-                                .foregroundStyle(.purple)
+                                .foregroundStyle(Color.purple)
                                 .frame(width: 44, height: 44)
                                 .background(Color.purple.opacity(0.15))
                                 .clipShape(RoundedRectangle(cornerRadius: 10))

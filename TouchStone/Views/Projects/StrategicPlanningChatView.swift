@@ -133,7 +133,7 @@ struct StrategicPlanningChatView: View {
             if let arch = archetype {
                 HStack {
                     Image(systemName: arch.icon)
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(Color.purple)
                     Text(arch.displayName)
                         .fontWeight(.bold)
                     Text("Project Structure")

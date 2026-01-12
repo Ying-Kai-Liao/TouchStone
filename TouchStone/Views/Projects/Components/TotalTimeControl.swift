@@ -20,7 +20,7 @@ struct TotalTimeControl: View {
                 } label: {
                     Image(systemName: "minus.circle.fill")
                         .font(.title2)
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(Color.purple)
                 }
                 .disabled(totalHours <= minHours)
 
@@ -35,7 +35,7 @@ struct TotalTimeControl: View {
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.title2)
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(Color.purple)
                 }
                 .disabled(totalHours >= maxHours)
             }

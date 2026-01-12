@@ -159,7 +159,7 @@ struct FocusModeView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "target")
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(Color.purple)
                 Text("Current Session")
                     .font(.headline)
                 Spacer()
@@ -200,7 +200,7 @@ struct FocusModeView: View {
                 Spacer()
                 Text(project.progressString)
                     .font(.subheadline)
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(Color.purple)
             }
 
             ProgressView(value: project.progress)
