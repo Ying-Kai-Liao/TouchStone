@@ -315,108 +315,79 @@ struct ProjectTouchRow: View {
     let onFocus: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Top row: title and touch button
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(project.title)
-                            .font(.body)
-                            .fontWeight(.medium)
+        HStack(spacing: 12) {
+            // Project info (simplified)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(project.title)
+                        .font(.body)
+                        .fontWeight(.medium)
 
-                        if project.hasStrategicPlan, let archetype = project.archetype {
-                            Text(archetype.displayName)
-                                .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.purple.opacity(0.15))
-                                .clipShape(Capsule())
-                        }
+                    if project.hasStrategicPlan, let archetype = project.archetype {
+                        Text(archetype.displayName)
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.purple.opacity(0.15))
+                            .clipShape(Capsule())
                     }
+                }
 
-                    // Phase info for strategic projects
-                    if project.hasStrategicPlan {
-                        if let phase = project.activePhase {
-                            Text("Phase: \(phase.title) (\(phase.progressString))")
+                // Phase name and progress only
+                if project.hasStrategicPlan {
+                    if let phase = project.activePhase {
+                        HStack(spacing: 8) {
+                            Text(phase.title)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+
+                            Text(project.progressString)
+                                .font(.caption)
+                                .foregroundStyle(.purple)
                         }
-                    } else if let phase = project.currentPhase {
-                        Text(phase)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
-                }
 
-                Spacer()
-
-                if project.touchCountToday > 0 {
-                    Text("Touched \(project.touchCountToday)x")
+                    // Simple progress bar
+                    if project.totalSessionCount > 0 {
+                        ProgressView(value: project.progress)
+                            .tint(.purple)
+                    }
+                } else if let phase = project.currentPhase {
+                    Text(phase)
                         .font(.caption)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(.secondary)
                 }
+            }
 
-                Menu {
-                    Button {
-                        onTouch()
-                    } label: {
-                        Label("Log Touch", systemImage: "hand.tap")
-                    }
+            Spacer()
 
-                    Button {
-                        onFocus()
-                    } label: {
-                        Label("Focus Mode", systemImage: "scope")
-                    }
+            // Touch count
+            if project.touchCountToday > 0 {
+                Text("\(project.touchCountToday)x")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+            }
+
+            // Action menu
+            Menu {
+                Button {
+                    onTouch()
                 } label: {
-                    Image(systemName: "hand.tap.fill")
-                        .font(.title3)
-                        .foregroundStyle(.blue)
-                        .padding(8)
-                        .background(Color.blue.opacity(0.1))
-                        .clipShape(Circle())
+                    Label("Log Touch", systemImage: "hand.tap")
                 }
-            }
 
-            // Next session info for strategic projects
-            if project.hasStrategicPlan, let nextSession = project.nextPlannedSession {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Image(systemName: "arrow.right.circle")
-                            .font(.caption)
-                            .foregroundStyle(.purple)
-                        Text("Next: \(nextSession.title)")
-                            .font(.caption)
-                            .foregroundStyle(.primary)
-                        Text(nextSession.formattedDuration)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if let mentalRule = nextSession.mentalRule {
-                        Text("\"\(mentalRule)\"")
-                            .font(.caption2)
-                            .italic()
-                            .foregroundStyle(.purple.opacity(0.8))
-                    }
-
-                    if let goal = nextSession.goal {
-                        Text("Goal: \(goal)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                Button {
+                    onFocus()
+                } label: {
+                    Label("Focus Mode", systemImage: "scope")
                 }
-                .padding(.top, 4)
-            }
-
-            // Progress bar for strategic projects
-            if project.hasStrategicPlan && project.totalSessionCount > 0 {
-                ProgressView(value: project.progress)
-                    .tint(.purple)
-
-                Text(project.progressString)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            } label: {
+                Image(systemName: "hand.tap.fill")
+                    .font(.title3)
+                    .foregroundStyle(.blue)
+                    .padding(8)
+                    .background(Color.blue.opacity(0.1))
+                    .clipShape(Circle())
             }
         }
         .padding()

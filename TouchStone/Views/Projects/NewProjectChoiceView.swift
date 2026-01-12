@@ -115,16 +115,10 @@ struct NewProjectChoiceView: View {
                 }
             }
             .sheet(isPresented: $showStrategicProject) {
-                StrategicProjectInputView { project, phases in
-                    modelContext.insert(project)
-                    for phase in phases {
-                        modelContext.insert(phase)
-                        for session in phase.sessions {
-                            modelContext.insert(session)
-                        }
+                StrategicPlanningChatView()
+                    .onDisappear {
+                        dismiss()
                     }
-                    dismiss()
-                }
             }
         }
     }
