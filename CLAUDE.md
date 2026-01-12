@@ -29,11 +29,65 @@ All future development must follow this branching workflow:
    - Push your branch to origin
    - Create a PR targeting `main`
    - Include a summary of changes
+   - Wait for CI checks to pass
    - Wait for review/approval before merging
 
 6. **After PR is merged:**
    - Delete the feature branch
    - Pull latest main before starting new work
+
+## Continuous Integration (CI)
+
+This project uses GitHub Actions to automatically build and test the app on every PR and push to `main`.
+
+### CI Workflow
+
+- **Trigger**: Runs on every push to `main` and on all pull requests targeting `main`
+- **Environment**: macOS 14 with Xcode 15.2
+- **Platform**: iOS Simulator (iPhone 15, iOS 17.2)
+- **Steps**:
+  1. Checkout code
+  2. Build the project
+  3. Run tests (if available)
+  4. Upload logs on failure
+
+### PR Requirements
+
+**All pull requests MUST pass CI checks before merging.**
+
+If CI fails on your PR:
+1. Review the build logs in the GitHub Actions tab
+2. Fix the issues locally on your feature branch
+3. Commit and push the fixes
+4. CI will automatically re-run
+5. Repeat until all checks pass
+
+### Common Build Issues
+
+- **Missing files**: Ensure all Swift files are added to the Xcode project
+- **Import errors**: Check that all dependencies are properly configured
+- **Signing issues**: CI runs without code signing - don't add signing requirements
+- **API keys**: Don't commit API keys; use environment variables or mock services for tests
+
+### Testing Locally Before Push
+
+To ensure your changes will pass CI, build and test locally:
+
+```bash
+# Clean build
+xcodebuild clean build \
+  -project TouchStone.xcodeproj \
+  -scheme TouchStone \
+  -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.2'
+
+# Run tests
+xcodebuild test \
+  -project TouchStone.xcodeproj \
+  -scheme TouchStone \
+  -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.2'
+```
+
+**Important**: If you're using Claude Code for development, ensure it checks CI status and fixes any failures in a loop until all checks pass successfully.
 
 ## Project Structure
 
