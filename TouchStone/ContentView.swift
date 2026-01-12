@@ -19,9 +19,9 @@ struct ContentView: View {
                     Label("Stones", systemImage: "clock")
                 }
 
-            HistoryView()
+            CalendarView()
                 .tabItem {
-                    Label("History", systemImage: "calendar")
+                    Label("Calendar", systemImage: "calendar")
                 }
 
             SettingsView()
