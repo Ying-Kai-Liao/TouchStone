@@ -73,7 +73,7 @@ struct PhaseAllocationCard: View {
                     onAdjust(-step)
                 } label: {
                     Image(systemName: "minus.circle")
-                        .foregroundStyle(percent <= minPercent ? .secondary : .purple)
+                        .foregroundColor(percent <= minPercent ? .secondary : .purple)
                 }
                 .disabled(percent <= minPercent)
 
@@ -96,7 +96,7 @@ struct PhaseAllocationCard: View {
                     onAdjust(step)
                 } label: {
                     Image(systemName: "plus.circle")
-                        .foregroundStyle(percent >= maxPercent ? .secondary : .purple)
+                        .foregroundColor(percent >= maxPercent ? .secondary : .purple)
                 }
                 .disabled(percent >= maxPercent)
             }
