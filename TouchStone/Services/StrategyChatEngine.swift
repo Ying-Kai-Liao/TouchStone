@@ -215,7 +215,8 @@ actor StrategyChatEngine {
     ) -> (Project, [ProjectPhase]) {
         let project = Project(
             title: title,
-            archetype: archetype
+            archetype: archetype,
+            totalPlannedMinutes: allocation.totalMinutes
         )
 
         var projectPhases: [ProjectPhase] = []

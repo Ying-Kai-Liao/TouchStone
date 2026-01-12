@@ -15,6 +15,7 @@ final class Project {
     var isActive: Bool
     var createdAt: Date
     var archetypeRaw: String?       // Archetype for strategic projects
+    var totalPlannedMinutes: Int    // Total time budget set during planning (in minutes)
 
     @Relationship(deleteRule: .cascade, inverse: \TouchLog.project)
     var touchLogs: [TouchLog] = []
@@ -29,7 +30,8 @@ final class Project {
         softDeadline: Date? = nil,
         isActive: Bool = true,
         createdAt: Date = Date(),
-        archetype: Archetype? = nil
+        archetype: Archetype? = nil,
+        totalPlannedMinutes: Int = 0
     ) {
         self.id = id
         self.title = title
@@ -38,6 +40,7 @@ final class Project {
         self.isActive = isActive
         self.createdAt = createdAt
         self.archetypeRaw = archetype?.rawValue
+        self.totalPlannedMinutes = totalPlannedMinutes
     }
 
     // MARK: - Computed Properties
@@ -54,9 +57,43 @@ final class Project {
         touchLogs.count
     }
 
-    /// Total minutes invested
+    /// Total minutes invested (from touch logs)
     var totalMinutesInvested: Int {
         touchLogs.reduce(0) { $0 + $1.durationMinutes }
+    }
+
+    /// Total planned hours for this project
+    var totalPlannedHours: Int {
+        totalPlannedMinutes / 60
+    }
+
+    /// Completed hours (each touch = 1 hour)
+    var completedHours: Int {
+        totalMinutesInvested / 60
+    }
+
+    /// Remaining hours
+    var remainingHours: Int {
+        max(0, totalPlannedHours - completedHours)
+    }
+
+    /// Hours string like "12/30 hrs" or "12 hrs" for simple projects
+    var hoursString: String {
+        if totalPlannedMinutes > 0 {
+            return "\(completedHours)/\(totalPlannedHours) hrs"
+        } else {
+            return "\(completedHours) hrs"
+        }
+    }
+
+    /// Hours touched today
+    var hoursTouchedToday: Int {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let todayMinutes = touchLogs
+            .filter { calendar.startOfDay(for: $0.timestamp) == today }
+            .reduce(0) { $0 + $1.durationMinutes }
+        return todayMinutes / 60
     }
 
     /// Last touched date

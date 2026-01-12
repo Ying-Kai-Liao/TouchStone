@@ -325,9 +325,13 @@ struct ProjectTouchRow: View {
 
             Spacer()
 
-            // Touch count
-            if project.touchCountToday > 0 {
-                Text("\(project.touchCountToday)x")
+            // Hours display
+            if project.totalPlannedMinutes > 0 {
+                Text(project.hoursString)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if project.hoursTouchedToday > 0 {
+                Text("+\(project.hoursTouchedToday)h today")
                     .font(.caption)
                     .foregroundStyle(.green)
             }
