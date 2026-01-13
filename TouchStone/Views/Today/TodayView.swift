@@ -12,7 +12,6 @@ struct TodayView: View {
     @State private var dayState = DayState()
     @State private var lastTouch: TouchLog?
     @State private var showUndoToast = false
-    @State private var showFocusMode = false
     @State private var focusProject: Project?
     @State private var showAddStone = false
     @State private var showSpeechInput = false
@@ -34,11 +33,9 @@ struct TodayView: View {
             .onAppear { computeDayState() }
             .onChange(of: allStones.count) { computeDayState() }
             .overlay(alignment: .bottom) { undoToast }
-            .sheet(isPresented: $showFocusMode) {
-                if let project = focusProject {
-                    FocusModeView(project: project) {
-                        showFocusMode = false
-                    }
+            .sheet(item: $focusProject) { project in
+                FocusModeView(project: project) {
+                    focusProject = nil
                 }
             }
             .sheet(isPresented: $showAddStone) {
@@ -253,7 +250,6 @@ struct TodayView: View {
 
     private func startFocus(_ project: Project) {
         focusProject = project
-        showFocusMode = true
     }
 }
 
