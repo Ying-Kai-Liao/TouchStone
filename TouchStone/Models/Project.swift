@@ -15,7 +15,7 @@ final class Project {
     var isActive: Bool
     var createdAt: Date
     var archetypeRaw: String?       // Archetype for strategic projects
-    var totalPlannedMinutes: Int    // Total time budget set during planning (in minutes)
+    var totalPlannedMinutes: Int = 0  // Total time budget set during planning (in minutes)
 
     @Relationship(deleteRule: .cascade, inverse: \TouchLog.project)
     var touchLogs: [TouchLog] = []
