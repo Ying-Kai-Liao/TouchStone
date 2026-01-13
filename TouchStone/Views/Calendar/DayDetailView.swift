@@ -154,10 +154,10 @@ struct StoneRowView: View {
                     Text("\(stone.durationMinutes) min")
                         .font(.caption)
 
-                    if stone.recurrencePattern != .none {
+                    if stone.recurrence.type != .none {
                         Image(systemName: "repeat")
                             .font(.caption)
-                        Text(stone.recurrenceLabel)
+                        Text(recurrenceLabel)
                             .font(.caption)
                     }
                 }
@@ -167,6 +167,22 @@ struct StoneRowView: View {
             .padding()
             .background(Color.blue.opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    private var recurrenceLabel: String {
+        switch stone.recurrence.type {
+        case .none: return "One time"
+        case .daily: return "Daily"
+        case .weekdays: return "Weekdays"
+        case .weekends: return "Weekends"
+        case .weekly: return "Weekly"
+        case .custom:
+            if let days = stone.recurrence.customDays {
+                let dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                return days.map { dayLabels[$0 - 1] }.joined(separator: ", ")
+            }
+            return "Custom"
         }
     }
 }
