@@ -104,7 +104,7 @@ struct CalendarView: View {
 
     private func stonesForDay(_ date: Date) -> [StoneEvent] {
         stones.filter { stone in
-            stone.isActive && stone.occursOn(date: date)
+            stone.occursOn(date: date)
         }
     }
 

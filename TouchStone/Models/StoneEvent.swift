@@ -49,7 +49,6 @@ final class StoneEvent {
     // Recurrence
     var recurrenceData: Data?  // Encoded RecurrencePattern
 
-    var isActive: Bool
     var createdAt: Date
 
     init(
@@ -61,7 +60,6 @@ final class StoneEvent {
         endMinute: Int = 0,
         specificDate: Date? = nil,
         recurrence: RecurrencePattern = .none,
-        isActive: Bool = true,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -72,7 +70,6 @@ final class StoneEvent {
         self.endMinute = endMinute
         self.specificDate = specificDate
         self.recurrenceData = try? JSONEncoder().encode(recurrence)
-        self.isActive = isActive
         self.createdAt = createdAt
     }
 
@@ -116,8 +113,6 @@ final class StoneEvent {
 
     /// Check if this event occurs on a given date
     func occursOn(date: Date) -> Bool {
-        guard isActive else { return false }
-
         let calendar = Calendar.current
         let weekday = calendar.component(.weekday, from: date)  // 1 = Sunday
 

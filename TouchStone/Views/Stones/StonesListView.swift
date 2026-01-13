@@ -36,30 +36,11 @@ struct StonesListView: View {
 
     private var stonesList: some View {
         List {
-            Section {
-                ForEach(stones.filter { $0.isActive }) { stone in
-                    StoneEventRow(stone: stone)
-                }
-                .onDelete { indexSet in
-                    deleteStones(at: indexSet, from: stones.filter { $0.isActive })
-                }
-            } header: {
-                if !stones.filter({ $0.isActive }).isEmpty {
-                    Text("Active")
-                }
+            ForEach(stones) { stone in
+                StoneEventRow(stone: stone)
             }
-
-            Section {
-                ForEach(stones.filter { !$0.isActive }) { stone in
-                    StoneEventRow(stone: stone)
-                }
-                .onDelete { indexSet in
-                    deleteStones(at: indexSet, from: stones.filter { !$0.isActive })
-                }
-            } header: {
-                if !stones.filter({ !$0.isActive }).isEmpty {
-                    Text("Inactive")
-                }
+            .onDelete { indexSet in
+                deleteStones(at: indexSet, from: stones)
             }
         }
     }
@@ -84,32 +65,25 @@ struct StonesListView: View {
 }
 
 struct StoneEventRow: View {
-    @Bindable var stone: StoneEvent
+    let stone: StoneEvent
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(stone.title)
-                    .fontWeight(.medium)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(stone.title)
+                .fontWeight(.medium)
 
-                HStack(spacing: 8) {
-                    Text(stone.timeRangeString)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Text(stone.timeRangeString)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
-                    Text("•")
-                        .foregroundStyle(.tertiary)
+                Text("•")
+                    .foregroundStyle(.tertiary)
 
-                    Text(recurrenceLabel)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Text(recurrenceLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-
-            Spacer()
-
-            Toggle("", isOn: $stone.isActive)
-                .labelsHidden()
         }
         .padding(.vertical, 4)
     }

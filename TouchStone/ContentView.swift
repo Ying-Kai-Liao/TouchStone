@@ -14,11 +14,6 @@ struct ContentView: View {
                     Label("Projects", systemImage: "folder")
                 }
 
-            StonesListView()
-                .tabItem {
-                    Label("Stones", systemImage: "clock")
-                }
-
             CalendarView()
                 .tabItem {
                     Label("Calendar", systemImage: "calendar")
