@@ -53,10 +53,10 @@ struct SpeechStoneInputView: View {
                 await speechRecognizer.requestAuthorization()
             }
             .sheet(isPresented: $showManualForm) {
-                StoneEventFormView { stone in
+                StoneEventFormView(onSave: { stone in
                     modelContext.insert(stone)
                     dismiss()
-                }
+                })
             }
         }
     }

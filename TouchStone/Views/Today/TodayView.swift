@@ -43,10 +43,10 @@ struct TodayView: View {
                 }
             }
             .sheet(isPresented: $showAddStone) {
-                StoneEventFormView { stone in
+                StoneEventFormView(onSave: { stone in
                     modelContext.insert(stone)
                     computeDayState()
-                }
+                })
             }
             .sheet(isPresented: $showSpeechInput) {
                 SpeechStoneInputView()
