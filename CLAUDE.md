@@ -30,7 +30,7 @@ All future development must follow this branching workflow:
    - Create a PR targeting `main`
    - Include a summary of changes
    - Wait for CI checks to pass
-   - Wait for review/approval before merging
+   - **Do NOT auto-merge** - Wait for user to explicitly say "merge" or "pr and merge"
 
 6. **Before merging a PR:**
    - Always run `xcodebuild` to verify the build passes
