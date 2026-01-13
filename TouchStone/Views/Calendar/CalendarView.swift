@@ -7,6 +7,7 @@ struct CalendarView: View {
     @Query private var touchLogs: [TouchLog]
 
     @State private var selectedMonth = Date()
+    @State private var showingDayDetail = false
     @State private var showingAddStone = false
     @State private var selectedDate: Date?
 
@@ -34,6 +35,21 @@ struct CalendarView: View {
                         Text("Today")
                             .fontWeight(.medium)
                     }
+                }
+            }
+            .sheet(isPresented: $showingDayDetail) {
+                if let date = selectedDate {
+                    DayDetailView(
+                        date: date,
+                        stones: stonesForDay(date),
+                        onAddStone: {
+                            showingDayDetail = false
+                            // Small delay to allow first sheet to dismiss
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showingAddStone = true
+                            }
+                        }
+                    )
                 }
             }
             .sheet(isPresented: $showingAddStone) {
@@ -111,7 +127,7 @@ struct CalendarView: View {
                     onTap: {
                         if dayData.isCurrentMonth {
                             selectedDate = dayData.date
-                            showingAddStone = true
+                            showingDayDetail = true
                         }
                     }
                 )
