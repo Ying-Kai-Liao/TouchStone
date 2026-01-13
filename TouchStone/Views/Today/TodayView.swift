@@ -49,7 +49,7 @@ struct TodayView: View {
                 })
             }
             .sheet(isPresented: $showSpeechInput) {
-                SpeechStoneInputView()
+                SpeechStoneInputView(initialDate: nil)
             }
         }
     }

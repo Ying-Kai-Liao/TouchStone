@@ -8,7 +8,6 @@ struct CalendarView: View {
 
     @State private var selectedMonth = Date()
     @State private var showingAddStone = false
-    @State private var showingSpeechInput = false
     @State private var selectedDate: Date?
 
     private let calendar = Calendar.current
@@ -26,17 +25,6 @@ struct CalendarView: View {
             }
             .navigationTitle("Calendar")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showingSpeechInput = true
-                    } label: {
-                        Image(systemName: "mic.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.blue)
-                            .symbolRenderingMode(.hierarchical)
-                    }
-                }
-
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         withAnimation(.spring(response: 0.3)) {
@@ -49,12 +37,7 @@ struct CalendarView: View {
                 }
             }
             .sheet(isPresented: $showingAddStone) {
-                StoneEventFormView(onSave: { stone in
-                    modelContext.insert(stone)
-                }, initialDate: selectedDate)
-            }
-            .sheet(isPresented: $showingSpeechInput) {
-                SpeechStoneInputView()
+                SpeechStoneInputView(initialDate: selectedDate)
             }
         }
     }
