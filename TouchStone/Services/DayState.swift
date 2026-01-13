@@ -10,13 +10,34 @@ class DayState {
     let date: Date
     private let calendar = Calendar.current
 
+    // Daily productive capacity (hardcoded for now, settings can come later)
+    private let dailyProductiveMinutes: Int = 360  // 6 hours
+
     // Computed data
     private(set) var stoneInstances: [StoneEventInstance] = []
     private(set) var freeSlots: [TimeSlot] = []
     private(set) var dayMessage: String = ""
+    private(set) var minutesTouchedToday: Int = 0
 
     init(date: Date = Date()) {
         self.date = calendar.startOfDay(for: date)
+    }
+
+    // MARK: - Capacity Tracking
+
+    /// Total minutes of stones (fixed events) today
+    var stoneMinutesToday: Int {
+        stoneInstances.reduce(0) { $0 + $1.event.durationMinutes }
+    }
+
+    /// Available minutes for project work (capacity - stones)
+    var availableMinutes: Int {
+        max(0, dailyProductiveMinutes - stoneMinutesToday)
+    }
+
+    /// Whether user has reached their daily productive capacity
+    var hasReachedCapacity: Bool {
+        minutesTouchedToday >= availableMinutes && availableMinutes > 0
     }
 
     // MARK: - Compute Day State
@@ -31,7 +52,13 @@ class DayState {
         // 2. Calculate free time slots
         freeSlots = calculateFreeSlots()
 
-        // 3. Generate day message based on load
+        // 3. Calculate total minutes touched today across all projects
+        let today = calendar.startOfDay(for: Date())
+        minutesTouchedToday = projects.flatMap { $0.touchLogs }
+            .filter { calendar.startOfDay(for: $0.timestamp) == today }
+            .reduce(0) { $0 + $1.durationMinutes }
+
+        // 4. Generate day message based on load and capacity
         dayMessage = generateDayMessage()
     }
 
@@ -65,20 +92,14 @@ class DayState {
     // MARK: - Day Message Generation
 
     private func generateDayMessage() -> String {
-        let totalStoneMinutes = stoneInstances.reduce(0) { $0 + $1.event.durationMinutes }
-        let freeMinutes = freeSlots.reduce(0) { $0 + $1.durationMinutes }
-
-        // Check current time of day
-        let hour = calendar.component(.hour, from: Date())
-        let timeOfDay: String
-        switch hour {
-        case 5..<12: timeOfDay = "morning"
-        case 12..<17: timeOfDay = "afternoon"
-        case 17..<21: timeOfDay = "evening"
-        default: timeOfDay = "night"
+        // Check if user has done enough for today
+        if hasReachedCapacity {
+            return capacityReachedMessage()
         }
 
-        // Generate message based on load
+        let totalStoneMinutes = stoneInstances.reduce(0) { $0 + $1.event.durationMinutes }
+
+        // Generate message based on stone load
         if stoneInstances.isEmpty {
             return "The day is open. You have space to think."
         } else if totalStoneMinutes < 120 {
@@ -88,6 +109,19 @@ class DayState {
         } else {
             return "A full day. Be kind to yourself."
         }
+    }
+
+    private func capacityReachedMessage() -> String {
+        let messages = [
+            "You've done meaningful work today. Time to recharge.",
+            "Good progress today. Your mind needs rest too.",
+            "You've touched enough today. Go easy on yourself.",
+            "Solid day. Consider stepping away for a bit.",
+            "You've put in good work. Take care of yourself."
+        ]
+        // Use a seed based on today's date for consistent daily message
+        let dayOfYear = calendar.ordinality(of: .day, in: .year, for: date) ?? 0
+        return messages[dayOfYear % messages.count]
     }
 
     // MARK: - Current Time Context
