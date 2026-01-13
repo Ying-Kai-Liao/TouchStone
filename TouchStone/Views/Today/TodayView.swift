@@ -14,6 +14,7 @@ struct TodayView: View {
     @State private var showUndoToast = false
     @State private var showAddStone = false
     @State private var showSpeechInput = false
+    @State private var focusProject: Project?
 
     var body: some View {
         NavigationStack {
@@ -41,6 +42,11 @@ struct TodayView: View {
             }
             .sheet(isPresented: $showSpeechInput) {
                 SpeechStoneInputView(initialDate: nil)
+            }
+            .sheet(item: $focusProject) { project in
+                FocusModeView(project: project) {
+                    focusProject = nil
+                }
             }
         }
     }
@@ -160,6 +166,8 @@ struct TodayView: View {
                     ForEach(dayState.suggestedSessions) { session in
                         SuggestedSessionRow(session: session) {
                             touchProject(session.project)
+                        } onFocus: {
+                            focusProject = session.project
                         }
                     }
                 }
@@ -187,6 +195,8 @@ struct TodayView: View {
                     ForEach(activeProjects) { project in
                         ProjectTouchRow(project: project) {
                             touchProject(project)
+                        } onFocus: {
+                            focusProject = project
                         }
                     }
                 }
@@ -296,57 +306,67 @@ struct StoneRow: View {
 
 // MARK: - Project Touch Row
 
-/// Simplified touch row - the entire block is tappable.
-/// Shows project name, phase name, and touched times.
+/// Touch row with tap to touch and long press or button for focus mode.
 struct ProjectTouchRow: View {
     let project: Project
     let onTouch: () -> Void
+    let onFocus: () -> Void
 
     var body: some View {
-        Button(action: onTouch) {
-            HStack(spacing: 12) {
-                // Project info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(project.title)
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.primary)
+        HStack(spacing: 0) {
+            // Main tappable area
+            Button(action: onTouch) {
+                HStack(spacing: 12) {
+                    // Project info
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(project.title)
+                            .font(.body)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.primary)
 
-                    // Phase name
-                    if project.hasStrategicPlan {
-                        if let phase = project.activePhase {
-                            Text(phase.title)
+                        // Phase name
+                        if project.hasStrategicPlan {
+                            if let phase = project.activePhase {
+                                Text(phase.title)
+                                    .font(.caption)
+                                    .foregroundStyle(.purple)
+                            }
+                        } else if let phase = project.currentPhase {
+                            Text(phase)
                                 .font(.caption)
-                                .foregroundStyle(.purple)
+                                .foregroundStyle(.secondary)
                         }
-                    } else if let phase = project.currentPhase {
-                        Text(phase)
+                    }
+
+                    Spacer()
+
+                    // Touched times today
+                    let touchCount = project.touchCountToday
+                    if touchCount > 0 {
+                        Text("\(touchCount)x today")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.green)
                     }
                 }
-
-                Spacer()
-
-                // Touched times today
-                let touchCount = project.touchCountToday
-                if touchCount > 0 {
-                    Text("\(touchCount)x today")
-                        .font(.caption)
-                        .foregroundStyle(.green)
-                }
-
-                // Touch indicator
-                Image(systemName: "hand.tap")
-                    .font(.caption)
-                    .foregroundStyle(.blue.opacity(0.6))
+                .padding(.leading, 16)
+                .padding(.vertical, 12)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .buttonStyle(.plain)
+
+            // Focus button
+            Button(action: onFocus) {
+                Image(systemName: "scope")
+                    .font(.subheadline)
+                    .foregroundStyle(.orange)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .onLongPressGesture {
+            onFocus()
+        }
     }
 }
 
