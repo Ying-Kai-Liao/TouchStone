@@ -48,8 +48,8 @@ This project uses GitHub Actions to automatically build and test the app on ever
 ### CI Workflow
 
 - **Trigger**: Runs on every push to `main` and on all pull requests targeting `main`
-- **Environment**: macOS 15 with latest available Xcode (16.x preferred for objectVersion 77 support)
-- **Platform**: iOS Simulator (iPhone 16, latest iOS SDK)
+- **Environment**: macOS 14 with Xcode 16.x (required for objectVersion 77 support)
+- **Platform**: iOS Simulator (Any available device)
 - **Steps**:
   1. Checkout code
   2. Build the project
@@ -84,13 +84,13 @@ To ensure your changes will pass CI, build and test locally:
 xcodebuild clean build \
   -project TouchStone.xcodeproj \
   -scheme TouchStone \
-  -destination 'platform=iOS Simulator,name=iPhone 16'
+  -destination 'platform=iOS Simulator,name=iPhone 16' # or any available simulator
 
 # Run tests
 xcodebuild test \
   -project TouchStone.xcodeproj \
   -scheme TouchStone \
-  -destination 'platform=iOS Simulator,name=iPhone 16'
+  -destination 'platform=iOS Simulator,name=iPhone 16' # or any available simulator
 ```
 
 **Important**: If you're using Claude Code for development, ensure it checks CI status and fixes any failures in a loop until all checks pass successfully.
