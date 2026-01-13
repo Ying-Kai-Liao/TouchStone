@@ -184,10 +184,10 @@ final class Project {
         phases.flatMap { $0.sessions }.count
     }
 
-    /// Progress fraction (0.0 to 1.0)
+    /// Progress fraction (0.0 to 1.0) based on hours
     var progress: Double {
-        guard totalSessionCount > 0 else { return 0 }
-        return Double(completedSessionCount) / Double(totalSessionCount)
+        guard totalPlannedMinutes > 0 else { return 0 }
+        return min(1.0, Double(totalMinutesInvested) / Double(totalPlannedMinutes))
     }
 
     /// Total estimated minutes for all sessions
