@@ -39,6 +39,7 @@ final class PlannedSession {
     var statusRaw: String                // SessionStatus raw value
     var completedAt: Date?
     var createdAt: Date
+    var isManuallyEdited: Bool = false   // Track if user manually modified this session
 
     var phase: ProjectPhase?
     var completedTouchLog: TouchLog?     // Link when completed

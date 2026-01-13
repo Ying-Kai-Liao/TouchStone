@@ -9,6 +9,17 @@ struct ProjectDetailView: View {
     @State private var showingLogSheet = false
 
     var body: some View {
+        // Route to strategic view for projects with phases
+        if project.hasStrategicPlan {
+            StrategicProjectDetailView(project: project)
+        } else {
+            simpleProjectView
+        }
+    }
+
+    // MARK: - Simple Project View (no strategic plan)
+
+    private var simpleProjectView: some View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
