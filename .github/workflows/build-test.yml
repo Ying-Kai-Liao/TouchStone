@@ -39,6 +39,12 @@ jobs:
       - name: Show available SDKs
         run: xcodebuild -showsdks
 
+      - name: List available simulators
+        run: xcrun simctl list devices available
+
+      - name: List available runtimes
+        run: xcrun simctl list runtimes
+
       - name: Build project
         run: |
           set -o pipefail
