@@ -4,8 +4,7 @@ import SwiftData
 struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
 
-    @Query(filter: #Predicate<StoneEvent> { $0.isActive })
-    private var allStones: [StoneEvent]
+    @Query private var allStones: [StoneEvent]
 
     @Query(filter: #Predicate<Project> { $0.isActive }, sort: \Project.createdAt, order: .reverse)
     private var activeProjects: [Project]
