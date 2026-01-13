@@ -187,7 +187,7 @@ struct DayCell: View {
                     // Day number
                     Text("\(day)")
                         .font(.system(size: 18, weight: isToday ? .bold : .semibold))
-                        .foregroundStyle(isToday ? .white : (dayData.isCurrentMonth ? .primary : .tertiary))
+                        .foregroundStyle(isToday ? .white : (dayData.isCurrentMonth ? .primary : .secondary.opacity(0.3)))
                         .frame(width: 32, height: 32)
                         .background(
                             Circle()
