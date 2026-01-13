@@ -19,6 +19,7 @@ class DayState {
     private(set) var stoneInstances: [StoneEventInstance] = []
     private(set) var freeSlots: [TimeSlot] = []
     private(set) var suggestedSessions: [SuggestedSession] = []
+    private(set) var workflowItems: [WorkflowItem] = []
     private(set) var dayMessage: String = ""
     private(set) var minutesTouchedToday: Int = 0
 
@@ -64,7 +65,10 @@ class DayState {
         // 4. Generate suggested sessions (pour water into slots)
         suggestedSessions = generateSuggestedSessions(projects: projects)
 
-        // 5. Generate day message based on load and capacity
+        // 5. Generate unified workflow items (merge stones and waters)
+        workflowItems = generateWorkflowItems(projects: projects)
+
+        // 6. Generate day message based on load and capacity
         dayMessage = generateDayMessage()
     }
 
@@ -130,6 +134,103 @@ class DayState {
         }
 
         return sessions
+    }
+
+    // MARK: - Workflow Items Generation
+
+    private func generateWorkflowItems(projects: [Project]) -> [WorkflowItem] {
+        var items: [WorkflowItem] = []
+        let now = Date()
+
+        // 1. Add all stone instances as workflow items
+        for instance in stoneInstances {
+            let status: WorkflowItemStatus
+            if instance.endTime <= now {
+                status = .completed
+            } else if instance.startTime <= now && now < instance.endTime {
+                status = .inProgress
+            } else {
+                status = .upcoming
+            }
+
+            let item = WorkflowItem(
+                type: .stone(instance),
+                startTime: instance.startTime,
+                endTime: instance.endTime,
+                status: status
+            )
+            items.append(item)
+        }
+
+        // 2. Add suggested sessions as workflow items with time slots
+        for session in suggestedSessions {
+            let sessionEnd = session.timeSlot.start.addingTimeInterval(Double(session.suggestedMinutes) * 60)
+            let status: WorkflowItemStatus = .suggested
+
+            let item = WorkflowItem(
+                type: .water(session),
+                startTime: session.timeSlot.start,
+                endTime: sessionEnd,
+                status: status
+            )
+            items.append(item)
+        }
+
+        // 3. Sort all items chronologically
+        items.sort { $0.startTime < $1.startTime }
+
+        // 4. Insert breathing spaces and flow prep between items
+        items = insertTransitionItems(items: items)
+
+        return items
+    }
+
+    private func insertTransitionItems(items: [WorkflowItem]) -> [WorkflowItem] {
+        guard !items.isEmpty else { return items }
+
+        var result: [WorkflowItem] = []
+        let minBreathingSpace = 15 // Minimum minutes for breathing space
+        let flowPrepDuration = 15  // Minutes for flow prep
+
+        for (index, item) in items.enumerated() {
+            // Check gap before first water session
+            if index > 0 {
+                let previousItem = items[index - 1]
+                let gapMinutes = Int(item.startTime.timeIntervalSince(previousItem.endTime) / 60)
+
+                // Add breathing space if there's a significant gap
+                if gapMinutes >= minBreathingSpace && gapMinutes <= 60 {
+                    let breathingItem = WorkflowItem(
+                        type: .breathingSpace(minutes: min(gapMinutes, 30)),
+                        startTime: previousItem.endTime,
+                        endTime: item.startTime,
+                        status: .suggested
+                    )
+                    result.append(breathingItem)
+                }
+            }
+
+            // Add flow prep before water sessions (if there's room)
+            if item.isWater && index > 0 {
+                let previousItem = result.last ?? items[index - 1]
+                let gapMinutes = Int(item.startTime.timeIntervalSince(previousItem.endTime) / 60)
+
+                if gapMinutes >= flowPrepDuration + 5 {
+                    let prepStart = item.startTime.addingTimeInterval(-Double(flowPrepDuration) * 60)
+                    let prepItem = WorkflowItem(
+                        type: .flowPrep(minutes: flowPrepDuration),
+                        startTime: prepStart,
+                        endTime: item.startTime,
+                        status: .suggested
+                    )
+                    result.append(prepItem)
+                }
+            }
+
+            result.append(item)
+        }
+
+        return result
     }
 
     // MARK: - Free Time Calculation

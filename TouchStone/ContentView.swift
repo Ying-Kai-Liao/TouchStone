@@ -4,19 +4,19 @@ import SwiftData
 struct ContentView: View {
     var body: some View {
         TabView {
-            TodayView()
+            TodayFlowView()
                 .tabItem {
-                    Label("Today", systemImage: "sun.max")
+                    Label("Flow", systemImage: "drop.fill")
                 }
 
             ProjectsListView()
                 .tabItem {
-                    Label("Projects", systemImage: "folder")
+                    Label("Plan", systemImage: "square.grid.2x2")
                 }
 
             CalendarView()
                 .tabItem {
-                    Label("Calendar", systemImage: "calendar")
+                    Label("Stats", systemImage: "chart.bar.fill")
                 }
 
             SettingsView()
