@@ -12,7 +12,6 @@ struct TodayView: View {
     @State private var dayState = DayState()
     @State private var lastTouch: TouchLog?
     @State private var showUndoToast = false
-    @State private var focusProject: Project?
     @State private var showAddStone = false
     @State private var showSpeechInput = false
 
@@ -22,6 +21,7 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     dateHeader
                     realitySection
+                    suggestedSessionsSection
                     dayMessageSection
                     projectsSection
                 }
@@ -33,11 +33,6 @@ struct TodayView: View {
             .onAppear { computeDayState() }
             .onChange(of: allStones.count) { computeDayState() }
             .overlay(alignment: .bottom) { undoToast }
-            .sheet(item: $focusProject) { project in
-                FocusModeView(project: project) {
-                    focusProject = nil
-                }
-            }
             .sheet(isPresented: $showAddStone) {
                 StoneEventFormView(onSave: { stone in
                     modelContext.insert(stone)
@@ -144,15 +139,43 @@ struct TodayView: View {
             .padding(.vertical, 8)
     }
 
+    // MARK: - Suggested Sessions Section
+
+    @ViewBuilder
+    private var suggestedSessionsSection: some View {
+        if !dayState.suggestedSessions.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "wand.and.stars")
+                        .foregroundStyle(.purple)
+                    Text("Suggested workflow")
+                        .font(.headline)
+                    Spacer()
+                    Text("optional")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+
+                VStack(spacing: 8) {
+                    ForEach(dayState.suggestedSessions) { session in
+                        SuggestedSessionRow(session: session) {
+                            touchProject(session.project)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Projects Section
 
     private var projectsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Things worth touching today")
+                Text("All projects")
                     .font(.headline)
                 Spacer()
-                Text("no need to be exact")
+                Text("tap to touch")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
@@ -163,10 +186,7 @@ struct TodayView: View {
                 VStack(spacing: 8) {
                     ForEach(activeProjects) { project in
                         ProjectTouchRow(project: project) {
-                            // All touches are instant (< 2 sec) - per guardrails
                             touchProject(project)
-                        } onFocus: {
-                            startFocus(project)
                         }
                     }
                 }
@@ -247,10 +267,6 @@ struct TodayView: View {
             }
         }
     }
-
-    private func startFocus(_ project: Project) {
-        focusProject = project
-    }
 }
 
 // MARK: - Stone Row
@@ -280,82 +296,57 @@ struct StoneRow: View {
 
 // MARK: - Project Touch Row
 
+/// Simplified touch row - the entire block is tappable.
+/// Shows project name, phase name, and touched times.
 struct ProjectTouchRow: View {
     let project: Project
     let onTouch: () -> Void
-    let onFocus: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Project info (simplified)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
+        Button(action: onTouch) {
+            HStack(spacing: 12) {
+                // Project info
+                VStack(alignment: .leading, spacing: 4) {
                     Text(project.title)
                         .font(.body)
                         .fontWeight(.medium)
+                        .foregroundStyle(.primary)
 
-                    if project.hasStrategicPlan, let archetype = project.archetype {
-                        Text(archetype.displayName)
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.purple.opacity(0.15))
-                            .clipShape(Capsule())
-                    }
-                }
-
-                // Phase name only (no progress tracking - per guardrails)
-                if project.hasStrategicPlan {
-                    if let phase = project.activePhase {
-                        Text(phase.title)
+                    // Phase name
+                    if project.hasStrategicPlan {
+                        if let phase = project.activePhase {
+                            Text(phase.title)
+                                .font(.caption)
+                                .foregroundStyle(.purple)
+                        }
+                    } else if let phase = project.currentPhase {
+                        Text(phase)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                } else if let phase = project.currentPhase {
-                    Text(phase)
+                }
+
+                Spacer()
+
+                // Touched times today
+                let touchCount = project.touchCountToday
+                if touchCount > 0 {
+                    Text("\(touchCount)x today")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.green)
                 }
-            }
 
-            Spacer()
-
-            // Hours display
-            if project.totalPlannedMinutes > 0 {
-                Text(project.hoursString)
+                // Touch indicator
+                Image(systemName: "hand.tap")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else if project.hoursTouchedToday > 0 {
-                Text("+\(project.hoursTouchedToday)h today")
-                    .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(.blue.opacity(0.6))
             }
-
-            // Action menu
-            Menu {
-                Button {
-                    onTouch()
-                } label: {
-                    Label("Log Touch", systemImage: "hand.tap")
-                }
-
-                Button {
-                    onFocus()
-                } label: {
-                    Label("Focus Mode", systemImage: "scope")
-                }
-            } label: {
-                Image(systemName: "hand.tap.fill")
-                    .font(.title3)
-                    .foregroundStyle(.blue)
-                    .padding(8)
-                    .background(Color.blue.opacity(0.1))
-                    .clipShape(Circle())
-            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
-        .padding()
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .buttonStyle(.plain)
     }
 }
 
