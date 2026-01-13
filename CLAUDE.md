@@ -48,8 +48,8 @@ This project uses GitHub Actions to automatically build and test the app on ever
 ### CI Workflow
 
 - **Trigger**: Runs on every push to `main` and on all pull requests targeting `main`
-- **Environment**: macOS 14 with Xcode 15.2
-- **Platform**: iOS Simulator (iPhone 15, iOS 17.2)
+- **Environment**: macOS 14 with Xcode 16.x (required for objectVersion 77 support)
+- **Platform**: iOS Simulator (Any available device)
 - **Steps**:
   1. Checkout code
   2. Build the project
@@ -73,6 +73,7 @@ If CI fails on your PR:
 - **Import errors**: Check that all dependencies are properly configured
 - **Signing issues**: CI runs without code signing - don't add signing requirements
 - **API keys**: Don't commit API keys; use environment variables or mock services for tests
+- **Xcode version**: This project uses objectVersion 77 (Xcode 15+). If you see "didn't find classname for 'isa' key" errors, ensure you're using Xcode 15.3 or later
 
 ### Testing Locally Before Push
 
@@ -83,13 +84,13 @@ To ensure your changes will pass CI, build and test locally:
 xcodebuild clean build \
   -project TouchStone.xcodeproj \
   -scheme TouchStone \
-  -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.2'
+  -destination 'platform=iOS Simulator,name=iPhone 16' # or any available simulator
 
 # Run tests
 xcodebuild test \
   -project TouchStone.xcodeproj \
   -scheme TouchStone \
-  -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.2'
+  -destination 'platform=iOS Simulator,name=iPhone 16' # or any available simulator
 ```
 
 **Important**: If you're using Claude Code for development, ensure it checks CI status and fixes any failures in a loop until all checks pass successfully.
