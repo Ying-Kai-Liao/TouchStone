@@ -32,7 +32,12 @@ All future development must follow this branching workflow:
    - Wait for CI checks to pass
    - Wait for review/approval before merging
 
-6. **After PR is merged:**
+6. **Before merging a PR:**
+   - Always run `xcodebuild` to verify the build passes
+   - Test on a simulator to catch runtime errors (especially SwiftData migrations)
+   - Never merge a PR without confirming the build succeeds
+
+7. **After PR is merged:**
    - Delete the feature branch
    - Pull latest main before starting new work
 

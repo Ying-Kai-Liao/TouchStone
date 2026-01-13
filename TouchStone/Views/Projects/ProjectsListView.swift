@@ -112,29 +112,33 @@ struct ProjectRow: View {
                 }
 
                 HStack(spacing: 8) {
+                    // Phase name
                     if project.hasStrategicPlan {
                         if let phase = project.activePhase {
                             Text(phase.title)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        Text(project.progressString)
-                            .font(.caption)
-                            .foregroundStyle(Color.purple)
                     } else if let phase = project.currentPhase {
                         Text(phase)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
 
-                    if project.totalTouchCount > 0 {
-                        Text("\(project.totalTouchCount) touches")
+                    // Hours progress
+                    if project.totalPlannedMinutes > 0 {
+                        Text(project.hoursString)
+                            .font(.caption)
+                            .foregroundStyle(Color.purple)
+                    } else if project.completedHours > 0 {
+                        Text("\(project.completedHours) hrs")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                     }
                 }
 
-                if project.hasStrategicPlan && project.totalSessionCount > 0 {
+                // Hours-based progress bar
+                if project.totalPlannedMinutes > 0 {
                     ProgressView(value: project.progress)
                         .tint(.purple)
                 }
