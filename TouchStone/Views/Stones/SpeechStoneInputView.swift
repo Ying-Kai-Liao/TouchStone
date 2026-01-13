@@ -5,6 +5,8 @@ struct SpeechStoneInputView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
+    let initialDate: Date?
+
     @State private var speechRecognizer = SpeechRecognizer()
     @State private var parsedStone: SpeechParser.ParsedStone?
     @State private var showManualForm = false
@@ -16,6 +18,10 @@ struct SpeechStoneInputView: View {
     @State private var endHour: Int = 10
     @State private var endMinute: Int = 0
     @State private var recurrence: RecurrenceType = .none
+
+    init(initialDate: Date? = nil) {
+        self.initialDate = initialDate
+    }
 
     var body: some View {
         NavigationStack {
@@ -53,10 +59,10 @@ struct SpeechStoneInputView: View {
                 await speechRecognizer.requestAuthorization()
             }
             .sheet(isPresented: $showManualForm) {
-                StoneEventFormView { stone in
+                StoneEventFormView(onSave: { stone in
                     modelContext.insert(stone)
                     dismiss()
-                }
+                }, initialDate: initialDate)
             }
         }
     }
@@ -289,7 +295,7 @@ struct SpeechStoneInputView: View {
             startMinute: startMinute,
             endHour: endHour,
             endMinute: endMinute,
-            specificDate: recurrence == .none ? Date() : nil,
+            specificDate: recurrence == .none ? (initialDate ?? Date()) : nil,
             recurrence: RecurrencePattern(type: recurrence)
         )
 
@@ -300,6 +306,6 @@ struct SpeechStoneInputView: View {
 }
 
 #Preview {
-    SpeechStoneInputView()
+    SpeechStoneInputView(initialDate: nil)
         .modelContainer(for: StoneEvent.self, inMemory: true)
 }

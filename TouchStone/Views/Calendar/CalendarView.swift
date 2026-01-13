@@ -2,77 +2,139 @@ import SwiftUI
 import SwiftData
 
 struct CalendarView: View {
+    @Environment(\.modelContext) private var modelContext
     @Query private var stones: [StoneEvent]
     @Query private var touchLogs: [TouchLog]
 
     @State private var selectedMonth = Date()
+    @State private var showingDayDetail = false
+    @State private var showingAddStone = false
+    @State private var selectedDate: Date?
 
     private let calendar = Calendar.current
-    private let daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    private let daysOfWeek = ["S", "M", "T", "W", "T", "F", "S"]
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                monthNavigationHeader
-                weekdayHeader
-                calendarGrid
+            ScrollView {
+                VStack(spacing: 16) {
+                    monthNavigationHeader
+                    weekdayHeader
+                    calendarGrid
+                }
+                .padding(.vertical)
             }
             .navigationTitle("Calendar")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            selectedMonth = Date()
+                        }
+                    } label: {
+                        Text("Today")
+                            .fontWeight(.medium)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingDayDetail) {
+                if let date = selectedDate {
+                    DayDetailView(
+                        date: date,
+                        stones: stonesForDay(date),
+                        onAddStone: {
+                            showingDayDetail = false
+                            // Small delay to allow first sheet to dismiss
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showingAddStone = true
+                            }
+                        }
+                    )
+                }
+            }
+            .sheet(isPresented: $showingAddStone) {
+                SpeechStoneInputView(initialDate: selectedDate)
+            }
         }
     }
 
     private var monthNavigationHeader: some View {
-        HStack {
-            Button {
-                selectedMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.title3)
-            }
+        VStack(spacing: 8) {
+            HStack(spacing: 16) {
+                Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        selectedMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.title3)
+                        .foregroundStyle(.primary)
+                }
 
-            Spacer()
+                Spacer()
 
-            Text(monthYearFormatter.string(from: selectedMonth))
-                .font(.title2.bold())
+                VStack(spacing: 4) {
+                    Text(monthYearFormatter.string(from: selectedMonth))
+                        .font(.title2.bold())
+                        .foregroundStyle(.primary)
 
-            Spacer()
+                    Text("CALENDAR VIEW")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.blue)
+                        .tracking(1.2)
+                }
 
-            Button {
-                selectedMonth = calendar.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.title3)
+                Spacer()
+
+                Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        selectedMonth = calendar.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.title3)
+                        .foregroundStyle(.primary)
+                }
             }
         }
-        .padding()
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
     }
 
     private var weekdayHeader: some View {
         HStack(spacing: 0) {
             ForEach(daysOfWeek, id: \.self) { day in
                 Text(day)
-                    .font(.caption.bold())
+                    .font(.callout.bold())
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
             }
         }
-        .padding(.horizontal)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 16)
     }
 
     private var calendarGrid: some View {
         let days = generateCalendarDays()
 
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 8) {
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 7), spacing: 12) {
             ForEach(days) { dayData in
                 DayCell(
                     dayData: dayData,
                     stones: stonesForDay(dayData.date),
-                    touchCount: touchCountForDay(dayData.date)
+                    touchCount: touchCountForDay(dayData.date),
+                    onTap: {
+                        if dayData.isCurrentMonth {
+                            selectedDate = dayData.date
+                            showingDayDetail = true
+                        }
+                    }
                 )
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
     }
 
     private func generateCalendarDays() -> [DayData] {
@@ -137,70 +199,79 @@ struct DayCell: View {
     let dayData: DayData
     let stones: [StoneEvent]
     let touchCount: Int
+    let onTap: () -> Void
 
     private let calendar = Calendar.current
 
     var body: some View {
-        VStack(spacing: 4) {
-            if let day = dayData.day {
-                Text("\(day)")
-                    .font(.system(size: 16))
-                    .fontWeight(isToday ? .bold : .regular)
-                    .foregroundStyle(dayData.isCurrentMonth ? .primary : .tertiary)
-                    .frame(height: 24)
+        Button(action: onTap) {
+            VStack(spacing: 0) {
+                if let day = dayData.day {
+                    Spacer()
 
-                // Stone tags container
-                VStack(spacing: 2) {
-                    ForEach(stones.prefix(3)) { stone in
-                        Text(stone.title)
-                            .font(.system(size: 8))
-                            .lineLimit(1)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                            .background(Color.blue.opacity(0.2))
-                            .foregroundStyle(.blue)
-                            .cornerRadius(4)
-                    }
+                    // Day number
+                    Text("\(day)")
+                        .font(.system(size: 20, weight: isToday ? .bold : .semibold))
+                        .foregroundStyle(isToday ? .white : (dayData.isCurrentMonth ? .primary : .secondary.opacity(0.3)))
+                        .frame(width: 36, height: 36)
+                        .background(
+                            Circle()
+                                .fill(isToday ? Color.accentColor : Color.clear)
+                        )
 
-                    if stones.count > 3 {
-                        Text("+\(stones.count - 3)")
-                            .font(.system(size: 8))
-                            .foregroundStyle(.secondary)
+                    Spacer()
+
+                    // Event indicators
+                    HStack(spacing: 4) {
+                        if !stones.isEmpty {
+                            ForEach(stones.prefix(3)) { _ in
+                                Circle()
+                                    .fill(Color.blue)
+                                    .frame(width: 6, height: 6)
+                            }
+                        }
                     }
+                    .frame(height: 12)
+                    .padding(.bottom, 8)
+                } else {
+                    Color.clear
+                        .frame(height: 80)
                 }
-                .frame(height: 40, alignment: .top)
-
-                // Touch indicator
-                if touchCount > 0 {
-                    HStack(spacing: 2) {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 4, height: 4)
-                        Text("\(touchCount)")
-                            .font(.system(size: 8))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } else {
-                Color.clear
-                    .frame(height: 80)
             }
+            .frame(maxWidth: .infinity)
+            .frame(height: 80)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(cellBackgroundColor)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(isToday ? Color.accentColor : Color.clear, lineWidth: isToday ? 2 : 0)
+            )
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 80)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isToday ? Color.accentColor.opacity(0.1) : Color.clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(isToday ? Color.accentColor : Color.clear, lineWidth: 2)
-        )
+        .buttonStyle(.plain)
+    }
+
+    private var cellBackgroundColor: Color {
+        if !dayData.isCurrentMonth {
+            return Color.clear
+        }
+
+        if isWeekend {
+            return Color(.systemGray6).opacity(0.5)
+        }
+
+        return Color(.systemGray6).opacity(0.3)
     }
 
     private var isToday: Bool {
         guard dayData.isCurrentMonth else { return false }
         return calendar.isDateInToday(dayData.date)
+    }
+
+    private var isWeekend: Bool {
+        let weekday = calendar.component(.weekday, from: dayData.date)
+        return weekday == 1 || weekday == 7  // Sunday or Saturday
     }
 }
 

@@ -27,9 +27,9 @@ struct StonesListView: View {
                 }
             }
             .sheet(isPresented: $showingAddSheet) {
-                StoneEventFormView { stone in
+                StoneEventFormView(onSave: { stone in
                     modelContext.insert(stone)
-                }
+                })
             }
         }
     }

@@ -5,6 +5,7 @@ struct StoneEventFormView: View {
     @Environment(\.dismiss) private var dismiss
 
     let onSave: (StoneEvent) -> Void
+    let initialDate: Date?
 
     @State private var title: String = ""
     @State private var startHour: Int = 9
@@ -14,6 +15,12 @@ struct StoneEventFormView: View {
     @State private var recurrenceType: RecurrenceType = .none
     @State private var specificDate: Date = Date()
     @State private var customDays: Set<Int> = []
+
+    init(onSave: @escaping (StoneEvent) -> Void, initialDate: Date? = nil) {
+        self.onSave = onSave
+        self.initialDate = initialDate
+        _specificDate = State(initialValue: initialDate ?? Date())
+    }
 
     private let hours = Array(0...23)
     private let minutes = [0, 15, 30, 45]
@@ -174,5 +181,5 @@ struct StoneEventFormView: View {
 }
 
 #Preview {
-    StoneEventFormView { _ in }
+    StoneEventFormView(onSave: { _ in })
 }
