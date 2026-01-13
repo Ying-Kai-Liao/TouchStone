@@ -16,12 +16,18 @@ final class Project {
     var createdAt: Date
     var archetypeRaw: String?       // Archetype for strategic projects
     var totalPlannedMinutes: Int = 0  // Total time budget set during planning (in minutes)
+    var planningContext: String?     // Original goal/description used for planning
+    var planningNotes: String?       // Additional context notes for AI refinement
+    var lastPlanModifiedAt: Date?    // Track when plan was last edited
 
     @Relationship(deleteRule: .cascade, inverse: \TouchLog.project)
     var touchLogs: [TouchLog] = []
 
     @Relationship(deleteRule: .cascade, inverse: \ProjectPhase.project)
     var phases: [ProjectPhase] = []
+
+    @Relationship(deleteRule: .cascade, inverse: \ProjectDocument.project)
+    var documents: [ProjectDocument] = []
 
     init(
         id: UUID = UUID(),
@@ -205,6 +211,32 @@ final class Project {
     /// Progress string like "2/6 sessions"
     var progressString: String {
         "\(completedSessionCount)/\(totalSessionCount) sessions"
+    }
+
+    /// Sessions that are completed or skipped (immutable during regeneration)
+    var lockedSessions: [PlannedSession] {
+        phases.flatMap { $0.sessions }.filter { $0.status != .planned }
+    }
+
+    /// Sessions that can be regenerated (only planned sessions)
+    var regenerableSessions: [PlannedSession] {
+        phases.flatMap { $0.sessions }.filter { $0.status == .planned }
+    }
+
+    /// Summary of current progress for AI context
+    var progressSummary: String {
+        let completed = completedSessionCount
+        let total = totalSessionCount
+        let phaseName = activePhase?.title ?? "None"
+        return "Progress: \(completed)/\(total) sessions completed. Current phase: \(phaseName)."
+    }
+
+    /// Combined document context for AI refinement
+    var documentContext: String {
+        documents
+            .compactMap { $0.extractedText }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n---\n\n")
     }
 }
 

@@ -11,6 +11,7 @@ struct TouchStoneApp: App {
             StoneEvent.self,
             TouchLog.self,
             FocusSession.self,
+            ProjectDocument.self,
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,
