@@ -12,6 +12,7 @@ struct TouchStoneApp: App {
             TouchLog.self,
             FocusSession.self,
             ProjectDocument.self,
+            DayPlan.self,
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,

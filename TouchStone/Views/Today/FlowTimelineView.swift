@@ -4,28 +4,38 @@ import SwiftUI
 
 /// Displays the daily workflow as a vertical timeline stream.
 /// Shows stones (fixed events) and waters (suggested sessions) merged chronologically.
+/// Also displays additional projects not in the scheduled flow at the bottom.
 struct FlowTimelineView: View {
     let items: [WorkflowItem]
+    let additionalProjects: [Project]
     let onTouch: (Project) -> Void
     let onFocus: (Project) -> Void
 
     var body: some View {
-        if items.isEmpty {
-            emptyState
-        } else {
-            VStack(spacing: 0) {
-                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                    TimelineItemContainer(
-                        item: item,
-                        isFirst: index == 0,
-                        isLast: index == items.count - 1,
-                        onTouch: { project in onTouch(project) },
-                        onFocus: { project in onFocus(project) }
-                    )
+        VStack(spacing: 0) {
+            if items.isEmpty && additionalProjects.isEmpty {
+                emptyState
+            } else {
+                // Scheduled flow items
+                if !items.isEmpty {
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                        TimelineItemContainer(
+                            item: item,
+                            isFirst: index == 0,
+                            isLast: index == items.count - 1,
+                            onTouch: { project in onTouch(project) },
+                            onFocus: { project in onFocus(project) }
+                        )
+                    }
+
+                    // End of stream indicator
+                    endOfStreamIndicator
                 }
 
-                // End of stream indicator
-                endOfStreamIndicator
+                // Additional projects section
+                if !additionalProjects.isEmpty {
+                    additionalProjectsSection
+                }
             }
         }
     }
@@ -69,6 +79,38 @@ struct FlowTimelineView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
+    }
+
+    private var additionalProjectsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Section header
+            HStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text("MORE TO TOUCH")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+                    .tracking(1)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+
+            // Project blocks
+            VStack(spacing: 8) {
+                ForEach(additionalProjects) { project in
+                    AdditionalProjectRow(
+                        project: project,
+                        onTouch: { onTouch(project) },
+                        onFocus: { onFocus(project) }
+                    )
+                    .padding(.horizontal, 16)
+                }
+            }
+        }
+        .padding(.bottom, 24)
     }
 }
 
@@ -142,6 +184,7 @@ struct TimelineItemContainer: View {
     ScrollView {
         FlowTimelineView(
             items: [],
+            additionalProjects: [],
             onTouch: { _ in },
             onFocus: { _ in }
         )

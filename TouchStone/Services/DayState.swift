@@ -72,6 +72,44 @@ class DayState {
         dayMessage = generateDayMessage()
     }
 
+    /// Compute only stones (fixed events) for rest days.
+    /// User declined to work today, so we only show reality without suggestions.
+    func computeStonesOnly(stones: [StoneEvent]) {
+        // 1. Get today's stone instances
+        stoneInstances = stones
+            .filter { $0.occursOn(date: date) }
+            .map { StoneEventInstance(event: $0, on: date) }
+            .sorted { $0.startTime < $1.startTime }
+
+        // 2. Clear water-related data
+        freeSlots = []
+        suggestedSessions = []
+        minutesTouchedToday = 0
+
+        // 3. Generate workflow items for stones only
+        let now = Date()
+        workflowItems = stoneInstances.map { instance in
+            let status: WorkflowItemStatus
+            if instance.endTime <= now {
+                status = .completed
+            } else if instance.startTime <= now && now < instance.endTime {
+                status = .inProgress
+            } else {
+                status = .upcoming
+            }
+
+            return WorkflowItem(
+                type: .stone(instance),
+                startTime: instance.startTime,
+                endTime: instance.endTime,
+                status: status
+            )
+        }
+
+        // 4. Set rest day message
+        dayMessage = "Taking it easy today. Your stones are shown above."
+    }
+
     // MARK: - Liquid Scheduler (Pour Water into Slots)
 
     private func generateSuggestedSessions(projects: [Project]) -> [SuggestedSession] {
