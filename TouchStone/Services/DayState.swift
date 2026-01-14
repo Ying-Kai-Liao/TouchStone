@@ -147,26 +147,40 @@ class DayState {
             return TimeSlot(start: now, end: slot.end)
         }.filter { $0.durationMinutes >= 30 }
 
-        // Pour projects into slots
+        // Pour projects into slots - track current position within slot
+        var currentSlotStart = usableSlots.first?.start ?? now
+
         for project in prioritized {
             guard usedMinutes < remainingCapacity else { break }
             guard slotIndex < usableSlots.count else { break }
 
             let slot = usableSlots[slotIndex]
-            let sessionDuration = min(defaultSessionMinutes, slot.durationMinutes, remainingCapacity - usedMinutes)
+            let remainingSlotMinutes = Int(slot.end.timeIntervalSince(currentSlotStart) / 60)
+            let sessionDuration = min(defaultSessionMinutes, remainingSlotMinutes, remainingCapacity - usedMinutes)
 
             if sessionDuration >= 30 {
+                // Create a time slot for this specific session
+                let sessionSlot = TimeSlot(
+                    start: currentSlotStart,
+                    end: currentSlotStart.addingTimeInterval(Double(sessionDuration) * 60)
+                )
                 let session = SuggestedSession(
                     project: project,
-                    timeSlot: slot,
+                    timeSlot: sessionSlot,
                     suggestedMinutes: sessionDuration
                 )
                 sessions.append(session)
                 usedMinutes += sessionDuration
 
+                // Move current position forward
+                currentSlotStart = currentSlotStart.addingTimeInterval(Double(sessionDuration) * 60)
+
                 // Move to next slot if this one is consumed
-                if sessionDuration >= slot.durationMinutes - 15 {
+                if currentSlotStart >= slot.end.addingTimeInterval(-15 * 60) {
                     slotIndex += 1
+                    if slotIndex < usableSlots.count {
+                        currentSlotStart = usableSlots[slotIndex].start
+                    }
                 }
             }
         }
