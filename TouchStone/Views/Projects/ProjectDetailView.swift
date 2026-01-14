@@ -3,10 +3,12 @@ import SwiftData
 
 struct ProjectDetailView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @Bindable var project: Project
 
     @State private var showingEditSheet = false
     @State private var showingLogSheet = false
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         // Route to strategic view for projects with phases
@@ -77,14 +79,45 @@ struct ProjectDetailView: View {
         .navigationTitle(project.title)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Edit") {
-                    showingEditSheet = true
+                Menu {
+                    Button {
+                        showingEditSheet = true
+                    } label: {
+                        Label("Edit Details", systemImage: "pencil")
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Label("Delete Project", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
         .sheet(isPresented: $showingEditSheet) {
             ProjectFormView(mode: .edit(project)) { _ in }
         }
+        .confirmationDialog(
+            "Delete Project",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                deleteProject()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to delete \"\(project.title)\"? This will also delete all associated touches and data. This action cannot be undone.")
+        }
+    }
+
+    private func deleteProject() {
+        modelContext.delete(project)
+        dismiss()
     }
 
     private var deadlineColor: Color {

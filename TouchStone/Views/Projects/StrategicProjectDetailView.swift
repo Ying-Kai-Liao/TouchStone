@@ -5,11 +5,13 @@ import SwiftData
 /// Supports both manual editing and AI-assisted plan refinement.
 struct StrategicProjectDetailView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @Bindable var project: Project
 
     @State private var showingEditSheet = false
     @State private var showingRefinementChat = false
     @State private var showingDocumentPicker = false
+    @State private var showingDeleteConfirmation = false
     @State private var editMode: EditMode = .inactive
     @State private var selectedSession: PlannedSession?
 
@@ -71,6 +73,14 @@ struct StrategicProjectDetailView: View {
                             systemImage: editMode.isEditing ? "checkmark" : "slider.horizontal.3"
                         )
                     }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Label("Delete Project", systemImage: "trash")
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -86,6 +96,23 @@ struct StrategicProjectDetailView: View {
         .sheet(item: $selectedSession) { session in
             SessionEditorSheet(session: session)
         }
+        .confirmationDialog(
+            "Delete Project",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                deleteProject()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to delete \"\(project.title)\"? This will delete all phases, sessions, documents, and touch history. This action cannot be undone.")
+        }
+    }
+
+    private func deleteProject() {
+        modelContext.delete(project)
+        dismiss()
     }
 
     // MARK: - Header Section
