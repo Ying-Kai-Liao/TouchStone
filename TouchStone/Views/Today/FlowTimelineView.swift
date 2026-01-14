@@ -8,8 +8,11 @@ import SwiftUI
 struct FlowTimelineView: View {
     let items: [WorkflowItem]
     let additionalProjects: [Project]
+    let isToday: Bool  // Whether viewing today's date
     let onTouch: (Project) -> Void
     let onFocus: (Project) -> Void
+
+    @State private var showMoreToTouch = false  // Collapsed by default
 
     var body: some View {
         VStack(spacing: 0) {
@@ -32,8 +35,8 @@ struct FlowTimelineView: View {
                     endOfStreamIndicator
                 }
 
-                // Additional projects section
-                if !additionalProjects.isEmpty {
+                // Additional projects section - only for today
+                if isToday && !additionalProjects.isEmpty {
                     additionalProjectsSection
                 }
             }
@@ -83,30 +86,45 @@ struct FlowTimelineView: View {
 
     private var additionalProjectsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Section header
-            HStack(spacing: 8) {
-                Image(systemName: "plus.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            // Section header - tappable to expand/collapse
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showMoreToTouch.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: showMoreToTouch ? "chevron.down" : "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
 
-                Text("MORE TO TOUCH")
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.secondary)
-                    .tracking(1)
+                    Text("MORE TO TOUCH")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                        .tracking(1)
+
+                    Text("(\(additionalProjects.count))")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
+            .buttonStyle(.plain)
 
-            // Project blocks
-            VStack(spacing: 8) {
-                ForEach(additionalProjects) { project in
-                    AdditionalProjectRow(
-                        project: project,
-                        onTouch: { onTouch(project) },
-                        onFocus: { onFocus(project) }
-                    )
-                    .padding(.horizontal, 16)
+            // Project blocks - only show when expanded
+            if showMoreToTouch {
+                VStack(spacing: 8) {
+                    ForEach(additionalProjects) { project in
+                        AdditionalProjectRow(
+                            project: project,
+                            onTouch: { onTouch(project) },
+                            onFocus: { onFocus(project) }
+                        )
+                        .padding(.horizontal, 16)
+                    }
                 }
             }
         }
@@ -185,6 +203,7 @@ struct TimelineItemContainer: View {
         FlowTimelineView(
             items: [],
             additionalProjects: [],
+            isToday: true,
             onTouch: { _ in },
             onFocus: { _ in }
         )

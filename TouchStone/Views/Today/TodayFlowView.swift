@@ -83,6 +83,7 @@ struct TodayFlowView: View {
                         FlowTimelineView(
                             items: dayState.workflowItems,
                             additionalProjects: additionalProjects,
+                            isToday: calendar.isDateInToday(selectedDate),
                             onTouch: touchProject,
                             onFocus: { project in focusProject = project }
                         )
