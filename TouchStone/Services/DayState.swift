@@ -284,8 +284,17 @@ class DayState {
     // MARK: - Liquid Scheduler (Pour Water into Slots)
 
     private func generateSuggestedSessions(projects: [Project]) -> [SuggestedSession] {
-        // Filter to active projects only
-        let activeProjects = projects.filter { $0.isActive }
+        // Filter to active, non-completed projects only
+        // A project is completed when it has planned hours and remaining hours is 0
+        let activeProjects = projects.filter { project in
+            guard project.isActive else { return false }
+            // If project has planned hours, check if there's remaining work
+            if project.totalPlannedMinutes > 0 {
+                return project.remainingHours > 0
+            }
+            // Projects without planned hours are always included
+            return true
+        }
         guard !activeProjects.isEmpty else { return [] }
 
         // Sort projects by priority (staleness + remaining work)

@@ -50,9 +50,16 @@ struct TodayFlowView: View {
         todaysPlan?.isRestDay == true
     }
 
-    /// All active projects available for touching anytime
+    /// All active, non-completed projects available for touching anytime
     private var additionalProjects: [Project] {
-        Array(activeProjects)
+        activeProjects.filter { project in
+            // If project has planned hours, check if there's remaining work
+            if project.totalPlannedMinutes > 0 {
+                return project.remainingHours > 0
+            }
+            // Projects without planned hours are always included
+            return true
+        }
     }
 
     var body: some View {
