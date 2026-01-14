@@ -7,12 +7,18 @@ struct CalendarView: View {
     @Query private var touchLogs: [TouchLog]
 
     @State private var selectedMonth = Date()
-    @State private var showingDayDetail = false
+    @State private var selectedDay: SelectedDay?
     @State private var showingAddStone = false
-    @State private var selectedDate: Date?
+    @State private var addStoneDate: Date?
 
     private let calendar = Calendar.current
     private let daysOfWeek = ["S", "M", "T", "W", "T", "F", "S"]
+
+    struct SelectedDay: Identifiable {
+        let id = UUID()
+        let date: Date
+        let stones: [StoneEvent]
+    }
 
     var body: some View {
         NavigationStack {
@@ -37,23 +43,23 @@ struct CalendarView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingDayDetail) {
-                if let date = selectedDate {
-                    DayDetailView(
-                        date: date,
-                        stones: stonesForDay(date),
-                        onAddStone: {
-                            showingDayDetail = false
-                            // Small delay to allow first sheet to dismiss
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                showingAddStone = true
-                            }
+            .sheet(item: $selectedDay) { day in
+                DayDetailView(
+                    date: day.date,
+                    stones: day.stones,
+                    onAddStone: {
+                        let dateToUse = day.date
+                        selectedDay = nil
+                        // Small delay to allow first sheet to dismiss
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            addStoneDate = dateToUse
+                            showingAddStone = true
                         }
-                    )
-                }
+                    }
+                )
             }
             .sheet(isPresented: $showingAddStone) {
-                SpeechStoneInputView(initialDate: selectedDate)
+                SpeechStoneInputView(initialDate: addStoneDate)
             }
         }
     }
@@ -126,8 +132,10 @@ struct CalendarView: View {
                     touchCount: touchCountForDay(dayData.date),
                     onTap: {
                         if dayData.isCurrentMonth {
-                            selectedDate = dayData.date
-                            showingDayDetail = true
+                            selectedDay = SelectedDay(
+                                date: dayData.date,
+                                stones: stonesForDay(dayData.date)
+                            )
                         }
                     }
                 )

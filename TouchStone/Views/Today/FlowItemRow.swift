@@ -109,58 +109,48 @@ struct StoneFlowRow: View {
 
 // MARK: - Water Flow Row
 
-/// Suggested session card with touch and focus actions
+/// Suggested session card with touch and focus actions.
+/// Appears as ghost block (dashed, translucent) before touch, solid block after touch.
 struct WaterFlowRow: View {
     let item: WorkflowItem
     let onTouch: (() -> Void)?
     let onFocus: (() -> Void)?
 
-    @State private var isInFlow = false
+    /// Check if this project was touched today
+    private var hasTouchedToday: Bool {
+        guard let project = item.project else { return false }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return project.touchLogs.contains { log in
+            calendar.startOfDay(for: log.timestamp) == today
+        }
+    }
+
+    /// Ghost styling for untouched, solid for touched
+    private var isGhost: Bool {
+        !hasTouchedToday
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Optional image header (for visual appeal)
-            if isInFlow {
-                ZStack(alignment: .bottomLeading) {
-                    // Placeholder gradient for visual appeal
-                    LinearGradient(
-                        colors: [Color.teal.opacity(0.3), Color.blue.opacity(0.2)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .frame(height: 100)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-                    Text("IN FLOW")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.teal)
-                        .clipShape(Capsule())
-                        .padding(12)
-                }
-            }
-
-            // Main content
+        // Whole block is tappable to touch
+        Button(action: { onTouch?() }) {
             HStack(alignment: .center, spacing: 16) {
-                // Play/status icon
+                // Status icon
                 ZStack {
                     Circle()
-                        .fill(Color.teal.opacity(0.2))
+                        .fill(Color.teal.opacity(isGhost ? 0.1 : 0.2))
                         .frame(width: 44, height: 44)
 
-                    Image(systemName: isInFlow ? "play.fill" : "circle")
+                    Image(systemName: hasTouchedToday ? "checkmark" : "circle")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.teal)
+                        .foregroundStyle(isGhost ? .teal.opacity(0.5) : .teal)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.title)
                         .font(.body)
                         .fontWeight(.semibold)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.primary.opacity(isGhost ? 0.6 : 1.0))
 
                     if let subtitle = item.subtitle {
                         Text(subtitle)
@@ -175,49 +165,33 @@ struct WaterFlowRow: View {
 
                 Spacer()
 
-                // Focus button
+                // Focus button - small icon inside the block
                 if let onFocus = onFocus {
                     Button(action: onFocus) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "scope")
-                                .font(.caption)
-                            Text("Focus")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                        }
-                        .foregroundStyle(.orange)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.orange.opacity(0.15))
-                        .clipShape(Capsule())
+                        Image(systemName: "scope")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.orange)
+                            .frame(width: 36, height: 36)
+                            .background(Color.orange.opacity(0.15))
+                            .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
                 }
-
-                // More menu
-                Menu {
-                    Button("Start Focus", action: { onFocus?() })
-                    Button("Log Touch", action: { onTouch?() })
-                    Button("Skip", role: .destructive, action: {})
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 32, height: 32)
-                }
             }
             .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.secondarySystemGroupedBackground).opacity(isGhost ? 0.5 : 1))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(
+                        isGhost ? Color.teal.opacity(0.3) : Color.clear,
+                        style: StrokeStyle(lineWidth: 1, dash: isGhost ? [6, 4] : [])
+                    )
+            )
         }
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-        .onTapGesture {
-            onTouch?()
-        }
-        .onLongPressGesture {
-            onFocus?()
-        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -324,6 +298,71 @@ struct OverdueItemRow: View {
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(.secondarySystemGroupedBackground))
         )
+    }
+}
+
+// MARK: - Additional Project Row
+
+/// A compact touch block for projects in the "MORE TO TOUCH" section.
+/// Shows touch count (x0, x1, x2...) instead of checkmark.
+struct AdditionalProjectRow: View {
+    let project: Project
+    let onTouch: () -> Void
+    let onFocus: () -> Void
+
+    /// Count how many times this project was touched today
+    private var touchCountToday: Int {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return project.touchLogs.filter { log in
+            calendar.startOfDay(for: log.timestamp) == today
+        }.count
+    }
+
+    var body: some View {
+        // Whole block is tappable to touch
+        Button(action: onTouch) {
+            HStack(alignment: .center, spacing: 12) {
+                // Touch count badge
+                Text("x\(touchCountToday)")
+                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(touchCountToday > 0 ? .teal : .secondary)
+                    .frame(width: 36)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(project.title)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.primary)
+
+                    if let phase = project.currentPhase, !phase.isEmpty {
+                        Text(phase)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                // Focus button - small icon inside the block
+                Button(action: onFocus) {
+                    Image(systemName: "scope")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.orange)
+                        .frame(width: 30, height: 30)
+                        .background(Color.orange.opacity(0.15))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.secondarySystemGroupedBackground))
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

@@ -13,6 +13,8 @@ struct TodayFlowView: View {
     @Query(filter: #Predicate<Project> { $0.isActive }, sort: \Project.createdAt, order: .reverse)
     private var activeProjects: [Project]
 
+    @Query private var dayPlans: [DayPlan]
+
     @State private var dayState = DayState()
     @State private var selectedDate = Date()
     @State private var showZenMode = false
@@ -23,6 +25,42 @@ struct TodayFlowView: View {
     @State private var showSpeechInput = false
 
     private let calendar = Calendar.current
+
+    // MARK: - Day Plan Computed Properties
+
+    /// Get today's DayPlan if it exists
+    private var todaysPlan: DayPlan? {
+        let today = calendar.startOfDay(for: selectedDate)
+        return dayPlans.first { calendar.isDate($0.date, inSameDayAs: today) }
+    }
+
+    /// Whether to show the "Do you want to work today?" prompt
+    private var showWorkPrompt: Bool {
+        // Only show for today, not future dates
+        calendar.isDateInToday(selectedDate) && todaysPlan?.hasDecided != true
+    }
+
+    /// Whether user has confirmed they want to work today
+    private var isWorkDayActive: Bool {
+        todaysPlan?.isWorkDay == true
+    }
+
+    /// Whether user declined to work today
+    private var isRestDay: Bool {
+        todaysPlan?.isRestDay == true
+    }
+
+    /// All active, non-completed projects available for touching anytime
+    private var additionalProjects: [Project] {
+        activeProjects.filter { project in
+            // If project has planned hours, check if there's remaining work
+            if project.totalPlannedMinutes > 0 {
+                return project.remainingHours > 0
+            }
+            // Projects without planned hours are always included
+            return true
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -45,11 +83,27 @@ struct TodayFlowView: View {
                     ScrollView {
                         FlowTimelineView(
                             items: dayState.workflowItems,
+                            additionalProjects: additionalProjects,
+                            isToday: calendar.isDateInToday(selectedDate),
                             onTouch: touchProject,
                             onFocus: { project in focusProject = project }
                         )
                         .padding(.top, 16)
+                        // Add padding at bottom when prompt is showing
+                        .padding(.bottom, showWorkPrompt ? 140 : 0)
                     }
+                }
+
+                // Work prompt overlay at bottom
+                if showWorkPrompt {
+                    VStack {
+                        Spacer()
+                        WorkTodayPromptView(
+                            onConfirmWork: confirmWorkToday,
+                            onDeclineWork: declineWorkToday
+                        )
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .navigationBarHidden(true)
@@ -189,13 +243,75 @@ struct TodayFlowView: View {
 
     private func computeDayState() {
         dayState = DayState(date: selectedDate)
-        dayState.compute(stones: allStones, projects: activeProjects)
+
+        // Check if we have a persisted schedule for today
+        if let plan = todaysPlan, plan.isWorkDay, plan.hasSchedule {
+            // Auto-skip expired sessions first
+            DayState.autoSkipExpiredSessions(dayPlan: plan)
+            // Load from persisted schedule (locked-in times)
+            dayState.loadFromPersistedSchedule(dayPlan: plan, stones: Array(allStones))
+        } else if isRestDay && calendar.isDateInToday(selectedDate) {
+            // Rest day - only show stones (no work suggestions)
+            dayState.computeStonesOnly(stones: Array(allStones))
+        } else {
+            // Preview mode (before "Let's go") - compute ephemeral suggestions
+            dayState.compute(stones: Array(allStones), projects: Array(activeProjects))
+        }
+    }
+
+    /// User confirmed they want to work today - record start time and lock in schedule
+    private func confirmWorkToday() {
+        let plan = getOrCreateTodayPlan()
+        plan.wantsToWork = true
+        plan.startedAt = Date()
+
+        // Generate and persist the schedule NOW (one-time, locked in)
+        dayState.commitSchedule(
+            to: plan,
+            context: modelContext,
+            stones: Array(allStones),
+            projects: Array(activeProjects)
+        )
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            computeDayState()
+        }
+    }
+
+    /// User declined to work today - hide work suggestions
+    private func declineWorkToday() {
+        let plan = getOrCreateTodayPlan()
+        plan.wantsToWork = false
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            computeDayState()
+        }
+    }
+
+    /// Get or create today's DayPlan
+    private func getOrCreateTodayPlan() -> DayPlan {
+        if let existing = todaysPlan {
+            return existing
+        }
+        let newPlan = DayPlan(date: selectedDate)
+        modelContext.insert(newPlan)
+        return newPlan
     }
 
     private func touchProject(_ project: Project) {
         let touch = TouchLog(project: project)
         modelContext.insert(touch)
         lastTouch = touch
+
+        // If we have a persisted schedule, mark the corresponding session as completed
+        if let plan = todaysPlan, plan.hasSchedule {
+            // Find a pending session for this project and mark it completed
+            if let session = plan.scheduledSessions.first(where: {
+                $0.project?.id == project.id && $0.status == .pending
+            }) {
+                session.complete(with: touch)
+            }
+        }
 
         withAnimation {
             showUndoToast = true
@@ -210,8 +326,8 @@ struct TodayFlowView: View {
             }
         }
 
-        // Recompute to update suggested sessions
-        computeDayState()
+        // Don't recompute - items stay in place as daily summary
+        // Ghost/solid styling updates automatically via SwiftData
     }
 
     private func undoTouch() {
@@ -221,7 +337,7 @@ struct TodayFlowView: View {
                 showUndoToast = false
                 lastTouch = nil
             }
-            computeDayState()
+            // Don't recompute - styling updates automatically
         }
     }
 }
