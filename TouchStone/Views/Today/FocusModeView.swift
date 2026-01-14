@@ -30,21 +30,17 @@ struct FocusModeView: View {
         project.nextPlannedSession
     }
 
-    // MARK: - Colors
+    // MARK: - Colors (aligned with TodayFlowView)
 
-    private let accentGreen = Color(red: 0.55, green: 0.75, blue: 0.60)
-    private let softBackground = Color(red: 0.98, green: 0.97, blue: 0.95)
-    private let cardBackground = Color.white
+    private let accentTeal = Color.teal
+    private let darkBackground = Color(uiColor: UIColor(red: 0.12, green: 0.14, blue: 0.15, alpha: 1.0))
+    private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
 
     var body: some View {
         ZStack {
-            // Soft gradient background
-            LinearGradient(
-                colors: [softBackground, softBackground.opacity(0.9)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            // Dark background (matching TodayFlowView)
+            darkBackground
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Header
@@ -66,6 +62,7 @@ struct FocusModeView: View {
                     .padding(.bottom, 16)
             }
         }
+        .preferredColorScheme(.dark)
         .confirmationDialog("Options", isPresented: $showMenu) {
             if let session = currentSession {
                 Button("View Session Goal") {
@@ -93,15 +90,26 @@ struct FocusModeView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.7))
             }
 
             Spacer()
 
-            Text("NOW")
-                .font(.system(size: 13, weight: .semibold))
-                .tracking(2)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Image(systemName: "leaf.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+                Text("FOCUS")
+                    .font(.system(size: 13, weight: .semibold))
+                    .tracking(2)
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(Color.white.opacity(0.1))
+            )
 
             Spacer()
 
@@ -110,7 +118,7 @@ struct FocusModeView: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.7))
             }
         }
         .padding(.horizontal, 24)
@@ -121,15 +129,15 @@ struct FocusModeView: View {
 
     private var mainCard: some View {
         VStack(spacing: 20) {
-            // Icon circle
+            // Icon circle (teal accent matching flow view)
             ZStack {
                 Circle()
-                    .fill(accentGreen.opacity(0.15))
+                    .fill(accentTeal.opacity(0.2))
                     .frame(width: 100, height: 100)
 
                 Image(systemName: "leaf.fill")
                     .font(.system(size: 36))
-                    .foregroundStyle(accentGreen.opacity(0.6))
+                    .foregroundStyle(.green)
             }
             .padding(.top, 32)
 
@@ -137,7 +145,7 @@ struct FocusModeView: View {
             Text(project.title)
                 .font(.system(size: 28, weight: .bold))
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.primary)
+                .foregroundStyle(.white)
                 .padding(.horizontal, 24)
 
             // Phase subtitle (if available)
@@ -146,7 +154,7 @@ struct FocusModeView: View {
             } else if let phase = project.currentPhase {
                 Text(phase)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.6))
             }
 
             // Time remaining badge
@@ -169,8 +177,7 @@ struct FocusModeView: View {
         }
         .frame(maxWidth: .infinity)
         .background(cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 4)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .padding(.horizontal, 24)
     }
 
@@ -187,12 +194,12 @@ struct FocusModeView: View {
             HStack(spacing: 4) {
                 Text(phase.title)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.6))
 
                 if phase.mentalRule != nil {
                     Image(systemName: showPhaseDetails ? "chevron.up" : "chevron.down")
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.white.opacity(0.4))
                 }
             }
         }
@@ -208,10 +215,10 @@ struct FocusModeView: View {
             Text("\(remainingMinutes) min remaining")
                 .font(.system(size: 14, weight: .medium))
         }
-        .foregroundStyle(.secondary)
+        .foregroundStyle(.white.opacity(0.7))
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(Color(.systemGray6))
+        .background(Color.white.opacity(0.1))
         .clipShape(Capsule())
     }
 
@@ -222,18 +229,18 @@ struct FocusModeView: View {
             Text("Mental Rule")
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.white.opacity(0.5))
 
             Text("\"\(rule)\"")
                 .font(.subheadline)
                 .italic()
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.7))
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
-        .background(Color(.systemGray6).opacity(0.5))
+        .background(Color.white.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 16)
         .transition(.opacity.combined(with: .scale(scale: 0.95)))
@@ -246,23 +253,23 @@ struct FocusModeView: View {
             Text("Session Goal")
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.white.opacity(0.5))
 
             Text(session.title)
                 .font(.subheadline)
                 .fontWeight(.medium)
-                .foregroundStyle(.primary)
+                .foregroundStyle(.white)
 
             if let goal = session.goal {
                 Text(goal)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.6))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color(.systemGray6).opacity(0.5))
+        .background(Color.white.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 16)
         .transition(.opacity.combined(with: .scale(scale: 0.95)))
@@ -289,7 +296,7 @@ struct FocusModeView: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
-            .background(accentGreen)
+            .background(accentTeal)
             .clipShape(Capsule())
         }
         .padding(.horizontal, 48)
@@ -300,14 +307,13 @@ struct FocusModeView: View {
     private var progressIndicator: some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(Color(.systemGray4))
+                .fill(Color.white.opacity(0.3))
                 .frame(width: 6, height: 6)
 
             RoundedRectangle(cornerRadius: 2)
-                .fill(Color(.systemGray5))
+                .fill(Color.white.opacity(0.15))
                 .frame(width: 120, height: 4)
         }
-        .opacity(0.6)
     }
 
     // MARK: - Actions
