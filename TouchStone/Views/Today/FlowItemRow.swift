@@ -303,46 +303,37 @@ struct OverdueItemRow: View {
 
 // MARK: - Additional Project Row
 
-/// A compact touch block for projects not in the scheduled flow.
-/// Always appears as ghost until touched.
+/// A compact touch block for projects in the "MORE TO TOUCH" section.
+/// Shows touch count (x0, x1, x2...) instead of checkmark.
 struct AdditionalProjectRow: View {
     let project: Project
     let onTouch: () -> Void
     let onFocus: () -> Void
 
-    /// Check if this project was touched today
-    private var hasTouchedToday: Bool {
+    /// Count how many times this project was touched today
+    private var touchCountToday: Int {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        return project.touchLogs.contains { log in
+        return project.touchLogs.filter { log in
             calendar.startOfDay(for: log.timestamp) == today
-        }
-    }
-
-    private var isGhost: Bool {
-        !hasTouchedToday
+        }.count
     }
 
     var body: some View {
         // Whole block is tappable to touch
         Button(action: onTouch) {
             HStack(alignment: .center, spacing: 12) {
-                // Status icon
-                ZStack {
-                    Circle()
-                        .fill(Color.teal.opacity(isGhost ? 0.1 : 0.2))
-                        .frame(width: 36, height: 36)
-
-                    Image(systemName: hasTouchedToday ? "checkmark" : "circle")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(isGhost ? .teal.opacity(0.5) : .teal)
-                }
+                // Touch count badge
+                Text("x\(touchCountToday)")
+                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(touchCountToday > 0 ? .teal : .secondary)
+                    .frame(width: 36)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(project.title)
                         .font(.subheadline)
                         .fontWeight(.medium)
-                        .foregroundStyle(Color.primary.opacity(isGhost ? 0.6 : 1.0))
+                        .foregroundStyle(.primary)
 
                     if let phase = project.currentPhase, !phase.isEmpty {
                         Text(phase)
@@ -368,14 +359,7 @@ struct AdditionalProjectRow: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.secondarySystemGroupedBackground).opacity(isGhost ? 0.5 : 1))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(
-                        isGhost ? Color.teal.opacity(0.3) : Color.clear,
-                        style: StrokeStyle(lineWidth: 1, dash: isGhost ? [6, 4] : [])
-                    )
+                    .fill(Color(.secondarySystemGroupedBackground))
             )
         }
         .buttonStyle(.plain)
