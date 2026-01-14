@@ -110,6 +110,177 @@ class DayState {
         dayMessage = "Taking it easy today. Your stones are shown above."
     }
 
+    // MARK: - Commit Schedule to Database
+
+    /// Generate and persist the day's schedule when user clicks "Let's go".
+    /// This locks in the schedule for the day.
+    func commitSchedule(to dayPlan: DayPlan, context: ModelContext, stones: [StoneEvent], projects: [Project]) {
+        // 1. First compute the day state to generate suggestions
+        compute(stones: stones, projects: projects)
+
+        // 2. Clear any existing scheduled sessions
+        for session in dayPlan.scheduledSessions {
+            context.delete(session)
+        }
+
+        // 3. Create or update backlog
+        let backlog = dayPlan.backlog ?? Backlog(date: date)
+        backlog.dayPlan = dayPlan
+        backlog.resetAllocation()
+        if dayPlan.backlog == nil {
+            context.insert(backlog)
+            dayPlan.backlog = backlog
+        }
+
+        // 4. Convert suggested sessions to persisted ScheduledSessions
+        for (index, suggestion) in suggestedSessions.enumerated() {
+            let scheduled = ScheduledSession(
+                project: suggestion.project,
+                start: suggestion.timeSlot.start,
+                end: suggestion.timeSlot.end,
+                order: index
+            )
+            scheduled.dayPlan = dayPlan
+            context.insert(scheduled)
+
+            // Track allocation in backlog (1 hour per session)
+            backlog.allocate(hours: 1)
+        }
+    }
+
+    // MARK: - Load from Persisted Schedule
+
+    /// Load workflow items from a persisted DayPlan schedule.
+    /// Used when user has already clicked "Let's go" and schedule is locked in.
+    func loadFromPersistedSchedule(dayPlan: DayPlan, stones: [StoneEvent]) {
+        // 1. Load stones as usual
+        stoneInstances = stones
+            .filter { $0.occursOn(date: date) }
+            .map { StoneEventInstance(event: $0, on: date) }
+            .sorted { $0.startTime < $1.startTime }
+
+        // 2. Calculate free slots (for reference)
+        freeSlots = calculateFreeSlots()
+
+        // 3. Clear ephemeral suggested sessions (we're using persisted ones)
+        suggestedSessions = []
+
+        // 4. Generate workflow items from persisted sessions + stones
+        workflowItems = generateWorkflowFromPersisted(
+            stones: stoneInstances,
+            sessions: dayPlan.sortedSessions
+        )
+
+        // 5. Calculate minutes touched today
+        let today = calendar.startOfDay(for: Date())
+        minutesTouchedToday = dayPlan.scheduledSessions
+            .filter { $0.status == .completed }
+            .reduce(0) { $0 + $1.durationMinutes }
+
+        // 6. Generate day message
+        dayMessage = generateDayMessage()
+    }
+
+    /// Generate workflow items from persisted scheduled sessions
+    private func generateWorkflowFromPersisted(stones: [StoneEventInstance], sessions: [ScheduledSession]) -> [WorkflowItem] {
+        var items: [WorkflowItem] = []
+        let now = Date()
+
+        // 1. Add all stone instances as workflow items
+        for instance in stones {
+            let status: WorkflowItemStatus
+            if instance.endTime <= now {
+                status = .completed
+            } else if instance.startTime <= now && now < instance.endTime {
+                status = .inProgress
+            } else {
+                status = .upcoming
+            }
+
+            let item = WorkflowItem(
+                type: .stone(instance),
+                startTime: instance.startTime,
+                endTime: instance.endTime,
+                status: status
+            )
+            items.append(item)
+        }
+
+        // 2. Add persisted sessions as workflow items
+        for session in sessions {
+            // Map ScheduledSession status to WorkflowItemStatus
+            let status: WorkflowItemStatus
+            switch session.status {
+            case .completed:
+                status = .completed
+            case .skipped:
+                status = .overdue
+            case .pending:
+                if session.isActive {
+                    status = .inProgress
+                } else if session.isPast {
+                    status = .overdue
+                } else {
+                    status = .suggested
+                }
+            }
+
+            // Create a SuggestedSession wrapper for the workflow item
+            let timeSlot = TimeSlot(start: session.scheduledStart, end: session.scheduledEnd)
+            if let project = session.project {
+                let suggestedSession = SuggestedSession(
+                    project: project,
+                    timeSlot: timeSlot,
+                    suggestedMinutes: session.durationMinutes
+                )
+
+                let item = WorkflowItem(
+                    type: .water(suggestedSession),
+                    startTime: session.scheduledStart,
+                    endTime: session.scheduledEnd,
+                    status: status
+                )
+                items.append(item)
+            }
+        }
+
+        // 3. Sort all items chronologically
+        items.sort { $0.startTime < $1.startTime }
+
+        // 4. Insert breathing spaces and flow prep between items
+        items = insertTransitionItems(items: items)
+
+        return items
+    }
+
+    // MARK: - Auto-Skip Expired Sessions
+
+    /// Mark sessions as skipped if their time has passed without completion.
+    /// Call this periodically or when viewing the day.
+    static func autoSkipExpiredSessions(dayPlan: DayPlan) {
+        let now = Date()
+        for session in dayPlan.scheduledSessions {
+            if session.status == .pending && session.scheduledEnd < now {
+                session.status = .skipped
+            }
+        }
+    }
+
+    // MARK: - Handle New Stones (Auto-Adjust)
+
+    /// Adjust schedule when a new stone (meeting) conflicts with existing sessions.
+    /// Moves affected sessions to after the stone.
+    static func adjustScheduleForNewStone(dayPlan: DayPlan, stoneStart: Date, stoneEnd: Date) {
+        for session in dayPlan.scheduledSessions where session.status == .pending {
+            if session.conflicts(with: stoneStart, end: stoneEnd) {
+                // Reschedule to start after the stone
+                session.reschedule(to: stoneEnd)
+            }
+        }
+        // Note: This simple approach may create overlaps if multiple sessions are affected.
+        // A more sophisticated approach would re-run the full scheduling algorithm.
+    }
+
     // MARK: - Liquid Scheduler (Pour Water into Slots)
 
     private func generateSuggestedSessions(projects: [Project]) -> [SuggestedSession] {

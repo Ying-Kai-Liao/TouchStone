@@ -237,19 +237,34 @@ struct TodayFlowView: View {
     private func computeDayState() {
         dayState = DayState(date: selectedDate)
 
-        // If it's a rest day, only show stones (no work suggestions)
-        if isRestDay && calendar.isDateInToday(selectedDate) {
+        // Check if we have a persisted schedule for today
+        if let plan = todaysPlan, plan.isWorkDay, plan.hasSchedule {
+            // Auto-skip expired sessions first
+            DayState.autoSkipExpiredSessions(dayPlan: plan)
+            // Load from persisted schedule (locked-in times)
+            dayState.loadFromPersistedSchedule(dayPlan: plan, stones: Array(allStones))
+        } else if isRestDay && calendar.isDateInToday(selectedDate) {
+            // Rest day - only show stones (no work suggestions)
             dayState.computeStonesOnly(stones: Array(allStones))
         } else {
+            // Preview mode (before "Let's go") - compute ephemeral suggestions
             dayState.compute(stones: Array(allStones), projects: Array(activeProjects))
         }
     }
 
-    /// User confirmed they want to work today - record start time
+    /// User confirmed they want to work today - record start time and lock in schedule
     private func confirmWorkToday() {
         let plan = getOrCreateTodayPlan()
         plan.wantsToWork = true
         plan.startedAt = Date()
+
+        // Generate and persist the schedule NOW (one-time, locked in)
+        dayState.commitSchedule(
+            to: plan,
+            context: modelContext,
+            stones: Array(allStones),
+            projects: Array(activeProjects)
+        )
 
         withAnimation(.easeInOut(duration: 0.3)) {
             computeDayState()
@@ -280,6 +295,16 @@ struct TodayFlowView: View {
         let touch = TouchLog(project: project)
         modelContext.insert(touch)
         lastTouch = touch
+
+        // If we have a persisted schedule, mark the corresponding session as completed
+        if let plan = todaysPlan, plan.hasSchedule {
+            // Find a pending session for this project and mark it completed
+            if let session = plan.scheduledSessions.first(where: {
+                $0.project?.id == project.id && $0.status == .pending
+            }) {
+                session.complete(with: touch)
+            }
+        }
 
         withAnimation {
             showUndoToast = true
