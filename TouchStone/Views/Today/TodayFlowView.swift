@@ -50,15 +50,9 @@ struct TodayFlowView: View {
         todaysPlan?.isRestDay == true
     }
 
-    /// Projects not scheduled in the flow - available for additional touches
+    /// All active projects available for touching anytime
     private var additionalProjects: [Project] {
-        // Get IDs of projects already in the workflow
-        let scheduledProjectIds = Set(
-            dayState.workflowItems
-                .compactMap { $0.project?.id }
-        )
-        // Return active projects not already scheduled
-        return activeProjects.filter { !scheduledProjectIds.contains($0.id) }
+        Array(activeProjects)
     }
 
     var body: some View {
