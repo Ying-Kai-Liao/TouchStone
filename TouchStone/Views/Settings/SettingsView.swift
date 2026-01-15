@@ -21,14 +21,19 @@ struct SettingsView: View {
                             value: $prefs.dailyProductiveHours,
                             in: 1...12)
 
-                    Stepper("Session Length: \(prefs.defaultSessionMinutes) min",
-                            value: $prefs.defaultSessionMinutes,
-                            in: 30...120,
+                    Stepper("Min Session: \(prefs.sessionMinMinutes) min",
+                            value: $prefs.sessionMinMinutes,
+                            in: 30...60,
+                            step: 15)
+
+                    Stepper("Max Session: \(prefs.sessionMaxMinutes) min",
+                            value: $prefs.sessionMaxMinutes,
+                            in: 60...120,
                             step: 15)
                 } header: {
                     Text("Productivity")
                 } footer: {
-                    Text("Your daily target and preferred session duration.")
+                    Text("Your daily target and session length range.")
                 }
 
                 // MARK: - Working Hours Section
@@ -52,63 +57,39 @@ struct SettingsView: View {
 
                 // MARK: - Daily Rules Section
                 Section {
-                    Toggle("Lunch Break", isOn: $prefs.lunchEnabled)
-
-                    if prefs.lunchEnabled {
+                    NavigationLink {
+                        RulesListView()
+                    } label: {
                         HStack {
-                            Text("Time")
+                            Label("Daily Rules", systemImage: "clock.badge.checkmark")
                             Spacer()
-                            Picker("Start", selection: $prefs.lunchStartHour) {
-                                ForEach(11...14, id: \.self) { hour in
-                                    Text(formatHour(hour)).tag(hour)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-
-                            Text("-")
-
-                            Picker("End", selection: $prefs.lunchEndHour) {
-                                ForEach(12...15, id: \.self) { hour in
-                                    Text(formatHour(hour)).tag(hour)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
                         }
-                        .foregroundStyle(.secondary)
-                    }
-
-                    Toggle("Dinner Break", isOn: $prefs.dinnerEnabled)
-
-                    if prefs.dinnerEnabled {
-                        HStack {
-                            Text("Time")
-                            Spacer()
-                            Picker("Start", selection: $prefs.dinnerStartHour) {
-                                ForEach(17...20, id: \.self) { hour in
-                                    Text(formatHour(hour)).tag(hour)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-
-                            Text("-")
-
-                            Picker("End", selection: $prefs.dinnerEndHour) {
-                                ForEach(18...21, id: \.self) { hour in
-                                    Text(formatHour(hour)).tag(hour)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                        }
-                        .foregroundStyle(.secondary)
                     }
                 } header: {
-                    Text("Daily Rules")
+                    Text("Time Blocks")
                 } footer: {
-                    Text("Sessions won't be scheduled during breaks.")
+                    Text("Manage lunch, dinner, and other blocked time slots.")
+                }
+
+                // MARK: - Rest Breaks Section
+                Section {
+                    Toggle("Rest Breaks", isOn: $prefs.restBetweenSessionsEnabled)
+
+                    if prefs.restBetweenSessionsEnabled {
+                        Stepper("Work for \(prefs.workIntervalMinutes) min",
+                                value: $prefs.workIntervalMinutes,
+                                in: 30...120,
+                                step: 15)
+
+                        Stepper("Rest for \(prefs.restDurationMinutes) min",
+                                value: $prefs.restDurationMinutes,
+                                in: 5...30,
+                                step: 5)
+                    }
+                } header: {
+                    Text("Rest Breaks")
+                } footer: {
+                    Text("Take a \(prefs.restDurationMinutes)-minute break after every \(prefs.workIntervalMinutes) minutes of work.")
                 }
 
                 // MARK: - Language Section (Future)

@@ -15,6 +15,7 @@ struct TouchStoneApp: App {
             DayPlan.self,
             Backlog.self,
             ScheduledSession.self,
+            Rule.self,
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,
@@ -22,7 +23,14 @@ struct TouchStoneApp: App {
         )
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            let container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+
+            // Seed default rules on first launch
+            let context = ModelContext(container)
+            seedDefaultRules(context: context)
+            try? context.save()
+
+            return container
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
