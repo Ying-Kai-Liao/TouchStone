@@ -23,6 +23,9 @@ class UserPreferences {
         static let dinnerEnabled = "dinnerEnabled"
         static let dinnerStartHour = "dinnerStartHour"
         static let dinnerEndHour = "dinnerEndHour"
+        static let restBetweenSessionsEnabled = "restBetweenSessionsEnabled"
+        static let workIntervalMinutes = "workIntervalMinutes"
+        static let restDurationMinutes = "restDurationMinutes"
         static let appLanguage = "appLanguage"
     }
 
@@ -89,6 +92,23 @@ class UserPreferences {
         didSet { defaults.set(dinnerEndHour, forKey: Keys.dinnerEndHour) }
     }
 
+    // MARK: - Rest Breaks
+
+    /// Whether to add rest breaks after work intervals
+    var restBetweenSessionsEnabled: Bool {
+        didSet { defaults.set(restBetweenSessionsEnabled, forKey: Keys.restBetweenSessionsEnabled) }
+    }
+
+    /// Work interval before taking a rest (default: 60 minutes)
+    var workIntervalMinutes: Int {
+        didSet { defaults.set(workIntervalMinutes, forKey: Keys.workIntervalMinutes) }
+    }
+
+    /// Duration of rest breaks in minutes (default: 15)
+    var restDurationMinutes: Int {
+        didSet { defaults.set(restDurationMinutes, forKey: Keys.restDurationMinutes) }
+    }
+
     // MARK: - Language (Future)
 
     /// App language setting (default: follow system)
@@ -110,6 +130,9 @@ class UserPreferences {
         self.dinnerEnabled = defaults.object(forKey: Keys.dinnerEnabled) as? Bool ?? true
         self.dinnerStartHour = defaults.object(forKey: Keys.dinnerStartHour) as? Int ?? 18
         self.dinnerEndHour = defaults.object(forKey: Keys.dinnerEndHour) as? Int ?? 19
+        self.restBetweenSessionsEnabled = defaults.object(forKey: Keys.restBetweenSessionsEnabled) as? Bool ?? true
+        self.workIntervalMinutes = defaults.object(forKey: Keys.workIntervalMinutes) as? Int ?? 60
+        self.restDurationMinutes = defaults.object(forKey: Keys.restDurationMinutes) as? Int ?? 15
         self.appLanguage = defaults.string(forKey: Keys.appLanguage) ?? "system"
     }
 

@@ -111,6 +111,27 @@ struct SettingsView: View {
                     Text("Sessions won't be scheduled during breaks.")
                 }
 
+                // MARK: - Rest Breaks Section
+                Section {
+                    Toggle("Rest Breaks", isOn: $prefs.restBetweenSessionsEnabled)
+
+                    if prefs.restBetweenSessionsEnabled {
+                        Stepper("Work for \(prefs.workIntervalMinutes) min",
+                                value: $prefs.workIntervalMinutes,
+                                in: 30...120,
+                                step: 15)
+
+                        Stepper("Rest for \(prefs.restDurationMinutes) min",
+                                value: $prefs.restDurationMinutes,
+                                in: 5...30,
+                                step: 5)
+                    }
+                } header: {
+                    Text("Rest Breaks")
+                } footer: {
+                    Text("Take a \(prefs.restDurationMinutes)-minute break after every \(prefs.workIntervalMinutes) minutes of work.")
+                }
+
                 // MARK: - Language Section (Future)
                 Section {
                     Picker("Language", selection: $prefs.appLanguage) {

@@ -19,6 +19,8 @@ struct FlowItemRow: View {
             BreathingSpaceRow(minutes: minutes)
         case .flowPrep(let minutes):
             FlowPrepRow(minutes: minutes)
+        case .rest(let minutes):
+            RestRow(minutes: minutes)
         }
     }
 }
@@ -241,6 +243,35 @@ struct FlowPrepRow: View {
             .background(
                 Capsule()
                     .fill(Color.green.opacity(0.1))
+            )
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Rest Row
+
+/// Rest break between work sessions
+struct RestRow: View {
+    let minutes: Int
+
+    var body: some View {
+        HStack {
+            Spacer()
+            HStack(spacing: 6) {
+                Image(systemName: "cup.and.saucer.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                Text("Rest \u{00B7} \(minutes)m")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(Color.orange.opacity(0.1))
             )
             Spacer()
         }

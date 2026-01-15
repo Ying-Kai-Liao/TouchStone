@@ -416,44 +416,35 @@ class DayState {
 
     private func insertTransitionItems(items: [WorkflowItem]) -> [WorkflowItem] {
         guard !items.isEmpty else { return items }
+        guard prefs.restBetweenSessionsEnabled else { return items }
 
         var result: [WorkflowItem] = []
-        let minBreathingSpace = 15 // Minimum minutes for breathing space
-        let flowPrepDuration = 15  // Minutes for flow prep
+        var accumulatedWorkMinutes = 0
+        let workInterval = prefs.workIntervalMinutes
+        let restDuration = prefs.restDurationMinutes
 
-        for (index, item) in items.enumerated() {
-            // Check gap before first water session
-            if index > 0 {
-                let previousItem = items[index - 1]
-                let gapMinutes = Int(item.startTime.timeIntervalSince(previousItem.endTime) / 60)
+        for item in items {
+            // Track work time for water (work) sessions
+            if item.isWater {
+                let sessionMinutes = item.durationMinutes
 
-                // Add breathing space if there's a significant gap
-                if gapMinutes >= minBreathingSpace && gapMinutes <= 60 {
-                    let breathingItem = WorkflowItem(
-                        type: .breathingSpace(minutes: min(gapMinutes, 30)),
-                        startTime: previousItem.endTime,
-                        endTime: item.startTime,
-                        status: .suggested
-                    )
-                    result.append(breathingItem)
+                // Check if adding this session would exceed the work interval
+                if accumulatedWorkMinutes + sessionMinutes >= workInterval && accumulatedWorkMinutes > 0 {
+                    // Insert rest break before this session
+                    if let lastItem = result.last {
+                        let restItem = WorkflowItem(
+                            type: .rest(minutes: restDuration),
+                            startTime: lastItem.endTime,
+                            endTime: lastItem.endTime.addingTimeInterval(Double(restDuration) * 60),
+                            status: .suggested
+                        )
+                        result.append(restItem)
+                    }
+                    // Reset accumulated time after rest
+                    accumulatedWorkMinutes = 0
                 }
-            }
 
-            // Add flow prep before water sessions (if there's room)
-            if item.isWater && index > 0 {
-                let previousItem = result.last ?? items[index - 1]
-                let gapMinutes = Int(item.startTime.timeIntervalSince(previousItem.endTime) / 60)
-
-                if gapMinutes >= flowPrepDuration + 5 {
-                    let prepStart = item.startTime.addingTimeInterval(-Double(flowPrepDuration) * 60)
-                    let prepItem = WorkflowItem(
-                        type: .flowPrep(minutes: flowPrepDuration),
-                        startTime: prepStart,
-                        endTime: item.startTime,
-                        status: .suggested
-                    )
-                    result.append(prepItem)
-                }
+                accumulatedWorkMinutes += sessionMinutes
             }
 
             result.append(item)
