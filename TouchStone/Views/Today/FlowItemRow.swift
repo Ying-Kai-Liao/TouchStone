@@ -154,8 +154,9 @@ struct StoneFlowRow: View {
 // MARK: - Water Flow Row
 
 /// Suggested session card with touch and focus actions.
-/// Shows expanded view with water image header when active (in flow).
-/// Shows compact collapsed view when not active.
+/// Ghost block (dashed, translucent) when not touched today.
+/// Shows expanded view with water image header when touched.
+/// Can only be touched once in schedule - use "MORE TO TOUCH" for additional touches.
 struct WaterFlowRow: View {
     let item: WorkflowItem
     let onTouch: (() -> Void)?
@@ -171,125 +172,137 @@ struct WaterFlowRow: View {
         }
     }
 
-    /// Ghost styling for untouched, solid for touched
+    /// Ghost styling for untouched items
     private var isGhost: Bool {
-        !hasTouchedToday && item.status != .inProgress
+        !hasTouchedToday
     }
 
-    /// Whether this is the active "in flow" session
-    private var isInFlow: Bool {
-        item.status == .inProgress
+    /// Show expanded view when touched (has been interacted with today)
+    private var isExpanded: Bool {
+        hasTouchedToday
     }
 
     private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
 
     var body: some View {
-        // Whole block is tappable to touch
-        Button(action: { onTouch?() }) {
-            VStack(alignment: .leading, spacing: 0) {
-                // Water image header for in-flow sessions
-                if isInFlow {
-                    inFlowHeader
+        // Only tappable if not yet touched today
+        Group {
+            if isGhost {
+                // Tappable ghost block
+                Button(action: { onTouch?() }) {
+                    cardContent
                 }
+                .buttonStyle(.plain)
+            } else {
+                // Already touched - not tappable (use MORE TO TOUCH for additional)
+                cardContent
+            }
+        }
+    }
 
-                // Content - expanded for active, compact for others
-                if isInFlow {
-                    // Full content for active water
-                    VStack(alignment: .leading, spacing: 8) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.title)
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.primary)
-                                .multilineTextAlignment(.leading)
+    private var cardContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Water image header for touched sessions
+            if isExpanded {
+                waterHeader
+            }
 
-                            if let subtitle = item.subtitle {
-                                Text(subtitle)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+            // Content - expanded for touched, compact for ghost
+            if isExpanded {
+                // Full content for touched water
+                VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.title)
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
 
-                        // Time and Focus button row
-                        HStack(alignment: .center, spacing: 12) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "clock")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text(item.timeRangeString)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            // Focus button - subtle styling
-                            if let onFocus = onFocus {
-                                Button(action: onFocus) {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "scope")
-                                            .font(.system(size: 12, weight: .medium))
-                                        Text("Focus")
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                    }
-                                    .foregroundStyle(Color.teal)
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 8)
-                                    .background(
-                                        Capsule()
-                                            .fill(Color.teal.opacity(0.15))
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
+                        if let subtitle = item.subtitle {
+                            Text(subtitle)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                } else {
-                    // Compact content for non-active waters
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.title)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundStyle(Color.primary.opacity(isGhost ? 0.6 : 1.0))
 
-                            if let subtitle = item.subtitle {
-                                Text(subtitle)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
+                    // Time and Focus button row
+                    HStack(alignment: .center, spacing: 12) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "clock")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(item.timeRangeString)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                         }
 
                         Spacer()
 
-                        Text(item.timeRangeString)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        // Focus button - subtle styling
+                        if let onFocus = onFocus {
+                            Button(action: onFocus) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "scope")
+                                        .font(.system(size: 12, weight: .medium))
+                                    Text("Focus")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                }
+                                .foregroundStyle(Color.teal)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.teal.opacity(0.15))
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+            } else {
+                // Compact ghost content for untouched waters
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.primary.opacity(0.6))
+
+                        if let subtitle = item.subtitle {
+                            Text(subtitle)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    Text(item.timeRangeString)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
             }
-            .background(
-                RoundedRectangle(cornerRadius: isInFlow ? 16 : 12, style: .continuous)
-                    .fill(cardBackground.opacity(isGhost ? 0.5 : 1))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: isInFlow ? 16 : 12, style: .continuous)
-                    .strokeBorder(
-                        isGhost ? Color.teal.opacity(0.3) : Color.clear,
-                        style: StrokeStyle(lineWidth: 1.5, dash: isGhost ? [6, 4] : [])
-                    )
-            )
         }
-        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: isExpanded ? 16 : 12, style: .continuous)
+                .fill(cardBackground.opacity(isGhost ? 0.5 : 1))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: isExpanded ? 16 : 12, style: .continuous)
+                .strokeBorder(
+                    isGhost ? Color.teal.opacity(0.3) : Color.clear,
+                    style: StrokeStyle(lineWidth: 1.5, dash: isGhost ? [6, 4] : [])
+                )
+        )
     }
 
-    /// Gradient header with "IN FLOW" badge for active sessions
-    private var inFlowHeader: some View {
+    /// Gradient header with "IN FLOW" badge for touched sessions
+    private var waterHeader: some View {
         ZStack(alignment: .topLeading) {
             // Gradient background simulating water/waves image
             LinearGradient(
@@ -325,8 +338,8 @@ struct WaterFlowRow: View {
                 )
             )
 
-            // IN FLOW badge
-            Text("IN FLOW")
+            // WATER badge
+            Text("WATER")
                 .font(.caption2)
                 .fontWeight(.bold)
                 .foregroundStyle(.white)
