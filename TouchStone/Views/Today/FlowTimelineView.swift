@@ -62,79 +62,80 @@ struct FlowTimelineView: View {
     }
 
     private var endOfStreamIndicator: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
             // Dots
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 ForEach(0..<3, id: \.self) { _ in
                     Circle()
-                        .fill(Color(.systemGray4))
-                        .frame(width: 4, height: 4)
+                        .fill(Color(.systemGray3))
+                        .frame(width: 5, height: 5)
                 }
             }
-            .padding(.top, 16)
+            .padding(.top, 20)
 
             Text("END OF STREAM")
                 .font(.caption2)
-                .fontWeight(.medium)
-                .foregroundStyle(.tertiary)
-                .tracking(1)
-                .padding(.top, 8)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color(.systemGray2))
+                .tracking(2)
+                .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+        .padding(.vertical, 32)
     }
 
     private var additionalProjectsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             // Section header - tappable to expand/collapse
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     showMoreToTouch.toggle()
                 }
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: showMoreToTouch ? "chevron.down" : "chevron.right")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color(.systemGray2))
 
                     Text("MORE TO TOUCH")
                         .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.secondary)
-                        .tracking(1)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color(.systemGray2))
+                        .tracking(2)
 
                     Text("(\(additionalProjects.count))")
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color(.systemGray3))
 
                     Spacer()
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
             }
             .buttonStyle(.plain)
 
             // Project blocks - only show when expanded
             if showMoreToTouch {
-                VStack(spacing: 8) {
+                VStack(spacing: 10) {
                     ForEach(additionalProjects) { project in
                         AdditionalProjectRow(
                             project: project,
                             onTouch: { onTouch(project) },
                             onFocus: { onFocus(project) }
                         )
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, 20)
                     }
                 }
             }
         }
-        .padding(.bottom, 24)
+        .padding(.bottom, 32)
     }
 }
 
 // MARK: - Timeline Item Container
 
-/// Wraps each flow item with the timeline connector line
+/// Wraps each flow item with the timeline connector line and status indicator
 struct TimelineItemContainer: View {
     let item: WorkflowItem
     let isFirst: Bool
@@ -145,21 +146,52 @@ struct TimelineItemContainer: View {
     private var lineColor: Color {
         switch item.status {
         case .completed:
-            return .green.opacity(0.5)
+            return Color(.systemGray4)
         case .inProgress:
-            return .teal
+            return Color(.systemGray4)
         case .upcoming, .suggested:
             return Color(.systemGray4)
         case .overdue:
-            return .orange.opacity(0.5)
+            return Color(.systemGray4)
         }
+    }
+
+    private var statusIcon: String {
+        switch item.status {
+        case .completed:
+            return "checkmark"
+        case .inProgress:
+            return "play.fill"
+        case .upcoming, .suggested:
+            return "circle"
+        case .overdue:
+            return "arrow.counterclockwise"
+        }
+    }
+
+    private var statusColor: Color {
+        switch item.status {
+        case .completed:
+            return .green
+        case .inProgress:
+            return .teal
+        case .upcoming, .suggested:
+            return Color(.systemGray3)
+        case .overdue:
+            return .orange
+        }
+    }
+
+    /// Whether this is a transition item (breathing space or flow prep)
+    private var isTransitionItem: Bool {
+        item.isBreathingSpace || item.isFlowPrep
     }
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            // Timeline connector
-            timelineConnector
-                .frame(width: 20)
+            // Timeline with status indicator
+            timelineWithIndicator
+                .frame(width: 56)
 
             // Content
             FlowItemRow(
@@ -167,30 +199,52 @@ struct TimelineItemContainer: View {
                 onTouch: item.project.map { project in { onTouch(project) } },
                 onFocus: item.project.map { project in { onFocus(project) } }
             )
-            .padding(.leading, 8)
             .padding(.trailing, 16)
-            .padding(.vertical, item.isBreathingSpace || item.isFlowPrep ? 4 : 8)
+            .padding(.vertical, isTransitionItem ? 2 : 6)
         }
     }
 
-    private var timelineConnector: some View {
+    private var timelineWithIndicator: some View {
         GeometryReader { geometry in
-            ZStack(alignment: .top) {
-                // Vertical line
-                if !isLast {
-                    Rectangle()
-                        .fill(lineColor)
-                        .frame(width: 2)
-                        .offset(x: 9) // Center in the 20pt width
-                }
+            ZStack(alignment: .leading) {
+                // Vertical line - continuous
+                Rectangle()
+                    .fill(lineColor.opacity(0.4))
+                    .frame(width: 2)
+                    .frame(maxHeight: .infinity)
+                    .offset(x: 24) // Center of the 56pt width
 
-                // Top connector (for non-first items)
-                if !isFirst {
-                    Rectangle()
-                        .fill(lineColor)
-                        .frame(width: 2, height: 8)
-                        .offset(x: 9)
+                // Status indicator (only for non-transition items)
+                if !isTransitionItem {
+                    statusIndicator
+                        .offset(x: 0, y: 14) // Position at top of content
                 }
+            }
+        }
+    }
+
+    private var statusIndicator: some View {
+        ZStack {
+            // Outer circle background
+            Circle()
+                .fill(Color(uiColor: UIColor(red: 0.12, green: 0.14, blue: 0.15, alpha: 1.0)))
+                .frame(width: 50, height: 50)
+
+            // Status circle
+            Circle()
+                .fill(statusColor.opacity(item.status == .completed ? 0.15 : 0.2))
+                .frame(width: 44, height: 44)
+
+            // Inner circle for upcoming/suggested (empty circle style)
+            if item.status == .upcoming || item.status == .suggested {
+                Circle()
+                    .strokeBorder(Color(.systemGray3), lineWidth: 2)
+                    .frame(width: 32, height: 32)
+            } else {
+                // Icon for other states
+                Image(systemName: statusIcon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(statusColor)
             }
         }
     }
