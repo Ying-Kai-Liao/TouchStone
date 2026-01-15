@@ -6,6 +6,8 @@ struct SettingsView: View {
     @State private var showSaveConfirmation = false
     @State private var showDeleteConfirmation = false
 
+    @State private var prefs = UserPreferences.shared
+
     private var hasExistingKey: Bool {
         APIKeyManager.shared.hasAPIKey
     }
@@ -13,6 +15,116 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // MARK: - Productivity Section
+                Section {
+                    Stepper("Daily Goal: \(prefs.dailyProductiveHours) hours",
+                            value: $prefs.dailyProductiveHours,
+                            in: 1...12)
+
+                    Stepper("Session Length: \(prefs.defaultSessionMinutes) min",
+                            value: $prefs.defaultSessionMinutes,
+                            in: 30...120,
+                            step: 15)
+                } header: {
+                    Text("Productivity")
+                } footer: {
+                    Text("Your daily target and preferred session duration.")
+                }
+
+                // MARK: - Working Hours Section
+                Section {
+                    Picker("Day Starts", selection: $prefs.workDayStartHour) {
+                        ForEach(5...12, id: \.self) { hour in
+                            Text(formatHour(hour)).tag(hour)
+                        }
+                    }
+
+                    Picker("Day Ends", selection: $prefs.workDayEndHour) {
+                        ForEach(17...23, id: \.self) { hour in
+                            Text(formatHour(hour)).tag(hour)
+                        }
+                    }
+                } header: {
+                    Text("Working Hours")
+                } footer: {
+                    Text("Sessions will only be scheduled within these hours.")
+                }
+
+                // MARK: - Daily Rules Section
+                Section {
+                    Toggle("Lunch Break", isOn: $prefs.lunchEnabled)
+
+                    if prefs.lunchEnabled {
+                        HStack {
+                            Text("Time")
+                            Spacer()
+                            Picker("Start", selection: $prefs.lunchStartHour) {
+                                ForEach(11...14, id: \.self) { hour in
+                                    Text(formatHour(hour)).tag(hour)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+
+                            Text("-")
+
+                            Picker("End", selection: $prefs.lunchEndHour) {
+                                ForEach(12...15, id: \.self) { hour in
+                                    Text(formatHour(hour)).tag(hour)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+
+                    Toggle("Dinner Break", isOn: $prefs.dinnerEnabled)
+
+                    if prefs.dinnerEnabled {
+                        HStack {
+                            Text("Time")
+                            Spacer()
+                            Picker("Start", selection: $prefs.dinnerStartHour) {
+                                ForEach(17...20, id: \.self) { hour in
+                                    Text(formatHour(hour)).tag(hour)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+
+                            Text("-")
+
+                            Picker("End", selection: $prefs.dinnerEndHour) {
+                                ForEach(18...21, id: \.self) { hour in
+                                    Text(formatHour(hour)).tag(hour)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Daily Rules")
+                } footer: {
+                    Text("Sessions won't be scheduled during breaks.")
+                }
+
+                // MARK: - Language Section (Future)
+                Section {
+                    Picker("Language", selection: $prefs.appLanguage) {
+                        Text("System Default").tag("system")
+                        Text("English").tag("en")
+                        Text("中文").tag("zh")
+                    }
+                } header: {
+                    Text("Language")
+                } footer: {
+                    Text("Language support coming soon.")
+                }
+
+                // MARK: - AI Integration Section
                 Section {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("OpenAI API Key")
@@ -83,6 +195,15 @@ struct SettingsView: View {
                 Text("This will remove your API key. You'll need to enter it again to use AI features.")
             }
         }
+    }
+
+    // MARK: - Helper Functions
+
+    private func formatHour(_ hour: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h a"
+        let date = Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date()) ?? Date()
+        return formatter.string(from: date)
     }
 
     // MARK: - Existing Key View
