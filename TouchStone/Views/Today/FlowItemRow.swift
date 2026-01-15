@@ -34,46 +34,19 @@ struct StoneFlowRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Main content
-            HStack(alignment: .center, spacing: 12) {
-                // Stone details
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.title)
-                        .font(.body)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(isCompleted ? .secondary : .primary)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(item.title)
+                .font(.body)
+                .fontWeight(.semibold)
+                .foregroundStyle(isCompleted ? .secondary : .primary)
 
-                    Text(item.timeRangeString)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                // Participant avatars (placeholder - can add real avatars later)
-                if !isCompleted {
-                    HStack(spacing: -8) {
-                        Circle()
-                            .fill(Color.orange.opacity(0.8))
-                            .frame(width: 28, height: 28)
-                            .overlay(
-                                Text("👤")
-                                    .font(.system(size: 14))
-                            )
-                        Circle()
-                            .fill(Color.blue.opacity(0.8))
-                            .frame(width: 28, height: 28)
-                            .overlay(
-                                Text("👔")
-                                    .font(.system(size: 14))
-                            )
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            Text(item.timeRangeString)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0)))
@@ -125,29 +98,19 @@ struct WaterFlowRow: View {
 
                 // Main content
                 VStack(alignment: .leading, spacing: 8) {
-                    // Title row with menu
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.title)
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundStyle(Color.primary.opacity(isGhost ? 0.6 : 1.0))
-                                .multilineTextAlignment(.leading)
+                    // Title row
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.title)
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.primary.opacity(isGhost ? 0.6 : 1.0))
+                            .multilineTextAlignment(.leading)
 
-                            if let subtitle = item.subtitle {
-                                Text(subtitle)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
+                        if let subtitle = item.subtitle {
+                            Text(subtitle)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                         }
-
-                        Spacer()
-
-                        // Three-dot menu
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 32, height: 32)
                     }
 
                     // Time and Focus button row
@@ -164,22 +127,22 @@ struct WaterFlowRow: View {
 
                         Spacer()
 
-                        // Focus button - styled as teal pill
+                        // Focus button - subtle styling
                         if let onFocus = onFocus {
                             Button(action: onFocus) {
                                 HStack(spacing: 6) {
                                     Image(systemName: "scope")
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .font(.system(size: 12, weight: .medium))
                                     Text("Focus")
                                         .font(.subheadline)
-                                        .fontWeight(.semibold)
+                                        .fontWeight(.medium)
                                 }
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.teal)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 8)
                                 .background(
                                     Capsule()
-                                        .fill(Color.teal)
+                                        .fill(Color.teal.opacity(0.15))
                                 )
                             }
                             .buttonStyle(.plain)
@@ -431,21 +394,21 @@ struct AdditionalProjectRow: View {
 
                 Spacer()
 
-                // Focus button - styled as teal pill to match WaterFlowRow
+                // Focus button - subtle styling
                 Button(action: onFocus) {
                     HStack(spacing: 4) {
                         Image(systemName: "scope")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.system(size: 10, weight: .medium))
                         Text("Focus")
                             .font(.caption)
-                            .fontWeight(.semibold)
+                            .fontWeight(.medium)
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.teal)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(
                         Capsule()
-                            .fill(Color.teal)
+                            .fill(Color.teal.opacity(0.15))
                     )
                 }
                 .buttonStyle(.plain)
