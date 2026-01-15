@@ -40,12 +40,14 @@ struct FocusModeView: View {
 
     // Get category label (WORK, CREATIVE, etc.)
     var categoryLabel: String {
-        switch project.archetype {
+        guard let archetype = project.archetype else {
+            return "WORK"
+        }
+        switch archetype {
         case .lab: return "RESEARCH"
-        case .studio: return "CREATIVE"
-        case .sprint: return "SPRINT"
-        case .simple: return "WORK"
-        case .none: return "WORK"
+        case .hunt: return "ADMIN"
+        case .spiral: return "LEARNING"
+        case .build: return "BUILD"
         }
     }
 
