@@ -43,15 +43,15 @@ class DayState {
 
     // MARK: - Compute Day State
 
-    func compute(stones: [StoneEvent], projects: [Project]) {
+    func compute(stones: [StoneEvent], projects: [Project], rules: [Rule] = []) {
         // 1. Get today's stone instances
         stoneInstances = stones
             .filter { $0.occursOn(date: date) }
             .map { StoneEventInstance(event: $0, on: date) }
             .sorted { $0.startTime < $1.startTime }
 
-        // 2. Calculate free time slots
-        freeSlots = calculateFreeSlots()
+        // 2. Calculate free time slots (considering rules)
+        freeSlots = calculateFreeSlots(rules: rules)
 
         // 3. Calculate total minutes touched today across all projects
         let today = calendar.startOfDay(for: Date())
@@ -308,12 +308,13 @@ class DayState {
 
         // Calculate remaining capacity
         let remainingCapacity = max(0, availableMinutes - minutesTouchedToday)
-        guard remainingCapacity >= 30 else { return [] } // Need at least 30 min
+        let minSession = prefs.sessionMinMinutes
+        guard remainingCapacity >= minSession else { return [] }
 
         var sessions: [SuggestedSession] = []
         var usedMinutes = 0
         var slotIndex = 0
-        var usableSlots = freeSlots.filter { $0.durationMinutes >= 30 }
+        var usableSlots = freeSlots.filter { $0.durationMinutes >= minSession }
 
         // Adjust slots to start from now if we're in the middle of the day
         let now = Date()
@@ -322,7 +323,7 @@ class DayState {
             if slot.start >= now { return slot } // Slot is in future
             // Truncate slot to start from now
             return TimeSlot(start: now, end: slot.end)
-        }.filter { $0.durationMinutes >= 30 }
+        }.filter { $0.durationMinutes >= minSession }
 
         // Pour projects into slots - track current position within slot
         var currentSlotStart = usableSlots.first?.start ?? now
@@ -333,36 +334,62 @@ class DayState {
 
             let slot = usableSlots[slotIndex]
             let remainingSlotMinutes = Int(slot.end.timeIntervalSince(currentSlotStart) / 60)
-            let sessionDuration = min(prefs.defaultSessionMinutes, remainingSlotMinutes, remainingCapacity - usedMinutes)
 
-            if sessionDuration >= 30 {
+            // Smart fit: calculate optimal session duration
+            let sessionDuration = optimalSessionDuration(
+                availableMinutes: min(remainingSlotMinutes, remainingCapacity - usedMinutes),
+                minDuration: prefs.sessionMinMinutes,
+                maxDuration: prefs.sessionMaxMinutes
+            )
+
+            if let duration = sessionDuration {
                 // Create a time slot for this specific session
                 let sessionSlot = TimeSlot(
                     start: currentSlotStart,
-                    end: currentSlotStart.addingTimeInterval(Double(sessionDuration) * 60)
+                    end: currentSlotStart.addingTimeInterval(Double(duration) * 60)
                 )
                 let session = SuggestedSession(
                     project: project,
                     timeSlot: sessionSlot,
-                    suggestedMinutes: sessionDuration
+                    suggestedMinutes: duration
                 )
                 sessions.append(session)
-                usedMinutes += sessionDuration
+                usedMinutes += duration
 
                 // Move current position forward
-                currentSlotStart = currentSlotStart.addingTimeInterval(Double(sessionDuration) * 60)
+                currentSlotStart = currentSlotStart.addingTimeInterval(Double(duration) * 60)
 
-                // Move to next slot if this one is consumed
-                if currentSlotStart >= slot.end.addingTimeInterval(-15 * 60) {
+                // Move to next slot if remaining space is too small
+                let remainingInSlot = Int(slot.end.timeIntervalSince(currentSlotStart) / 60)
+                if remainingInSlot < minSession {
                     slotIndex += 1
                     if slotIndex < usableSlots.count {
                         currentSlotStart = usableSlots[slotIndex].start
                     }
                 }
+            } else {
+                // Can't fit a session, move to next slot
+                slotIndex += 1
+                if slotIndex < usableSlots.count {
+                    currentSlotStart = usableSlots[slotIndex].start
+                }
             }
         }
 
         return sessions
+    }
+
+    /// Calculate optimal session duration using smart fit algorithm.
+    /// Returns nil if available time is less than minimum duration.
+    private func optimalSessionDuration(availableMinutes: Int, minDuration: Int, maxDuration: Int) -> Int? {
+        // Not enough time for minimum session
+        if availableMinutes < minDuration { return nil }
+
+        // Plenty of time - use max duration
+        if availableMinutes >= maxDuration { return maxDuration }
+
+        // Smart fit: use available space (fits perfectly)
+        return availableMinutes
     }
 
     // MARK: - Workflow Items Generation
@@ -416,44 +443,43 @@ class DayState {
 
     private func insertTransitionItems(items: [WorkflowItem]) -> [WorkflowItem] {
         guard !items.isEmpty else { return items }
+        guard prefs.restBetweenSessionsEnabled else { return items }
 
         var result: [WorkflowItem] = []
-        let minBreathingSpace = 15 // Minimum minutes for breathing space
-        let flowPrepDuration = 15  // Minutes for flow prep
+        var accumulatedWorkMinutes = 0
+        let workInterval = prefs.workIntervalMinutes
+        let restDuration = prefs.restDurationMinutes
 
-        for (index, item) in items.enumerated() {
-            // Check gap before first water session
-            if index > 0 {
-                let previousItem = items[index - 1]
-                let gapMinutes = Int(item.startTime.timeIntervalSince(previousItem.endTime) / 60)
+        for item in items {
+            // Track work time for water (work) sessions
+            if item.isWater {
+                let sessionMinutes = item.durationMinutes
 
-                // Add breathing space if there's a significant gap
-                if gapMinutes >= minBreathingSpace && gapMinutes <= 60 {
-                    let breathingItem = WorkflowItem(
-                        type: .breathingSpace(minutes: min(gapMinutes, 30)),
-                        startTime: previousItem.endTime,
-                        endTime: item.startTime,
-                        status: .suggested
-                    )
-                    result.append(breathingItem)
+                // Check if we've accumulated enough work to warrant a rest
+                if accumulatedWorkMinutes + sessionMinutes >= workInterval && accumulatedWorkMinutes > 0 {
+                    // Only insert rest if there's enough gap before this item
+                    if let lastItem = result.last {
+                        let restEnd = lastItem.endTime.addingTimeInterval(Double(restDuration) * 60)
+
+                        // FIX: Only insert rest if it doesn't overlap with the current item
+                        if restEnd <= item.startTime {
+                            let restItem = WorkflowItem(
+                                type: .rest(minutes: restDuration),
+                                startTime: lastItem.endTime,
+                                endTime: restEnd,
+                                status: .suggested
+                            )
+                            result.append(restItem)
+                        }
+                    }
+                    // Reset accumulated time after rest (or skipped rest)
+                    accumulatedWorkMinutes = 0
                 }
-            }
 
-            // Add flow prep before water sessions (if there's room)
-            if item.isWater && index > 0 {
-                let previousItem = result.last ?? items[index - 1]
-                let gapMinutes = Int(item.startTime.timeIntervalSince(previousItem.endTime) / 60)
-
-                if gapMinutes >= flowPrepDuration + 5 {
-                    let prepStart = item.startTime.addingTimeInterval(-Double(flowPrepDuration) * 60)
-                    let prepItem = WorkflowItem(
-                        type: .flowPrep(minutes: flowPrepDuration),
-                        startTime: prepStart,
-                        endTime: item.startTime,
-                        status: .suggested
-                    )
-                    result.append(prepItem)
-                }
+                accumulatedWorkMinutes += sessionMinutes
+            } else if item.isStone {
+                // Reset work accumulator when hitting a stone (natural break)
+                accumulatedWorkMinutes = 0
             }
 
             result.append(item)
@@ -464,18 +490,26 @@ class DayState {
 
     // MARK: - Free Time Calculation
 
-    private func calculateFreeSlots() -> [TimeSlot] {
+    private func calculateFreeSlots(rules: [Rule] = []) -> [TimeSlot] {
         // Use working hours from preferences
         let dayStart = calendar.date(bySettingHour: prefs.workDayStartHour, minute: 0, second: 0, of: date)!
         let dayEnd = calendar.date(bySettingHour: prefs.workDayEndHour, minute: 0, second: 0, of: date)!
 
-        // Combine stones with daily rules (lunch/dinner) as blocked slots
+        // Combine stones with rules as blocked slots
         var blockedSlots: [(start: Date, end: Date)] = stoneInstances.map {
             ($0.startTime, $0.endTime)
         }
 
-        // Add lunch/dinner from preferences
-        blockedSlots.append(contentsOf: prefs.blockedSlots(for: date))
+        // Add active rules that apply to this date
+        for rule in rules {
+            if let blocked = rule.blockedRange(for: date) {
+                blockedSlots.append(blocked)
+            }
+            // Handle overnight rules (morning portion)
+            if let morningBlocked = rule.morningBlockedRange(for: date) {
+                blockedSlots.append(morningBlocked)
+            }
+        }
 
         // Sort by start time
         blockedSlots.sort { $0.start < $1.start }

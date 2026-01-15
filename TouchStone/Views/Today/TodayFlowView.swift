@@ -15,6 +15,9 @@ struct TodayFlowView: View {
 
     @Query private var dayPlans: [DayPlan]
 
+    @Query(filter: #Predicate<Rule> { $0.isActive })
+    private var activeRules: [Rule]
+
     @State private var dayState = DayState()
     @State private var selectedDate = Date()
     @State private var showZenMode = false
@@ -255,7 +258,7 @@ struct TodayFlowView: View {
             dayState.computeStonesOnly(stones: Array(allStones))
         } else {
             // Preview mode (before "Let's go") - compute ephemeral suggestions
-            dayState.compute(stones: Array(allStones), projects: Array(activeProjects))
+            dayState.compute(stones: Array(allStones), projects: Array(activeProjects), rules: Array(activeRules))
         }
     }
 
@@ -392,5 +395,5 @@ struct DateTabButton: View {
 
 #Preview {
     TodayFlowView()
-        .modelContainer(for: [Project.self, StoneEvent.self, TouchLog.self], inMemory: true)
+        .modelContainer(for: [Project.self, StoneEvent.self, TouchLog.self, Rule.self], inMemory: true)
 }
