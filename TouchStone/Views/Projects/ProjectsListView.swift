@@ -7,6 +7,14 @@ struct ProjectsListView: View {
 
     @State private var showingAddSheet = false
 
+    private var activeProjects: [Project] {
+        projects.filter { $0.isActive }
+    }
+
+    private var archivedProjects: [Project] {
+        projects.filter { !$0.isActive }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -23,6 +31,13 @@ struct ProjectsListView: View {
                         showingAddSheet = true
                     } label: {
                         Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 36, height: 36)
+                            .background(
+                                Circle()
+                                    .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)
+                            )
                     }
                 }
             }
@@ -33,31 +48,33 @@ struct ProjectsListView: View {
     }
 
     private var projectList: some View {
-        List {
-            Section {
-                ForEach(projects.filter { $0.isActive }) { project in
-                    ProjectRow(project: project)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if !activeProjects.isEmpty {
+                    projectSection(title: "ACTIVE", projects: activeProjects)
                 }
-                .onDelete { indexSet in
-                    deleteProjects(at: indexSet, from: projects.filter { $0.isActive })
-                }
-            } header: {
-                if !projects.filter({ $0.isActive }).isEmpty {
-                    Text("Active")
+
+                if !archivedProjects.isEmpty {
+                    projectSection(title: "ARCHIVED", projects: archivedProjects)
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+        }
+        .background(Color(.systemBackground))
+    }
 
-            Section {
-                ForEach(projects.filter { !$0.isActive }) { project in
-                    ProjectRow(project: project)
-                }
-                .onDelete { indexSet in
-                    deleteProjects(at: indexSet, from: projects.filter { !$0.isActive })
-                }
-            } header: {
-                if !projects.filter({ !$0.isActive }).isEmpty {
-                    Text("Archived")
-                }
+    private func projectSection(title: String, projects: [Project]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .tracking(1)
+                .padding(.leading, 4)
+
+            ForEach(projects) { project in
+                ProjectCard(project: project)
             }
         }
     }
@@ -81,69 +98,138 @@ struct ProjectsListView: View {
     }
 }
 
-struct ProjectRow: View {
+struct ProjectCard: View {
     @Bindable var project: Project
+
+    private var hoursToday: Int {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let todayLogs = project.touchLogs.filter { calendar.startOfDay(for: $0.timestamp) == today }
+        let totalMinutes = todayLogs.reduce(0) { $0 + $1.durationMinutes }
+        return totalMinutes / 60
+    }
+
+    private var phaseName: String? {
+        if project.hasStrategicPlan {
+            return project.activePhase?.title
+        } else {
+            return project.currentPhase
+        }
+    }
+
+    private var totalHours: Int {
+        project.totalPlannedMinutes / 60
+    }
+
+    private var completedHoursValue: Int {
+        project.completedHours
+    }
 
     var body: some View {
         NavigationLink {
             ProjectDetailView(project: project)
         } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(project.title)
-                        .fontWeight(.medium)
+            VStack(alignment: .leading, spacing: 12) {
+                // Top row: Title and hours badge
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(project.title)
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
 
-                    if project.hasStrategicPlan, let archetype = project.archetype {
-                        Text(archetype.displayName)
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.purple.opacity(0.15))
-                            .clipShape(Capsule())
+                        if let phase = phaseName {
+                            Text(phase)
+                                .font(.subheadline)
+                                .foregroundStyle(Color.white.opacity(0.6))
+                        }
                     }
 
                     Spacer()
 
-                    if project.touchCountToday > 0 {
-                        Text("Today: \(project.touchCountToday)")
-                            .font(.caption)
-                            .foregroundStyle(.green)
-                    }
-                }
-
-                HStack(spacing: 8) {
-                    // Phase name
-                    if project.hasStrategicPlan {
-                        if let phase = project.activePhase {
-                            Text(phase.title)
+                    HStack(spacing: 4) {
+                        if hoursToday > 0 {
+                            Text("\(hoursToday) hr\(hoursToday == 1 ? "" : "s") today")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .fontWeight(.medium)
+                                .foregroundStyle(Color(red: 0.4, green: 0.8, blue: 0.6))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .strokeBorder(Color(red: 0.4, green: 0.8, blue: 0.6).opacity(0.4), lineWidth: 1)
+                                )
                         }
-                    } else if let phase = project.currentPhase {
-                        Text(phase)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    // Hours progress
-                    if project.totalPlannedMinutes > 0 {
-                        Text(project.hoursString)
-                            .font(.caption)
-                            .foregroundStyle(Color.purple)
-                    } else if project.completedHours > 0 {
-                        Text("\(project.completedHours) hrs")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
                     }
                 }
 
-                // Hours-based progress bar
-                if project.totalPlannedMinutes > 0 {
-                    ProgressView(value: project.progress)
-                        .tint(.purple)
+                Spacer()
+
+                // Bottom row: Progress bar and hours
+                HStack(alignment: .center, spacing: 12) {
+                    // Progress bar
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            // Background track
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.white.opacity(0.15))
+                                .frame(height: 8)
+
+                            // Progress fill
+                            if project.totalPlannedMinutes > 0 {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color(red: 0.4, green: 0.7, blue: 0.55))
+                                    .frame(width: geometry.size.width * project.progress, height: 8)
+                            } else if completedHoursValue > 0 {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color(red: 0.4, green: 0.7, blue: 0.55))
+                                    .frame(width: 20, height: 8)
+                            }
+                        }
+                    }
+                    .frame(height: 8)
+
+                    // Chevron and hours
+                    HStack(spacing: 8) {
+                        if project.totalPlannedMinutes > 0 {
+                            Text("\(completedHoursValue) / \(totalHours)h")
+                                .font(.caption)
+                                .foregroundStyle(Color.white.opacity(0.5))
+                        } else if completedHoursValue > 0 {
+                            Text("\(completedHoursValue)h")
+                                .font(.caption)
+                                .foregroundStyle(Color.white.opacity(0.5))
+                        }
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(Color.white.opacity(0.3))
+                    }
                 }
             }
+            .padding(16)
+            .frame(minHeight: 120)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(red: 0.1, green: 0.18, blue: 0.15))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Color(red: 0.2, green: 0.35, blue: 0.28), lineWidth: 1)
+                    )
+            )
         }
+        .buttonStyle(.plain)
+    }
+}
+
+// Keep the old ProjectRow for backwards compatibility if needed elsewhere
+struct ProjectRow: View {
+    @Bindable var project: Project
+
+    var body: some View {
+        ProjectCard(project: project)
     }
 }
 
