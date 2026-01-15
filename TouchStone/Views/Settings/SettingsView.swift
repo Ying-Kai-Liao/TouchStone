@@ -31,34 +31,47 @@ struct SettingsView: View {
                     Text("Your daily target and preferred session duration.")
                 }
 
-                // MARK: - Working Hours Section
+                // MARK: - Daily Schedule Section
                 Section {
-                    Picker("Day Starts", selection: $prefs.workDayStartHour) {
-                        ForEach(5...12, id: \.self) { hour in
-                            Text(formatHour(hour)).tag(hour)
+                    HStack {
+                        Image(systemName: "sunrise.fill")
+                            .foregroundStyle(.orange)
+                        Picker("Wake up", selection: $prefs.workDayStartHour) {
+                            ForEach(5...12, id: \.self) { hour in
+                                Text(formatHour(hour)).tag(hour)
+                            }
                         }
                     }
 
-                    Picker("Day Ends", selection: $prefs.workDayEndHour) {
-                        ForEach(17...23, id: \.self) { hour in
-                            Text(formatHour(hour)).tag(hour)
+                    HStack {
+                        Image(systemName: "moon.fill")
+                            .foregroundStyle(.indigo)
+                        Picker("Wind down", selection: $prefs.workDayEndHour) {
+                            ForEach(17...23, id: \.self) { hour in
+                                Text(formatHour(hour)).tag(hour)
+                            }
                         }
                     }
                 } header: {
-                    Text("Working Hours")
+                    Text("Daily Schedule")
                 } footer: {
-                    Text("Sessions will only be scheduled within these hours.")
+                    Text("Work is only suggested between wake up and wind down times. Outside these hours is rest time.")
                 }
 
-                // MARK: - Daily Rules Section
+                // MARK: - Breaks Section
                 Section {
-                    Toggle("Lunch Break", isOn: $prefs.lunchEnabled)
+                    Toggle(isOn: $prefs.lunchEnabled) {
+                        HStack {
+                            Image(systemName: "fork.knife")
+                                .foregroundStyle(.green)
+                            Text("Lunch")
+                        }
+                    }
 
                     if prefs.lunchEnabled {
                         HStack {
-                            Text("Time")
                             Spacer()
-                            Picker("Start", selection: $prefs.lunchStartHour) {
+                            Picker("", selection: $prefs.lunchStartHour) {
                                 ForEach(11...14, id: \.self) { hour in
                                     Text(formatHour(hour)).tag(hour)
                                 }
@@ -68,7 +81,7 @@ struct SettingsView: View {
 
                             Text("-")
 
-                            Picker("End", selection: $prefs.lunchEndHour) {
+                            Picker("", selection: $prefs.lunchEndHour) {
                                 ForEach(12...15, id: \.self) { hour in
                                     Text(formatHour(hour)).tag(hour)
                                 }
@@ -79,13 +92,18 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                     }
 
-                    Toggle("Dinner Break", isOn: $prefs.dinnerEnabled)
+                    Toggle(isOn: $prefs.dinnerEnabled) {
+                        HStack {
+                            Image(systemName: "cup.and.saucer.fill")
+                                .foregroundStyle(.orange)
+                            Text("Dinner")
+                        }
+                    }
 
                     if prefs.dinnerEnabled {
                         HStack {
-                            Text("Time")
                             Spacer()
-                            Picker("Start", selection: $prefs.dinnerStartHour) {
+                            Picker("", selection: $prefs.dinnerStartHour) {
                                 ForEach(17...20, id: \.self) { hour in
                                     Text(formatHour(hour)).tag(hour)
                                 }
@@ -95,7 +113,7 @@ struct SettingsView: View {
 
                             Text("-")
 
-                            Picker("End", selection: $prefs.dinnerEndHour) {
+                            Picker("", selection: $prefs.dinnerEndHour) {
                                 ForEach(18...21, id: \.self) { hour in
                                     Text(formatHour(hour)).tag(hour)
                                 }
@@ -106,9 +124,9 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                     }
                 } header: {
-                    Text("Daily Rules")
+                    Text("Breaks")
                 } footer: {
-                    Text("Sessions won't be scheduled during breaks.")
+                    Text("Rest periods during your day. No work will be scheduled during breaks.")
                 }
 
                 // MARK: - Language Section (Future)
