@@ -1,13 +1,9 @@
 import SwiftUI
 import SwiftData
 
-/// FocusModeView is an optional, minimal focus experience.
-/// Per STATE_MACHINE.md:
-/// - Shows: Project name + phase + short goal line
-/// - Soft time container (~1h) without strict countdown
-/// - Can exit anytime (leaving early = finishing)
-///
-/// Phase goal is collapsible, session goal is very subtle (only visible when wanted)
+/// FocusModeView - Redesigned focus experience
+/// Shows: Project name + abstract visual + intention
+/// Elegant expandable details via card tap
 struct FocusModeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -16,11 +12,9 @@ struct FocusModeView: View {
     let onDismiss: () -> Void
 
     @State private var note: String = ""
-    @State private var showPhaseDetails = false
-    @State private var showSessionGoal = false
+    @State private var showDetails = false
     @State private var showMenu = false
     @State private var hasStarted = false
-    @State private var remainingMinutes: Int = 55
 
     var activePhase: ProjectPhase? {
         project.activePhase
@@ -30,52 +24,90 @@ struct FocusModeView: View {
         project.nextPlannedSession
     }
 
-    // MARK: - Colors (aligned with TodayFlowView)
+    // Get intention text from session goal or phase
+    var intentionText: String {
+        if let session = currentSession, let goal = session.goal {
+            return goal
+        } else if let session = currentSession {
+            return session.title
+        } else if let phase = activePhase {
+            return phase.title
+        } else if let phase = project.currentPhase {
+            return phase
+        }
+        return "Deep work"
+    }
 
-    private let accentTeal = Color.teal
-    private let darkBackground = Color(uiColor: UIColor(red: 0.12, green: 0.14, blue: 0.15, alpha: 1.0))
-    private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
+    // Get category label (WORK, CREATIVE, etc.)
+    var categoryLabel: String {
+        switch project.archetype {
+        case .lab: return "RESEARCH"
+        case .studio: return "CREATIVE"
+        case .sprint: return "SPRINT"
+        case .simple: return "WORK"
+        case .none: return "WORK"
+        }
+    }
+
+    // MARK: - Colors
+
+    private let darkGreen = Color(red: 0.08, green: 0.12, blue: 0.10)
+    private let accentGreen = Color(red: 0.20, green: 0.85, blue: 0.55)
+    private let cardBackground = Color(red: 0.12, green: 0.18, blue: 0.15)
 
     var body: some View {
         ZStack {
-            // Dark background (matching TodayFlowView)
-            darkBackground
-                .ignoresSafeArea()
+            // Dark green gradient background
+            LinearGradient(
+                colors: [
+                    Color(red: 0.05, green: 0.10, blue: 0.08),
+                    Color(red: 0.08, green: 0.14, blue: 0.11),
+                    Color(red: 0.06, green: 0.11, blue: 0.09)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Header
                 headerView
+                    .padding(.top, 8)
 
                 Spacer()
 
                 // Main content card
                 mainCard
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            showDetails.toggle()
+                        }
+                    }
 
                 Spacer()
 
+                // Intention pill
+                intentionPill
+                    .padding(.bottom, 24)
+
                 // Action button
                 actionButton
-
-                // Progress indicator
-                progressIndicator
-                    .padding(.top, 24)
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 40)
             }
         }
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showDetails) {
+            detailsSheet
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(cardBackground)
+        }
         .confirmationDialog("Options", isPresented: $showMenu) {
-            if let session = currentSession {
-                Button("View Session Goal") {
-                    showSessionGoal.toggle()
-                }
-            }
-            if let phase = activePhase, phase.mentalRule != nil {
-                Button("View Phase Details") {
-                    showPhaseDetails.toggle()
-                }
+            Button("View Details") {
+                showDetails = true
             }
             Button("Add Note") {
-                // Focus on note - could scroll to note section
+                showDetails = true
             }
             Button("Cancel", role: .cancel) {}
         }
@@ -89,27 +121,17 @@ struct FocusModeView: View {
                 finishFocus()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .frame(width: 44, height: 44)
             }
 
             Spacer()
 
-            HStack(spacing: 6) {
-                Image(systemName: "leaf.fill")
-                    .font(.caption)
-                    .foregroundStyle(.green)
-                Text("FOCUS")
-                    .font(.system(size: 13, weight: .semibold))
-                    .tracking(2)
-                    .foregroundStyle(.white.opacity(0.8))
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(Color.white.opacity(0.1))
-            )
+            Text("NOW")
+                .font(.system(size: 14, weight: .semibold))
+                .tracking(3)
+                .foregroundStyle(.white.opacity(0.9))
 
             Spacer()
 
@@ -117,162 +139,81 @@ struct FocusModeView: View {
                 showMenu = true
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .frame(width: 44, height: 44)
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 16)
+        .padding(.horizontal, 16)
     }
 
     // MARK: - Main Card
 
     private var mainCard: some View {
-        VStack(spacing: 20) {
-            // Icon circle (teal accent matching flow view)
-            ZStack {
-                Circle()
-                    .fill(accentTeal.opacity(0.2))
-                    .frame(width: 100, height: 100)
+        VStack(spacing: 0) {
+            // Image container with badge
+            ZStack(alignment: .topTrailing) {
+                // Abstract art placeholder
+                AbstractArtView()
+                    .frame(height: 260)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding(16)
 
-                Image(systemName: "leaf.fill")
-                    .font(.system(size: 36))
-                    .foregroundStyle(.green)
+                // Category badge
+                Text(categoryLabel)
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(1)
+                    .foregroundStyle(accentGreen)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color.black.opacity(0.4))
+                    )
+                    .padding(.top, 28)
+                    .padding(.trailing, 28)
             }
-            .padding(.top, 32)
 
             // Project title
             Text(project.title)
-                .font(.system(size: 28, weight: .bold))
+                .font(.system(size: 32, weight: .bold))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 24)
-
-            // Phase subtitle (if available)
-            if let phase = activePhase {
-                phaseLabel(phase: phase)
-            } else if let phase = project.currentPhase {
-                Text(phase)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.6))
-            }
-
-            // Time remaining badge
-            timeRemainingBadge
-                .padding(.top, 4)
-
-            // Expanded phase details
-            if showPhaseDetails, let phase = activePhase, let rule = phase.mentalRule {
-                phaseDetailsView(rule: rule)
-                    .padding(.top, 8)
-            }
-
-            // Expanded session goal
-            if showSessionGoal, let session = currentSession {
-                sessionGoalView(session: session)
-                    .padding(.top, 8)
-            }
-
-            Spacer(minLength: 24)
+                .padding(.top, 8)
+                .padding(.bottom, 32)
         }
         .frame(maxWidth: .infinity)
         .background(cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.horizontal, 24)
+        .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
     }
 
-    // MARK: - Phase Label
+    // MARK: - Intention Pill
 
-    private func phaseLabel(phase: ProjectPhase) -> some View {
-        Button {
-            if phase.mentalRule != nil {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    showPhaseDetails.toggle()
-                }
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Text(phase.title)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.6))
+    private var intentionPill: some View {
+        HStack(spacing: 8) {
+            Text("INTENTION")
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(1)
+                .foregroundStyle(.white.opacity(0.5))
 
-                if phase.mentalRule != nil {
-                    Image(systemName: showPhaseDetails ? "chevron.up" : "chevron.down")
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.4))
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
+            Rectangle()
+                .fill(.white.opacity(0.3))
+                .frame(width: 1, height: 14)
 
-    // MARK: - Time Remaining Badge
-
-    private var timeRemainingBadge: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "clock")
-                .font(.system(size: 13))
-            Text("\(remainingMinutes) min remaining")
+            Text(intentionText)
                 .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.white.opacity(0.8))
+                .lineLimit(1)
         }
-        .foregroundStyle(.white.opacity(0.7))
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(Color.white.opacity(0.1))
-        .clipShape(Capsule())
-    }
-
-    // MARK: - Phase Details View
-
-    private func phaseDetailsView(rule: String) -> some View {
-        VStack(spacing: 8) {
-            Text("Mental Rule")
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(.white.opacity(0.5))
-
-            Text("\"\(rule)\"")
-                .font(.subheadline)
-                .italic()
-                .foregroundStyle(.white.opacity(0.7))
-                .multilineTextAlignment(.center)
-        }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .frame(maxWidth: .infinity)
-        .background(Color.white.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
-        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-    }
-
-    // MARK: - Session Goal View
-
-    private func sessionGoalView(session: PlannedSession) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Session Goal")
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(.white.opacity(0.5))
-
-            Text(session.title)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundStyle(.white)
-
-            if let goal = session.goal {
-                Text(goal)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.6))
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color.white.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
-        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+        .background(
+            Capsule()
+                .fill(Color.white.opacity(0.08))
+        )
     }
 
     // MARK: - Action Button
@@ -289,30 +230,145 @@ struct FocusModeView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: hasStarted ? "checkmark" : "play.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                Text(hasStarted ? "Done" : "Begin")
                     .font(.system(size: 18, weight: .semibold))
+                Text(hasStarted ? "Done" : "Begin")
+                    .font(.system(size: 19, weight: .semibold))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(.black)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .background(accentTeal)
+            .padding(.vertical, 20)
+            .background(accentGreen)
             .clipShape(Capsule())
         }
-        .padding(.horizontal, 48)
+        .padding(.horizontal, 40)
     }
 
-    // MARK: - Progress Indicator
+    // MARK: - Details Sheet
 
-    private var progressIndicator: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(Color.white.opacity(0.3))
-                .frame(width: 6, height: 6)
+    private var detailsSheet: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                // Header
+                HStack {
+                    Text("Details")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                }
+                .padding(.top, 8)
 
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.white.opacity(0.15))
-                .frame(width: 120, height: 4)
+                // Phase section
+                if let phase = activePhase {
+                    detailSection(
+                        icon: "layers.fill",
+                        title: "Current Phase",
+                        content: phase.title,
+                        subtitle: phase.mentalRule
+                    )
+                } else if let phase = project.currentPhase {
+                    detailSection(
+                        icon: "layers.fill",
+                        title: "Current Phase",
+                        content: phase,
+                        subtitle: nil
+                    )
+                }
+
+                // Session goal section
+                if let session = currentSession {
+                    detailSection(
+                        icon: "target",
+                        title: "Session Goal",
+                        content: session.title,
+                        subtitle: session.goal
+                    )
+                }
+
+                // Mental rule section
+                if let phase = activePhase, let rule = phase.mentalRule {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "brain.head.profile")
+                                .font(.system(size: 14))
+                                .foregroundStyle(accentGreen)
+                            Text("Mental Rule")
+                                .font(.system(size: 13, weight: .semibold))
+                                .tracking(0.5)
+                                .foregroundStyle(.white.opacity(0.6))
+                        }
+
+                        Text("\"\(rule)\"")
+                            .font(.system(size: 17))
+                            .italic()
+                            .foregroundStyle(.white.opacity(0.9))
+                            .padding(16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(accentGreen.opacity(0.1))
+                            )
+                    }
+                }
+
+                // Note section
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "note.text")
+                            .font(.system(size: 14))
+                            .foregroundStyle(accentGreen)
+                        Text("Session Note")
+                            .font(.system(size: 13, weight: .semibold))
+                            .tracking(0.5)
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+
+                    TextField("Add a note...", text: $note, axis: .vertical)
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white)
+                        .padding(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.white.opacity(0.08))
+                        )
+                        .lineLimit(3...6)
+                }
+
+                Spacer(minLength: 40)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 16)
+        }
+    }
+
+    private func detailSection(icon: String, title: String, content: String, subtitle: String?) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(accentGreen)
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .tracking(0.5)
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(content)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.white)
+
+                if let subtitle = subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.08))
+            )
         }
     }
 
@@ -326,6 +382,93 @@ struct FocusModeView: View {
         )
         modelContext.insert(touch)
         onDismiss()
+    }
+}
+
+// MARK: - Abstract Art View (Placeholder)
+
+/// Generates an abstract swirly gradient art similar to the design reference
+/// This can be replaced with an actual image later
+struct AbstractArtView: View {
+    var body: some View {
+        ZStack {
+            // Base gradient
+            LinearGradient(
+                colors: [
+                    Color(red: 0.65, green: 0.72, blue: 0.60),
+                    Color(red: 0.45, green: 0.58, blue: 0.55),
+                    Color(red: 0.35, green: 0.50, blue: 0.55)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            // Swirl effect using radial gradients
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color(red: 0.80, green: 0.85, blue: 0.75).opacity(0.8),
+                            Color(red: 0.55, green: 0.65, blue: 0.60).opacity(0.4),
+                            Color.clear
+                        ],
+                        center: .init(x: 0.3, y: 0.3),
+                        startRadius: 10,
+                        endRadius: 200
+                    )
+                )
+                .scaleEffect(x: 1.5, y: 1.2)
+                .offset(x: -50, y: -30)
+
+            // Additional swirl layer
+            Ellipse()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color(red: 0.40, green: 0.55, blue: 0.60).opacity(0.6),
+                            Color(red: 0.30, green: 0.45, blue: 0.50).opacity(0.3),
+                            Color.clear
+                        ],
+                        center: .init(x: 0.7, y: 0.6),
+                        startRadius: 20,
+                        endRadius: 180
+                    )
+                )
+                .scaleEffect(x: 1.3, y: 1.0)
+                .offset(x: 40, y: 50)
+
+            // Light arc effect
+            Arc(startAngle: .degrees(180), endAngle: .degrees(300), clockwise: false)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.85, green: 0.88, blue: 0.80).opacity(0.5),
+                            Color(red: 0.70, green: 0.78, blue: 0.72).opacity(0.2)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    style: StrokeStyle(lineWidth: 40, lineCap: .round)
+                )
+                .frame(width: 300, height: 300)
+                .offset(x: -30, y: -20)
+                .blur(radius: 20)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+struct Arc: Shape {
+    var startAngle: Angle
+    var endAngle: Angle
+    var clockwise: Bool
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        path.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAngle, clockwise: clockwise)
+        return path
     }
 }
 
