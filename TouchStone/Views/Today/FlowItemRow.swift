@@ -31,80 +31,55 @@ struct FlowItemRow: View {
 struct StoneFlowRow: View {
     let item: WorkflowItem
 
-    private var statusIcon: String {
-        switch item.status {
-        case .completed:
-            return "checkmark"
-        case .inProgress:
-            return "play.fill"
-        case .upcoming:
-            return "circle"
-        case .overdue:
-            return "arrow.counterclockwise"
-        case .suggested:
-            return "circle"
-        }
-    }
-
-    private var statusColor: Color {
-        switch item.status {
-        case .completed:
-            return .green
-        case .inProgress:
-            return .blue
-        case .upcoming:
-            return .secondary
-        case .overdue:
-            return .orange
-        case .suggested:
-            return .secondary
-        }
+    private var isCompleted: Bool {
+        item.status == .completed
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            // Status icon
-            ZStack {
-                Circle()
-                    .fill(statusColor.opacity(0.2))
-                    .frame(width: 44, height: 44)
+        VStack(alignment: .leading, spacing: 0) {
+            // Main content
+            HStack(alignment: .center, spacing: 12) {
+                // Stone details
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.title)
+                        .font(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(isCompleted ? .secondary : .primary)
 
-                Image(systemName: statusIcon)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(statusColor)
+                    Text(item.timeRangeString)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                // Participant avatars (placeholder - can add real avatars later)
+                if !isCompleted {
+                    HStack(spacing: -8) {
+                        Circle()
+                            .fill(Color.orange.opacity(0.8))
+                            .frame(width: 28, height: 28)
+                            .overlay(
+                                Text("👤")
+                                    .font(.system(size: 14))
+                            )
+                        Circle()
+                            .fill(Color.blue.opacity(0.8))
+                            .frame(width: 28, height: 28)
+                            .overlay(
+                                Text("👔")
+                                    .font(.system(size: 14))
+                            )
+                    }
+                }
             }
-
-            // Stone details
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.title)
-                    .font(.body)
-                    .fontWeight(.medium)
-                    .foregroundStyle(item.status == .completed ? .secondary : .primary)
-
-                Text(item.timeRangeString)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            // Participant avatars placeholder (for future)
-            if item.status == .inProgress {
-                Text("IN FLOW")
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.blue)
-                    .clipShape(Capsule())
-            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
         }
-        .padding()
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.secondarySystemGroupedBackground))
-                .opacity(item.status == .completed ? 0.6 : 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0)))
+                .opacity(isCompleted ? 0.5 : 1)
         )
     }
 }
@@ -113,6 +88,7 @@ struct StoneFlowRow: View {
 
 /// Suggested session card with touch and focus actions.
 /// Appears as ghost block (dashed, translucent) before touch, solid block after touch.
+/// Active "IN FLOW" sessions display with a gradient header image.
 struct WaterFlowRow: View {
     let item: WorkflowItem
     let onTouch: (() -> Void)?
@@ -130,70 +106,179 @@ struct WaterFlowRow: View {
 
     /// Ghost styling for untouched, solid for touched
     private var isGhost: Bool {
-        !hasTouchedToday
+        !hasTouchedToday && item.status != .inProgress
     }
+
+    /// Whether this is the active "in flow" session
+    private var isInFlow: Bool {
+        item.status == .inProgress
+    }
+
+    private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
 
     var body: some View {
         // Whole block is tappable to touch
         Button(action: { onTouch?() }) {
-            HStack(alignment: .center, spacing: 16) {
-                // Status icon
-                ZStack {
-                    Circle()
-                        .fill(Color.teal.opacity(isGhost ? 0.1 : 0.2))
-                        .frame(width: 44, height: 44)
-
-                    Image(systemName: hasTouchedToday ? "checkmark" : "circle")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(isGhost ? .teal.opacity(0.5) : .teal)
+            VStack(alignment: .leading, spacing: 0) {
+                // Gradient header for in-flow sessions
+                if isInFlow {
+                    inFlowHeader
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.title)
-                        .font(.body)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Color.primary.opacity(isGhost ? 0.6 : 1.0))
+                // Main content
+                VStack(alignment: .leading, spacing: 8) {
+                    // Title row with menu
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.title)
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundStyle(Color.primary.opacity(isGhost ? 0.6 : 1.0))
+                                .multilineTextAlignment(.leading)
 
-                    if let subtitle = item.subtitle {
-                        Text(subtitle)
-                            .font(.caption)
+                            if let subtitle = item.subtitle {
+                                Text(subtitle)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        Spacer()
+
+                        // Three-dot menu
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(.secondary)
+                            .frame(width: 32, height: 32)
                     }
 
-                    Text(item.timeRangeString)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                    // Time and Focus button row
+                    HStack(alignment: .center, spacing: 12) {
+                        // Time with clock icon
+                        HStack(spacing: 6) {
+                            Image(systemName: "clock")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(item.timeRangeString)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
 
-                Spacer()
+                        Spacer()
 
-                // Focus button - small icon inside the block
-                if let onFocus = onFocus {
-                    Button(action: onFocus) {
-                        Image(systemName: "scope")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.orange)
-                            .frame(width: 36, height: 36)
-                            .background(Color.orange.opacity(0.15))
-                            .clipShape(Circle())
+                        // Focus button - styled as teal pill
+                        if let onFocus = onFocus {
+                            Button(action: onFocus) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "scope")
+                                        .font(.system(size: 12, weight: .semibold))
+                                    Text("Focus")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.teal)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
             }
-            .padding()
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.secondarySystemGroupedBackground).opacity(isGhost ? 0.5 : 1))
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(cardBackground.opacity(isGhost ? 0.5 : 1))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(
                         isGhost ? Color.teal.opacity(0.3) : Color.clear,
-                        style: StrokeStyle(lineWidth: 1, dash: isGhost ? [6, 4] : [])
+                        style: StrokeStyle(lineWidth: 1.5, dash: isGhost ? [6, 4] : [])
                     )
             )
         }
         .buttonStyle(.plain)
+    }
+
+    /// Gradient header with "IN FLOW" badge for active sessions
+    private var inFlowHeader: some View {
+        ZStack(alignment: .topLeading) {
+            // Gradient background simulating water/waves image
+            LinearGradient(
+                colors: [
+                    Color(red: 0.4, green: 0.55, blue: 0.6),
+                    Color(red: 0.5, green: 0.65, blue: 0.7),
+                    Color(red: 0.55, green: 0.7, blue: 0.75)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .frame(height: 100)
+            .clipShape(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 16,
+                    topTrailingRadius: 16
+                )
+            )
+            .overlay(
+                // Subtle wave pattern overlay
+                ZStack {
+                    ForEach(0..<3, id: \.self) { i in
+                        WaveShape(offset: CGFloat(i) * 20, amplitude: 8)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            .offset(y: CGFloat(i) * 15)
+                    }
+                }
+                .clipShape(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 16,
+                        topTrailingRadius: 16
+                    )
+                )
+            )
+
+            // IN FLOW badge
+            Text("IN FLOW")
+                .font(.caption2)
+                .fontWeight(.bold)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule()
+                        .fill(Color.teal)
+                )
+                .padding(12)
+        }
+    }
+}
+
+/// Wave shape for decorative header
+struct WaveShape: Shape {
+    let offset: CGFloat
+    let amplitude: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let width = rect.width
+        let height = rect.height
+        let midY = height / 2
+
+        path.move(to: CGPoint(x: 0, y: midY + offset))
+
+        for x in stride(from: 0, through: width, by: 5) {
+            let relativeX = x / width
+            let y = midY + offset + sin(relativeX * .pi * 4) * amplitude
+            path.addLine(to: CGPoint(x: x, y: y))
+        }
+
+        return path
     }
 }
 
@@ -205,19 +290,19 @@ struct BreathingSpaceRow: View {
 
     var body: some View {
         HStack {
-            Spacer()
             Text("Breathing Space \u{00B7} \(minutes)m")
                 .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .fontWeight(.medium)
+                .foregroundStyle(Color(.systemGray))
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
                 .background(
                     Capsule()
-                        .fill(Color(.systemGray5))
+                        .fill(Color(uiColor: UIColor(red: 0.22, green: 0.24, blue: 0.26, alpha: 1.0)))
                 )
-            Spacer()
         }
-        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
     }
 }
 
@@ -229,12 +314,41 @@ struct FlowPrepRow: View {
 
     var body: some View {
         HStack {
-            Spacer()
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: "leaf.fill")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.green)
                 Text("Flow State Prep \u{00B7} \(minutes)m")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color(.systemGray))
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(Color.green.opacity(0.12))
+            )
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+    }
+}
+
+// MARK: - Rest Row
+
+/// Rest break between work sessions
+struct RestRow: View {
+    let minutes: Int
+
+    var body: some View {
+        HStack {
+            Spacer()
+            HStack(spacing: 6) {
+                Image(systemName: "cup.and.saucer.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                Text("Rest \u{00B7} \(minutes)m")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -242,7 +356,7 @@ struct FlowPrepRow: View {
             .padding(.vertical, 8)
             .background(
                 Capsule()
-                    .fill(Color.green.opacity(0.1))
+                    .fill(Color.orange.opacity(0.1))
             )
             Spacer()
         }
@@ -286,48 +400,48 @@ struct OverdueItemRow: View {
     let item: WorkflowItem
     let onReschedule: (() -> Void)?
 
+    private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
+
     var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            // Repeat icon
-            ZStack {
-                Circle()
-                    .fill(Color.orange.opacity(0.2))
-                    .frame(width: 44, height: 44)
+        VStack(alignment: .leading, spacing: 8) {
+            // Title row with reschedule button
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.title)
+                        .font(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
 
-                Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.orange)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.title)
-                    .font(.body)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.primary)
-
-                if let subtitle = item.subtitle {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if let subtitle = item.subtitle {
+                        Text(subtitle)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
-                Text("Yesterday \u{00B7} 1h estimate")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Spacer()
+
+                if let onReschedule = onReschedule {
+                    Button(action: onReschedule) {
+                        Text("Reschedule?")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color(.systemGray))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
-            Spacer()
-
-            if let onReschedule = onReschedule {
-                Button("Reschedule?", action: onReschedule)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            // Time info
+            Text("Yesterday \u{00B7} 1h estimate")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-        .padding()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.secondarySystemGroupedBackground))
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(cardBackground)
         )
     }
 }
@@ -340,6 +454,8 @@ struct AdditionalProjectRow: View {
     let project: Project
     let onTouch: () -> Void
     let onFocus: () -> Void
+
+    private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
 
     /// Count how many times this project was touched today
     private var touchCountToday: Int {
@@ -357,7 +473,7 @@ struct AdditionalProjectRow: View {
                 // Touch count badge
                 Text("x\(touchCountToday)")
                     .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(touchCountToday > 0 ? .teal : .secondary)
+                    .foregroundStyle(touchCountToday > 0 ? .teal : Color(.systemGray))
                     .frame(width: 36)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -375,22 +491,30 @@ struct AdditionalProjectRow: View {
 
                 Spacer()
 
-                // Focus button - small icon inside the block
+                // Focus button - styled as teal pill to match WaterFlowRow
                 Button(action: onFocus) {
-                    Image(systemName: "scope")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.orange)
-                        .frame(width: 30, height: 30)
-                        .background(Color.orange.opacity(0.15))
-                        .clipShape(Circle())
+                    HStack(spacing: 4) {
+                        Image(systemName: "scope")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("Focus")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color.teal)
+                    )
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.secondarySystemGroupedBackground))
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(cardBackground)
             )
         }
         .buttonStyle(.plain)
