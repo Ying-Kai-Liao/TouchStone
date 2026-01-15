@@ -26,6 +26,7 @@ struct FlowItemRow: View {
 // MARK: - Stone Flow Row
 
 /// Fixed event card with completion status
+/// Shows stone image header when currently active (in progress)
 struct StoneFlowRow: View {
     let item: WorkflowItem
 
@@ -33,33 +34,128 @@ struct StoneFlowRow: View {
         item.status == .completed
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(item.title)
-                .font(.body)
-                .fontWeight(.semibold)
-                .foregroundStyle(isCompleted ? .secondary : .primary)
+    private var isActive: Bool {
+        item.status == .inProgress
+    }
 
-            Text(item.timeRangeString)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Stone image header for active events
+            if isActive {
+                stoneHeader
+            }
+
+            // Content - expanded for active, compact for others
+            if isActive {
+                // Full content for active stone
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.title)
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.primary)
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(item.timeRangeString)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+            } else {
+                // Compact content for non-active stones
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundStyle(isCompleted ? .secondary : .primary)
+
+                        Text(item.timeRangeString)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0)))
+            RoundedRectangle(cornerRadius: isActive ? 16 : 12, style: .continuous)
+                .fill(cardBackground)
                 .opacity(isCompleted ? 0.5 : 1)
         )
+    }
+
+    /// Stone/rock gradient header for active events
+    private var stoneHeader: some View {
+        ZStack(alignment: .topLeading) {
+            // Gradient background simulating stone/rock texture
+            LinearGradient(
+                colors: [
+                    Color(red: 0.35, green: 0.35, blue: 0.38),
+                    Color(red: 0.45, green: 0.45, blue: 0.48),
+                    Color(red: 0.5, green: 0.5, blue: 0.52)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .frame(height: 100)
+            .clipShape(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 16,
+                    topTrailingRadius: 16
+                )
+            )
+            .overlay(
+                // Stone texture pattern
+                ZStack {
+                    ForEach(0..<5, id: \.self) { i in
+                        Circle()
+                            .fill(Color.white.opacity(0.03))
+                            .frame(width: CGFloat(30 + i * 15), height: CGFloat(30 + i * 15))
+                            .offset(
+                                x: CGFloat(i * 40 - 60),
+                                y: CGFloat(i * 10 - 20)
+                            )
+                    }
+                }
+                .clipShape(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 16,
+                        topTrailingRadius: 16
+                    )
+                )
+            )
+
+            // STONE badge
+            Text("STONE")
+                .font(.caption2)
+                .fontWeight(.bold)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule()
+                        .fill(Color(red: 0.4, green: 0.4, blue: 0.45))
+                )
+                .padding(12)
+        }
     }
 }
 
 // MARK: - Water Flow Row
 
 /// Suggested session card with touch and focus actions.
-/// Appears as ghost block (dashed, translucent) before touch, solid block after touch.
-/// Active "IN FLOW" sessions display with a gradient header image.
+/// Shows expanded view with water image header when active (in flow).
+/// Shows compact collapsed view when not active.
 struct WaterFlowRow: View {
     let item: WorkflowItem
     let onTouch: (() -> Void)?
@@ -91,73 +187,98 @@ struct WaterFlowRow: View {
         // Whole block is tappable to touch
         Button(action: { onTouch?() }) {
             VStack(alignment: .leading, spacing: 0) {
-                // Gradient header for in-flow sessions
+                // Water image header for in-flow sessions
                 if isInFlow {
                     inFlowHeader
                 }
 
-                // Main content
-                VStack(alignment: .leading, spacing: 8) {
-                    // Title row
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.title)
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.primary.opacity(isGhost ? 0.6 : 1.0))
-                            .multilineTextAlignment(.leading)
+                // Content - expanded for active, compact for others
+                if isInFlow {
+                    // Full content for active water
+                    VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.title)
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundStyle(.primary)
+                                .multilineTextAlignment(.leading)
 
-                        if let subtitle = item.subtitle {
-                            Text(subtitle)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                            if let subtitle = item.subtitle {
+                                Text(subtitle)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        // Time and Focus button row
+                        HStack(alignment: .center, spacing: 12) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "clock")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text(item.timeRangeString)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            // Focus button - subtle styling
+                            if let onFocus = onFocus {
+                                Button(action: onFocus) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "scope")
+                                            .font(.system(size: 12, weight: .medium))
+                                        Text("Focus")
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                    }
+                                    .foregroundStyle(Color.teal)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.teal.opacity(0.15))
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
-
-                    // Time and Focus button row
-                    HStack(alignment: .center, spacing: 12) {
-                        // Time with clock icon
-                        HStack(spacing: 6) {
-                            Image(systemName: "clock")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(item.timeRangeString)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                } else {
+                    // Compact content for non-active waters
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.title)
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .fontWeight(.medium)
+                                .foregroundStyle(Color.primary.opacity(isGhost ? 0.6 : 1.0))
+
+                            if let subtitle = item.subtitle {
+                                Text(subtitle)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
 
                         Spacer()
 
-                        // Focus button - subtle styling
-                        if let onFocus = onFocus {
-                            Button(action: onFocus) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "scope")
-                                        .font(.system(size: 12, weight: .medium))
-                                    Text("Focus")
-                                        .font(.subheadline)
-                                        .fontWeight(.medium)
-                                }
-                                .foregroundStyle(Color.teal)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(
-                                    Capsule()
-                                        .fill(Color.teal.opacity(0.15))
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
+                        Text(item.timeRangeString)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
             }
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: isInFlow ? 16 : 12, style: .continuous)
                     .fill(cardBackground.opacity(isGhost ? 0.5 : 1))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: isInFlow ? 16 : 12, style: .continuous)
                     .strokeBorder(
                         isGhost ? Color.teal.opacity(0.3) : Color.clear,
                         style: StrokeStyle(lineWidth: 1.5, dash: isGhost ? [6, 4] : [])
