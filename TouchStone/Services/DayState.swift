@@ -10,10 +10,7 @@ import SwiftData
 class DayState {
     let date: Date
     private let calendar = Calendar.current
-
-    // Daily productive capacity (hardcoded for now, settings can come later)
-    private let dailyProductiveMinutes: Int = 360  // 6 hours
-    private let defaultSessionMinutes: Int = 60    // 1 hour sessions
+    private let prefs = UserPreferences.shared
 
     // Computed data
     private(set) var stoneInstances: [StoneEventInstance] = []
@@ -36,7 +33,7 @@ class DayState {
 
     /// Available minutes for project work (capacity - stones)
     var availableMinutes: Int {
-        max(0, dailyProductiveMinutes - stoneMinutesToday)
+        max(0, prefs.dailyProductiveMinutes - stoneMinutesToday)
     }
 
     /// Whether user has reached their daily productive capacity
@@ -336,7 +333,7 @@ class DayState {
 
             let slot = usableSlots[slotIndex]
             let remainingSlotMinutes = Int(slot.end.timeIntervalSince(currentSlotStart) / 60)
-            let sessionDuration = min(defaultSessionMinutes, remainingSlotMinutes, remainingCapacity - usedMinutes)
+            let sessionDuration = min(prefs.defaultSessionMinutes, remainingSlotMinutes, remainingCapacity - usedMinutes)
 
             if sessionDuration >= 30 {
                 // Create a time slot for this specific session
@@ -468,23 +465,44 @@ class DayState {
     // MARK: - Free Time Calculation
 
     private func calculateFreeSlots() -> [TimeSlot] {
-        // Define working hours (9 AM - 9 PM for simplicity)
-        let dayStart = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: date)!
-        let dayEnd = calendar.date(bySettingHour: 21, minute: 0, second: 0, of: date)!
+        // Use working hours from preferences
+        let dayStart = calendar.date(bySettingHour: prefs.workDayStartHour, minute: 0, second: 0, of: date)!
+        let dayEnd = calendar.date(bySettingHour: prefs.workDayEndHour, minute: 0, second: 0, of: date)!
 
+        // Combine stones with daily rules (lunch/dinner) as blocked slots
+        var blockedSlots: [(start: Date, end: Date)] = stoneInstances.map {
+            ($0.startTime, $0.endTime)
+        }
+
+        // Add lunch/dinner from preferences
+        blockedSlots.append(contentsOf: prefs.blockedSlots(for: date))
+
+        // Sort by start time
+        blockedSlots.sort { $0.start < $1.start }
+
+        // Calculate free slots around all blocked times
         var slots: [TimeSlot] = []
         var currentTime = dayStart
 
-        for stone in stoneInstances {
-            // If there's free time before this stone
-            if currentTime < stone.startTime {
-                slots.append(TimeSlot(start: currentTime, end: stone.startTime))
+        for blocked in blockedSlots {
+            // Skip blocks outside working hours
+            if blocked.end <= dayStart || blocked.start >= dayEnd {
+                continue
             }
-            // Move current time to after the stone
-            currentTime = max(currentTime, stone.endTime)
+
+            // Clamp block to working hours
+            let blockStart = max(blocked.start, dayStart)
+            let blockEnd = min(blocked.end, dayEnd)
+
+            // If there's free time before this block
+            if currentTime < blockStart {
+                slots.append(TimeSlot(start: currentTime, end: blockStart))
+            }
+            // Move current time to after the block
+            currentTime = max(currentTime, blockEnd)
         }
 
-        // Add remaining time after last stone
+        // Add remaining time after last block
         if currentTime < dayEnd {
             slots.append(TimeSlot(start: currentTime, end: dayEnd))
         }
