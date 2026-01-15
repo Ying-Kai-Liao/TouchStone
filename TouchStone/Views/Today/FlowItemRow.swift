@@ -26,7 +26,7 @@ struct FlowItemRow: View {
 // MARK: - Stone Flow Row
 
 /// Fixed event card with completion status
-/// Shows stone image header when currently active (in progress)
+/// Shows stone image header when current time is within the scheduled time
 struct StoneFlowRow: View {
     let item: WorkflowItem
 
@@ -34,21 +34,28 @@ struct StoneFlowRow: View {
         item.status == .completed
     }
 
-    private var isActive: Bool {
-        item.status == .inProgress
+    /// Check if current time falls within this block's scheduled time
+    private var isCurrentTimeSlot: Bool {
+        let now = Date()
+        return now >= item.startTime && now <= item.endTime
+    }
+
+    /// Expand only when current time is within the stone's time slot
+    private var isExpanded: Bool {
+        isCurrentTimeSlot && !isCompleted
     }
 
     private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Stone image header for active events
-            if isActive {
+            // Stone image header when current time slot
+            if isExpanded {
                 stoneHeader
             }
 
-            // Content - expanded for active, compact for others
-            if isActive {
+            // Content - expanded for current time slot, compact for others
+            if isExpanded {
                 // Full content for active stone
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.title)
@@ -69,7 +76,7 @@ struct StoneFlowRow: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
             } else {
-                // Compact content for non-active stones
+                // Compact content for non-current stones
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.title)
@@ -88,7 +95,7 @@ struct StoneFlowRow: View {
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: isActive ? 16 : 12, style: .continuous)
+            RoundedRectangle(cornerRadius: isExpanded ? 16 : 12, style: .continuous)
                 .fill(cardBackground)
                 .opacity(isCompleted ? 0.5 : 1)
         )
@@ -154,9 +161,9 @@ struct StoneFlowRow: View {
 // MARK: - Water Flow Row
 
 /// Suggested session card with touch and focus actions.
-/// Ghost block (dashed, translucent) when not touched today.
-/// Shows expanded view with water image header when touched.
-/// Can only be touched once in schedule - use "MORE TO TOUCH" for additional touches.
+/// - Ghost block (dashed, translucent) when not touched today - always compact
+/// - Solid block when touched today - expands only during its scheduled time
+/// - Can only be touched once in schedule - use "MORE TO TOUCH" for additional touches
 struct WaterFlowRow: View {
     let item: WorkflowItem
     let onTouch: (() -> Void)?
@@ -177,9 +184,17 @@ struct WaterFlowRow: View {
         !hasTouchedToday
     }
 
-    /// Show expanded view when touched (has been interacted with today)
+    /// Check if current time falls within this block's scheduled time
+    private var isCurrentTimeSlot: Bool {
+        let now = Date()
+        return now >= item.startTime && now <= item.endTime
+    }
+
+    /// Show expanded view only when:
+    /// 1. Current time is within block's time range AND
+    /// 2. Block is NOT ghost (has been touched today)
     private var isExpanded: Bool {
-        hasTouchedToday
+        isCurrentTimeSlot && !isGhost
     }
 
     private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
@@ -202,14 +217,14 @@ struct WaterFlowRow: View {
 
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Water image header for touched sessions
+            // Water image header only when expanded (current time + touched)
             if isExpanded {
                 waterHeader
             }
 
-            // Content - expanded for touched, compact for ghost
+            // Content - expanded only when current time slot AND touched
             if isExpanded {
-                // Full content for touched water
+                // Full content for active water block
                 VStack(alignment: .leading, spacing: 8) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(item.title)
@@ -263,13 +278,13 @@ struct WaterFlowRow: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
             } else {
-                // Compact ghost content for untouched waters
+                // Compact content (ghost or non-current time slot)
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.title)
                             .font(.subheadline)
                             .fontWeight(.medium)
-                            .foregroundStyle(Color.primary.opacity(0.6))
+                            .foregroundStyle(Color.primary.opacity(isGhost ? 0.6 : 1.0))
 
                         if let subtitle = item.subtitle {
                             Text(subtitle)
@@ -301,7 +316,7 @@ struct WaterFlowRow: View {
         )
     }
 
-    /// Gradient header with "IN FLOW" badge for touched sessions
+    /// Gradient header with "WATER" badge for active sessions
     private var waterHeader: some View {
         ZStack(alignment: .topLeading) {
             // Gradient background simulating water/waves image
