@@ -6,7 +6,7 @@ struct StrategicPlanningChatView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    private var prefs = UserPreferences.shared
+    private var prefs: UserPreferences { UserPreferences.shared }
 
     @State private var step: StrategyChatEngine.ChatStep = .idle
     @State private var goal = ""

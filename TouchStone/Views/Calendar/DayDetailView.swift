@@ -6,7 +6,7 @@ struct DayDetailView: View {
     @Query(filter: #Predicate<Project> { $0.isActive }) private var activeProjects: [Project]
     @Query private var allStones: [StoneEvent]
 
-    private var prefs = UserPreferences.shared
+    private var prefs: UserPreferences { UserPreferences.shared }
 
     let date: Date
     let stones: [StoneEvent]

@@ -4,7 +4,7 @@ import SwiftData
 struct StrategicProjectInputView: View {
     @Environment(\.dismiss) private var dismiss
 
-    private var prefs = UserPreferences.shared
+    private var prefs: UserPreferences { UserPreferences.shared }
 
     @State private var goal = ""
     @State private var isGenerating = false

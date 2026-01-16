@@ -7,7 +7,7 @@ struct StrategicProjectDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    private var prefs = UserPreferences.shared
+    private var prefs: UserPreferences { UserPreferences.shared }
 
     @Bindable var project: Project
 

@@ -8,7 +8,7 @@ struct PlanRefinementChatView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    private var prefs = UserPreferences.shared
+    private var prefs: UserPreferences { UserPreferences.shared }
 
     @Bindable var project: Project
 
