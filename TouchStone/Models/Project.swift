@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import SwiftUI
 
 // MARK: - Project Model
 
@@ -147,6 +148,45 @@ final class Project {
         }
     }
 
+    // MARK: - Pressure Calculation
+
+    /// Days remaining until deadline (nil if no deadline)
+    var daysUntilDeadline: Int? {
+        guard let deadline = softDeadline else { return nil }
+        let calendar = Calendar.current
+        return calendar.dateComponents([.day], from: Date(), to: deadline).day
+    }
+
+    /// Required daily hours to meet deadline
+    /// Formula: remainingHours / daysUntilDeadline
+    var requiredDailyHours: Double? {
+        guard let days = daysUntilDeadline, days > 0 else { return nil }
+        return Double(remainingHours) / Double(days)
+    }
+
+    /// Pressure ratio: required pace / available capacity
+    var pressureRatio: Double {
+        guard let required = requiredDailyHours else { return 0 }
+        let dailyCapacity = Double(UserPreferences.shared.dailyProductiveHours)
+        return required / dailyCapacity
+    }
+
+    /// Feasibility status based on pressure ratio
+    var feasibilityStatus: FeasibilityStatus {
+        guard softDeadline != nil else { return .noDeadline }
+
+        if let days = daysUntilDeadline, days < 0 {
+            return .overdue
+        }
+
+        switch pressureRatio {
+        case ...0.5: return .healthy      // GREEN - comfortable pace
+        case 0.5...0.8: return .tight     // YELLOW - manageable but busy
+        case 0.8...1.0: return .atRisk    // ORANGE - pushing limits
+        default: return .impossible       // RED - can't make it
+        }
+    }
+
     // MARK: - Strategic Planning Properties
 
     /// Whether this project has a strategic plan with phases
@@ -247,6 +287,40 @@ enum DeadlineStatus {
     case comfortable   // > 7 days away
     case approaching   // <= 7 days away
     case passed        // Past deadline
+}
+
+// MARK: - Feasibility Status
+
+/// Pressure-based feasibility status for deadline tracking
+enum FeasibilityStatus: String, Codable {
+    case noDeadline     // No deadline set
+    case healthy        // Pressure ≤ 0.5 (GREEN)
+    case tight          // Pressure 0.5-0.8 (YELLOW)
+    case atRisk         // Pressure 0.8-1.0 (ORANGE)
+    case impossible     // Pressure > 1.0 (RED)
+    case overdue        // Past deadline (DARK RED)
+
+    var color: Color {
+        switch self {
+        case .noDeadline: return .clear
+        case .healthy: return .green
+        case .tight: return .yellow
+        case .atRisk: return .orange
+        case .impossible: return .red
+        case .overdue: return Color(red: 0.6, green: 0, blue: 0)
+        }
+    }
+
+    var severity: Int {
+        switch self {
+        case .noDeadline: return 0
+        case .healthy: return 1
+        case .tight: return 2
+        case .atRisk: return 3
+        case .impossible: return 4
+        case .overdue: return 5
+        }
+    }
 }
 
 // MARK: - Phase Template

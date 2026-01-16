@@ -5,6 +5,7 @@ struct CalendarView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var stones: [StoneEvent]
     @Query private var touchLogs: [TouchLog]
+    @Query(filter: #Predicate<Project> { $0.isActive }) private var activeProjects: [Project]
 
     @State private var selectedMonth = Date()
     @State private var selectedDay: SelectedDay?
@@ -130,6 +131,8 @@ struct CalendarView: View {
                     dayData: dayData,
                     stones: stonesForDay(dayData.date),
                     touchCount: touchCountForDay(dayData.date),
+                    pressureStatus: pressureForDay(dayData.date),
+                    hasDeadline: hasDeadlineOnDay(dayData.date),
                     onTap: {
                         if dayData.isCurrentMonth {
                             selectedDay = SelectedDay(
@@ -189,6 +192,14 @@ struct CalendarView: View {
         }.count
     }
 
+    private func pressureForDay(_ date: Date) -> FeasibilityStatus {
+        return PressureCalculator.aggregateFeasibility(for: date, projects: Array(activeProjects))
+    }
+
+    private func hasDeadlineOnDay(_ date: Date) -> Bool {
+        return PressureCalculator.hasDeadline(on: date, projects: Array(activeProjects))
+    }
+
     private var monthYearFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM yyyy"
@@ -207,6 +218,8 @@ struct DayCell: View {
     let dayData: DayData
     let stones: [StoneEvent]
     let touchCount: Int
+    let pressureStatus: FeasibilityStatus
+    let hasDeadline: Bool
     let onTap: () -> Void
 
     private let calendar = Calendar.current
@@ -229,14 +242,22 @@ struct DayCell: View {
 
                     Spacer()
 
-                    // Event indicators
+                    // Event and deadline indicators
                     HStack(spacing: 4) {
+                        // Stone event dots
                         if !stones.isEmpty {
-                            ForEach(stones.prefix(3)) { _ in
+                            ForEach(stones.prefix(2)) { _ in
                                 Circle()
                                     .fill(Color.blue)
                                     .frame(width: 6, height: 6)
                             }
+                        }
+
+                        // Deadline indicator dot
+                        if hasDeadline && pressureStatus != .noDeadline {
+                            Circle()
+                                .fill(pressureStatus.color)
+                                .frame(width: 8, height: 8)
                         }
                     }
                     .frame(height: 12)
@@ -263,6 +284,11 @@ struct DayCell: View {
     private var cellBackgroundColor: Color {
         if !dayData.isCurrentMonth {
             return Color.clear
+        }
+
+        // Apply pressure color if there's deadline pressure
+        if pressureStatus != .noDeadline {
+            return pressureStatus.color.opacity(0.2)
         }
 
         if isWeekend {
