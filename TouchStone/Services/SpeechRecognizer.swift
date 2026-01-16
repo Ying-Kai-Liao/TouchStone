@@ -16,6 +16,7 @@ class SpeechRecognizer {
         case requesting
         case recording
         case processing
+        case finished  // New state: recognition complete, ready to parse
         case error(String)
     }
 
@@ -27,6 +28,8 @@ class SpeechRecognizer {
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    private var recordingTimer: Timer?
+    private let maxRecordingDuration: TimeInterval = 30 // Auto-stop after 30 seconds
 
     init() {
         checkAvailability()
@@ -49,7 +52,9 @@ class SpeechRecognizer {
         }
 
         guard speechStatus == .authorized else {
-            state = .error("Speech recognition not authorized")
+            await MainActor.run {
+                state = .error("Speech recognition not authorized")
+            }
             return false
         }
 
@@ -66,11 +71,15 @@ class SpeechRecognizer {
         }
 
         guard micStatus else {
-            state = .error("Microphone access not authorized")
+            await MainActor.run {
+                state = .error("Microphone access not authorized")
+            }
             return false
         }
 
-        state = .idle
+        await MainActor.run {
+            state = .idle
+        }
         return true
     }
 
@@ -82,7 +91,7 @@ class SpeechRecognizer {
         }
 
         // Cancel any existing task
-        stopRecording()
+        cleanupAudio()
 
         transcript = ""
         state = .recording
@@ -112,13 +121,29 @@ class SpeechRecognizer {
             guard let self = self else { return }
 
             if let result = result {
-                self.transcript = result.bestTranscription.formattedString
+                DispatchQueue.main.async {
+                    self.transcript = result.bestTranscription.formattedString
+                }
+
+                // If final result, mark as finished
+                if result.isFinal {
+                    DispatchQueue.main.async {
+                        self.finishRecording()
+                    }
+                }
             }
 
-            if error != nil || (result?.isFinal ?? false) {
-                self.cleanupAudio()
-                if self.state == .recording {
-                    self.state = .processing
+            if let error = error {
+                DispatchQueue.main.async {
+                    // Only set error if we were still recording/processing
+                    if self.state == .recording || self.state == .processing {
+                        if self.transcript.isEmpty {
+                            self.state = .error("Could not recognize speech")
+                        } else {
+                            // We have some transcript, finish successfully
+                            self.finishRecording()
+                        }
+                    }
                 }
             }
         }
@@ -133,18 +158,40 @@ class SpeechRecognizer {
 
         audioEngine.prepare()
         try audioEngine.start()
-    }
 
-    func stopRecording() {
-        recognitionRequest?.endAudio()
-        cleanupAudio()
-
-        if state == .recording {
-            state = .processing
+        // Start auto-stop timer
+        recordingTimer = Timer.scheduledTimer(withTimeInterval: maxRecordingDuration, repeats: false) { [weak self] _ in
+            self?.stopRecording()
         }
     }
 
+    func stopRecording() {
+        recordingTimer?.invalidate()
+        recordingTimer = nil
+
+        guard state == .recording else { return }
+
+        state = .processing
+        recognitionRequest?.endAudio()
+
+        // Give recognition a moment to finalize, then force finish
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self = self else { return }
+            if self.state == .processing {
+                self.finishRecording()
+            }
+        }
+    }
+
+    private func finishRecording() {
+        cleanupAudio()
+        state = .finished
+    }
+
     private func cleanupAudio() {
+        recordingTimer?.invalidate()
+        recordingTimer = nil
+
         audioEngine?.stop()
         audioEngine?.inputNode.removeTap(onBus: 0)
         audioEngine = nil
@@ -153,16 +200,18 @@ class SpeechRecognizer {
         recognitionTask = nil
         recognitionRequest = nil
 
-        try? AVAudioSession.sharedInstance().setActive(false)
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     func reset() {
-        stopRecording()
+        cleanupAudio()
         transcript = ""
         state = .idle
     }
 
     func setIdle() {
-        state = .idle
+        if state == .finished || state == .processing {
+            state = .idle
+        }
     }
 }
