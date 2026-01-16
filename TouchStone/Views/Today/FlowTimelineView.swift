@@ -184,9 +184,9 @@ struct TimelineItemContainer: View {
     private var statusColor: Color {
         switch item.status {
         case .completed:
-            return .green
+            return UserPreferences.shared.accentColor
         case .inProgress:
-            return .teal
+            return UserPreferences.shared.accentColor
         case .upcoming, .suggested:
             return Color(.systemGray3)
         case .overdue:

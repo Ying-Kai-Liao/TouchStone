@@ -154,12 +154,12 @@ struct ProjectCard: View {
                             Text("\(hoursToday) hr\(hoursToday == 1 ? "" : "s") today")
                                 .font(.caption)
                                 .fontWeight(.medium)
-                                .foregroundStyle(Color(red: 0.4, green: 0.8, blue: 0.6))
+                                .foregroundStyle(UserPreferences.shared.accentColor)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
                                 .background(
                                     Capsule()
-                                        .strokeBorder(Color(red: 0.4, green: 0.8, blue: 0.6).opacity(0.4), lineWidth: 1)
+                                        .strokeBorder(UserPreferences.shared.accentColor.opacity(0.4), lineWidth: 1)
                                 )
                         }
                     }
@@ -180,11 +180,11 @@ struct ProjectCard: View {
                             // Progress fill
                             if project.totalPlannedMinutes > 0 {
                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color(red: 0.4, green: 0.7, blue: 0.55))
+                                    .fill(UserPreferences.shared.accentColor)
                                     .frame(width: geometry.size.width * project.progress, height: 8)
                             } else if completedHoursValue > 0 {
                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color(red: 0.4, green: 0.7, blue: 0.55))
+                                    .fill(UserPreferences.shared.accentColor)
                                     .frame(width: 20, height: 8)
                             }
                         }
