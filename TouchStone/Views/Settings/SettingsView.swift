@@ -14,122 +14,172 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                // MARK: - Productivity Section
+            List {
+                // MARK: - Schedule Section
                 Section {
-                    Stepper("Daily Goal: \(prefs.dailyProductiveHours) hours",
-                            value: $prefs.dailyProductiveHours,
-                            in: 1...12)
-
-                    Stepper("Min Session: \(prefs.sessionMinMinutes) min",
-                            value: $prefs.sessionMinMinutes,
-                            in: 30...60,
-                            step: 15)
-
-                    Stepper("Max Session: \(prefs.sessionMaxMinutes) min",
-                            value: $prefs.sessionMaxMinutes,
-                            in: 60...120,
-                            step: 15)
-                } header: {
-                    Text("Productivity")
-                } footer: {
-                    Text("Your daily target and session length range.")
-                }
-
-                // MARK: - Working Hours Section
-                Section {
-                    Picker("Day Starts", selection: $prefs.workDayStartHour) {
-                        ForEach(5...12, id: \.self) { hour in
-                            Text(formatHour(hour)).tag(hour)
+                    HStack {
+                        Label("Start", systemImage: "sunrise")
+                        Spacer()
+                        Picker("", selection: $prefs.workDayStartHour) {
+                            ForEach(5...12, id: \.self) { hour in
+                                Text(formatHour(hour)).tag(hour)
+                            }
                         }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
                     }
 
-                    Picker("Day Ends", selection: $prefs.workDayEndHour) {
-                        ForEach(17...23, id: \.self) { hour in
-                            Text(formatHour(hour)).tag(hour)
+                    HStack {
+                        Label("End", systemImage: "sunset")
+                        Spacer()
+                        Picker("", selection: $prefs.workDayEndHour) {
+                            ForEach(17...23, id: \.self) { hour in
+                                Text(formatHour(hour)).tag(hour)
+                            }
                         }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
                     }
-                } header: {
-                    Text("Working Hours")
-                } footer: {
-                    Text("Sessions will only be scheduled within these hours.")
-                }
 
-                // MARK: - Daily Rules Section
-                Section {
                     NavigationLink {
                         RulesListView()
                     } label: {
-                        HStack {
-                            Label("Daily Rules", systemImage: "clock.badge.checkmark")
-                            Spacer()
-                        }
+                        Label("Time Blocks", systemImage: "clock.badge.checkmark")
                     }
                 } header: {
-                    Text("Time Blocks")
+                    Text("Schedule")
                 } footer: {
-                    Text("Manage lunch, dinner, and other blocked time slots.")
+                    Text("Working hours and blocked time slots.")
                 }
 
-                // MARK: - Rest Breaks Section
+                // MARK: - Focus Sessions Section
                 Section {
-                    Toggle("Rest Breaks", isOn: $prefs.restBetweenSessionsEnabled)
+                    HStack {
+                        Label("Daily Goal", systemImage: "target")
+                        Spacer()
+                        Stepper("\(prefs.dailyProductiveHours) hrs",
+                                value: $prefs.dailyProductiveHours,
+                                in: 1...12)
+                        .fixedSize()
+                    }
+
+                    HStack {
+                        Label("Min Session", systemImage: "hourglass.bottomhalf.filled")
+                        Spacer()
+                        Stepper("\(prefs.sessionMinMinutes) min",
+                                value: $prefs.sessionMinMinutes,
+                                in: 30...60,
+                                step: 15)
+                        .fixedSize()
+                    }
+
+                    HStack {
+                        Label("Max Session", systemImage: "hourglass.tophalf.filled")
+                        Spacer()
+                        Stepper("\(prefs.sessionMaxMinutes) min",
+                                value: $prefs.sessionMaxMinutes,
+                                in: 60...120,
+                                step: 15)
+                        .fixedSize()
+                    }
+                } header: {
+                    Text("Focus Sessions")
+                } footer: {
+                    Text("Daily target and preferred session lengths.")
+                }
+
+                // MARK: - Rest & Recovery Section
+                Section {
+                    Toggle(isOn: $prefs.restBetweenSessionsEnabled) {
+                        Label("Enable Breaks", systemImage: "leaf")
+                    }
 
                     if prefs.restBetweenSessionsEnabled {
-                        Stepper("Work for \(prefs.workIntervalMinutes) min",
-                                value: $prefs.workIntervalMinutes,
-                                in: 30...120,
-                                step: 15)
+                        HStack {
+                            Label("Work Interval", systemImage: "timer")
+                            Spacer()
+                            Stepper("\(prefs.workIntervalMinutes) min",
+                                    value: $prefs.workIntervalMinutes,
+                                    in: 30...120,
+                                    step: 15)
+                            .fixedSize()
+                        }
 
-                        Stepper("Rest for \(prefs.restDurationMinutes) min",
-                                value: $prefs.restDurationMinutes,
-                                in: 5...30,
-                                step: 5)
-                    }
-                } header: {
-                    Text("Rest Breaks")
-                } footer: {
-                    Text("Take a \(prefs.restDurationMinutes)-minute break after every \(prefs.workIntervalMinutes) minutes of work.")
-                }
-
-                // MARK: - Language Section (Future)
-                Section {
-                    Picker("Language", selection: $prefs.appLanguage) {
-                        Text("System Default").tag("system")
-                        Text("English").tag("en")
-                        Text("中文").tag("zh")
-                    }
-                } header: {
-                    Text("Language")
-                } footer: {
-                    Text("Language support coming soon.")
-                }
-
-                // MARK: - AI Integration Section
-                Section {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("OpenAI API Key")
-                            .font(.headline)
-
-                        Text("Required for AI-powered strategic planning. Your key is stored securely in the device Keychain.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        if hasExistingKey {
-                            existingKeyView
-                        } else {
-                            newKeyInputView
+                        HStack {
+                            Label("Break Duration", systemImage: "cup.and.saucer")
+                            Spacer()
+                            Stepper("\(prefs.restDurationMinutes) min",
+                                    value: $prefs.restDurationMinutes,
+                                    in: 5...30,
+                                    step: 5)
+                            .fixedSize()
                         }
                     }
-                    .padding(.vertical, 8)
                 } header: {
-                    Text("AI Integration")
+                    Text("Rest & Recovery")
+                } footer: {
+                    if prefs.restBetweenSessionsEnabled {
+                        Text("\(prefs.restDurationMinutes)-min break after \(prefs.workIntervalMinutes) min of work.")
+                    } else {
+                        Text("Schedule breaks between focus sessions.")
+                    }
                 }
 
+                // MARK: - AI Assistant Section
                 Section {
+                    if hasExistingKey {
+                        HStack {
+                            Label("Status", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Spacer()
+                            Text("Connected")
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Button(role: .destructive) {
+                            showDeleteConfirmation = true
+                        } label: {
+                            Label("Remove API Key", systemImage: "trash")
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                if showAPIKey {
+                                    TextField("sk-...", text: $apiKey)
+                                        .textFieldStyle(.roundedBorder)
+                                        .autocorrectionDisabled()
+                                        .textInputAutocapitalization(.never)
+                                } else {
+                                    SecureField("sk-...", text: $apiKey)
+                                        .textFieldStyle(.roundedBorder)
+                                        .autocorrectionDisabled()
+                                        .textInputAutocapitalization(.never)
+                                }
+
+                                Button {
+                                    showAPIKey.toggle()
+                                } label: {
+                                    Image(systemName: showAPIKey ? "eye.slash" : "eye")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            Button {
+                                saveAPIKey()
+                            } label: {
+                                Text("Save API Key")
+                                    .fontWeight(.medium)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(apiKey.isEmpty)
+                        }
+                    }
+
                     Link(destination: URL(string: "https://platform.openai.com/api-keys")!) {
                         HStack {
-                            Label("Get an API Key", systemImage: "key")
+                            Label("Get API Key", systemImage: "key")
                             Spacer()
                             Image(systemName: "arrow.up.right")
                                 .font(.caption)
@@ -139,7 +189,7 @@ struct SettingsView: View {
 
                     Link(destination: URL(string: "https://platform.openai.com/usage")!) {
                         HStack {
-                            Label("Check Usage", systemImage: "chart.bar")
+                            Label("View Usage", systemImage: "chart.pie")
                             Spacer()
                             Image(systemName: "arrow.up.right")
                                 .font(.caption)
@@ -147,33 +197,62 @@ struct SettingsView: View {
                         }
                     }
                 } header: {
-                    Text("OpenAI Resources")
+                    Text("AI Assistant")
+                } footer: {
+                    Text("OpenAI powers strategic planning. Key stored in Keychain.")
                 }
 
+                // MARK: - Preferences Section
+                Section {
+                    Picker(selection: $prefs.appLanguage) {
+                        Text("System").tag("system")
+                        Text("English").tag("en")
+                        Text("Chinese").tag("zh")
+                    } label: {
+                        Label("Language", systemImage: "globe")
+                    }
+                } header: {
+                    Text("Preferences")
+                } footer: {
+                    Text("Language support coming soon.")
+                }
+
+                // MARK: - About Section
                 Section {
                     HStack {
-                        Text("Version")
+                        Label("Version", systemImage: "info.circle")
                         Spacer()
                         Text("1.0.0")
                             .foregroundStyle(.secondary)
+                    }
+
+                    Link(destination: URL(string: "https://github.com/Ying-Kai-Liao/TouchStone")!) {
+                        HStack {
+                            Label("Source Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 } header: {
                     Text("About")
                 }
             }
             .navigationTitle("Settings")
+            .tint(.accentColor)
             .alert("API Key Saved", isPresented: $showSaveConfirmation) {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text("Your OpenAI API key has been securely saved.")
             }
-            .alert("Delete API Key?", isPresented: $showDeleteConfirmation) {
-                Button("Delete", role: .destructive) {
+            .alert("Remove API Key?", isPresented: $showDeleteConfirmation) {
+                Button("Remove", role: .destructive) {
                     deleteAPIKey()
                 }
                 Button("Cancel", role: .cancel) { }
             } message: {
-                Text("This will remove your API key. You'll need to enter it again to use AI features.")
+                Text("You'll need to enter the key again to use AI features.")
             }
         }
     }
@@ -185,84 +264,6 @@ struct SettingsView: View {
         formatter.dateFormat = "h a"
         let date = Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date()) ?? Date()
         return formatter.string(from: date)
-    }
-
-    // MARK: - Existing Key View
-
-    private var existingKeyView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                Text("API Key configured")
-                    .foregroundStyle(.green)
-            }
-            .font(.subheadline)
-
-            HStack(spacing: 12) {
-                Button {
-                    showDeleteConfirmation = true
-                } label: {
-                    Text("Remove Key")
-                        .font(.subheadline)
-                        .foregroundStyle(.red)
-                }
-
-                Spacer()
-
-                Button {
-                    // Switch to edit mode
-                    apiKey = ""
-                } label: {
-                    Text("Update Key")
-                        .font(.subheadline)
-                }
-            }
-
-            if !apiKey.isEmpty {
-                newKeyInputView
-            }
-        }
-    }
-
-    // MARK: - New Key Input View
-
-    private var newKeyInputView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                if showAPIKey {
-                    TextField("sk-...", text: $apiKey)
-                        .textFieldStyle(.roundedBorder)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                } else {
-                    SecureField("sk-...", text: $apiKey)
-                        .textFieldStyle(.roundedBorder)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                }
-
-                Button {
-                    showAPIKey.toggle()
-                } label: {
-                    Image(systemName: showAPIKey ? "eye.slash" : "eye")
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Button {
-                saveAPIKey()
-            } label: {
-                Text("Save Key")
-                    .fontWeight(.medium)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(apiKey.isEmpty ? Color.gray : Color.blue)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-            .disabled(apiKey.isEmpty)
-        }
     }
 
     // MARK: - Actions
