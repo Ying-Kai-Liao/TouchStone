@@ -111,6 +111,9 @@ struct FocusModeView: View {
             Button("Add Note") {
                 showDetails = true
             }
+            Button("Don't Log", role: .destructive) {
+                dismissWithoutLogging()
+            }
             Button("Cancel", role: .cancel) {}
         }
     }
@@ -195,27 +198,27 @@ struct FocusModeView: View {
     // MARK: - Intention Pill
 
     private var intentionPill: some View {
-        HStack(spacing: 8) {
+        VStack(spacing: 6) {
             Text("INTENTION")
                 .font(.system(size: 11, weight: .semibold))
                 .tracking(1)
                 .foregroundStyle(.white.opacity(0.5))
 
-            Rectangle()
-                .fill(.white.opacity(0.3))
-                .frame(width: 1, height: 14)
-
             Text(intentionText)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.white.opacity(0.8))
-                .lineLimit(1)
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity)
         .background(
-            Capsule()
+            RoundedRectangle(cornerRadius: 16)
                 .fill(Color.white.opacity(0.08))
         )
+        .padding(.horizontal, 40)
     }
 
     // MARK: - Action Button
@@ -383,6 +386,10 @@ struct FocusModeView: View {
             project: project
         )
         modelContext.insert(touch)
+        onDismiss()
+    }
+
+    private func dismissWithoutLogging() {
         onDismiss()
     }
 }

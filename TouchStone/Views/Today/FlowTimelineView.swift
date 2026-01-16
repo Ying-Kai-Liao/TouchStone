@@ -11,6 +11,8 @@ struct FlowTimelineView: View {
     let isToday: Bool  // Whether viewing today's date
     let onTouch: (Project) -> Void
     let onFocus: (Project) -> Void
+    let onDelete: ((WorkflowItem) -> Void)?
+    let onEditMode: (() -> Void)?
 
     @State private var showMoreToTouch = false  // Collapsed by default
 
@@ -27,7 +29,9 @@ struct FlowTimelineView: View {
                             isFirst: index == 0,
                             isLast: index == items.count - 1,
                             onTouch: { project in onTouch(project) },
-                            onFocus: { project in onFocus(project) }
+                            onFocus: { project in onFocus(project) },
+                            onDelete: item.isWater ? { onDelete?(item) } : nil,
+                            onEditMode: item.isWater ? onEditMode : nil
                         )
                     }
 
@@ -142,6 +146,14 @@ struct TimelineItemContainer: View {
     let isLast: Bool
     let onTouch: (Project) -> Void
     let onFocus: (Project) -> Void
+    let onDelete: (() -> Void)?
+    let onEditMode: (() -> Void)?
+
+    @State private var swipeOffset: CGFloat = 0
+    @State private var showDeleteConfirm = false
+
+    private let deleteThreshold: CGFloat = -80
+    private let swipeSnapThreshold: CGFloat = -40
 
     private var lineColor: Color {
         switch item.status {
@@ -182,26 +194,115 @@ struct TimelineItemContainer: View {
         }
     }
 
-    /// Whether this is a transition item (breathing space or flow prep)
+    /// Whether this is a transition item (breathing space, flow prep, or rest)
     private var isTransitionItem: Bool {
-        item.isBreathingSpace || item.isFlowPrep
+        item.isBreathingSpace || item.isFlowPrep || item.isRest
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            // Timeline with status indicator
-            timelineWithIndicator
-                .frame(width: 56)
+        ZStack(alignment: .trailing) {
+            // Delete button background (revealed on swipe)
+            if onDelete != nil && swipeOffset < 0 {
+                deleteButton
+            }
 
-            // Content
-            FlowItemRow(
-                item: item,
-                onTouch: item.project.map { project in { onTouch(project) } },
-                onFocus: item.project.map { project in { onFocus(project) } }
-            )
-            .padding(.trailing, 16)
-            .padding(.vertical, isTransitionItem ? 2 : 6)
+            // Main content with swipe gesture
+            HStack(alignment: .top, spacing: 0) {
+                // Timeline with status indicator
+                timelineWithIndicator
+                    .frame(width: 56)
+
+                // Content
+                FlowItemRow(
+                    item: item,
+                    onTouch: item.project.map { project in { onTouch(project) } },
+                    onFocus: item.project.map { project in { onFocus(project) } }
+                )
+                .padding(.trailing, 16)
+                .padding(.vertical, isTransitionItem ? 2 : 6)
+            }
+            .offset(x: swipeOffset)
+            .gesture(swipeGesture)
+            .simultaneousGesture(longPressGesture)
         }
+        .clipped()
+        .confirmationDialog("Remove from flow?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            Button("Remove", role: .destructive) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    swipeOffset = 0
+                }
+                onDelete?()
+            }
+            Button("Cancel", role: .cancel) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    swipeOffset = 0
+                }
+            }
+        } message: {
+            Text("This will remove the session from today's schedule.")
+        }
+    }
+
+    // MARK: - Swipe Gesture
+
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: 20, coordinateSpace: .local)
+            .onChanged { value in
+                guard onDelete != nil else { return }
+                // Only allow left swipe (negative translation)
+                if value.translation.width < 0 {
+                    swipeOffset = max(value.translation.width, deleteThreshold * 1.2)
+                } else if swipeOffset < 0 {
+                    // Allow swiping back
+                    swipeOffset = min(0, swipeOffset + value.translation.width)
+                }
+            }
+            .onEnded { value in
+                guard onDelete != nil else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if swipeOffset < swipeSnapThreshold {
+                        // Snap to show delete button
+                        swipeOffset = deleteThreshold
+                    } else {
+                        // Snap back
+                        swipeOffset = 0
+                    }
+                }
+            }
+    }
+
+    // MARK: - Long Press Gesture
+
+    private var longPressGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.5)
+            .onEnded { _ in
+                guard onEditMode != nil else { return }
+                // Haptic feedback
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                impactFeedback.impactOccurred()
+                onEditMode?()
+            }
+    }
+
+    // MARK: - Delete Button
+
+    private var deleteButton: some View {
+        Button {
+            showDeleteConfirm = true
+        } label: {
+            VStack {
+                Image(systemName: "trash.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                Text("Remove")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+            }
+            .foregroundStyle(.white)
+            .frame(width: abs(deleteThreshold))
+            .frame(maxHeight: .infinity)
+            .background(Color.red.opacity(0.9))
+        }
+        .buttonStyle(.plain)
     }
 
     private var timelineWithIndicator: some View {
@@ -259,7 +360,9 @@ struct TimelineItemContainer: View {
             additionalProjects: [],
             isToday: true,
             onTouch: { _ in },
-            onFocus: { _ in }
+            onFocus: { _ in },
+            onDelete: nil,
+            onEditMode: nil
         )
     }
     .background(Color(.systemBackground))

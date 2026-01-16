@@ -18,7 +18,7 @@ struct TodayFlowView: View {
     @Query(filter: #Predicate<Rule> { $0.isActive })
     private var activeRules: [Rule]
 
-    @State private var dayState = DayState()
+    @State private var dayState: DayState = DayState()
     @State private var selectedDate = Date()
     @State private var showZenMode = false
     @State private var focusProject: Project?
@@ -26,6 +26,7 @@ struct TodayFlowView: View {
     @State private var showUndoToast = false
     @State private var showAddStone = false
     @State private var showSpeechInput = false
+    @State private var showEditMode = false
 
     private let calendar = Calendar.current
 
@@ -83,18 +84,7 @@ struct TodayFlowView: View {
                         .padding(.top, 16)
 
                     // Main content
-                    ScrollView {
-                        FlowTimelineView(
-                            items: dayState.workflowItems,
-                            additionalProjects: additionalProjects,
-                            isToday: calendar.isDateInToday(selectedDate),
-                            onTouch: touchProject,
-                            onFocus: { project in focusProject = project }
-                        )
-                        .padding(.top, 16)
-                        // Add padding at bottom when prompt is showing
-                        .padding(.bottom, showWorkPrompt ? 140 : 0)
-                    }
+                    scrollContent
                 }
 
                 // Work prompt overlay at bottom
@@ -128,6 +118,18 @@ struct TodayFlowView: View {
                     focusProject = nil
                 }
             }
+            .sheet(isPresented: $showEditMode) {
+                if let plan = todaysPlan {
+                    FlowEditModeView(
+                        dayPlan: plan,
+                        allProjects: Array(activeProjects),
+                        onDismiss: {
+                            showEditMode = false
+                            computeDayState()
+                        }
+                    )
+                }
+            }
         }
         .preferredColorScheme(.dark)
     }
@@ -136,15 +138,6 @@ struct TodayFlowView: View {
 
     private var headerView: some View {
         HStack(alignment: .center) {
-            // Menu button
-            Button {
-                showAddStone = true
-            } label: {
-                Image(systemName: "line.3.horizontal")
-                    .font(.title3)
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-
             VStack(alignment: .leading, spacing: 2) {
                 Text("Today's Flow")
                     .font(.title2)
@@ -156,7 +149,6 @@ struct TodayFlowView: View {
                     .foregroundStyle(.white.opacity(0.6))
                     .textCase(.uppercase)
             }
-            .padding(.leading, 8)
 
             Spacer()
 
@@ -212,6 +204,28 @@ struct TodayFlowView: View {
     private var upcomingDates: [Date] {
         (0..<7).compactMap { offset in
             calendar.date(byAdding: .day, value: offset, to: calendar.startOfDay(for: Date()))
+        }
+    }
+
+    // MARK: - Scroll Content
+
+    private var scrollContent: some View {
+        let deleteHandler: ((WorkflowItem) -> Void)? = isWorkDayActive ? { item in self.deleteFlowItem(item) } : nil
+        let editHandler: (() -> Void)? = isWorkDayActive ? { showEditMode = true } : nil
+        let bottomPadding: CGFloat = showWorkPrompt ? 140 : 0
+
+        return ScrollView(.vertical, showsIndicators: true) {
+            FlowTimelineView(
+                items: dayState.workflowItems,
+                additionalProjects: additionalProjects,
+                isToday: calendar.isDateInToday(selectedDate),
+                onTouch: touchProject,
+                onFocus: { project in focusProject = project },
+                onDelete: deleteHandler,
+                onEditMode: editHandler
+            )
+            .padding(.top, 16)
+            .padding(.bottom, bottomPadding)
         }
     }
 
@@ -331,6 +345,25 @@ struct TodayFlowView: View {
 
         // Don't recompute - items stay in place as daily summary
         // Ghost/solid styling updates automatically via SwiftData
+    }
+
+    private func deleteFlowItem(_ item: WorkflowItem) {
+        guard let plan = todaysPlan, plan.hasSchedule else { return }
+        guard let project = item.project else { return }
+
+        // Find the scheduled session matching this workflow item
+        if let session = plan.scheduledSessions.first(where: {
+            $0.project?.id == project.id &&
+            $0.scheduledStart == item.startTime &&
+            $0.scheduledEnd == item.endTime
+        }) {
+            modelContext.delete(session)
+
+            // Recompute to update the view
+            withAnimation(.easeInOut(duration: 0.3)) {
+                computeDayState()
+            }
+        }
     }
 
     private func undoTouch() {

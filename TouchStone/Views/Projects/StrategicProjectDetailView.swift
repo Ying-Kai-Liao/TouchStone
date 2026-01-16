@@ -14,37 +14,36 @@ struct StrategicProjectDetailView: View {
     @State private var showingDeleteConfirmation = false
     @State private var editMode: EditMode = .inactive
     @State private var selectedSession: PlannedSession?
+    @State private var expandedPhases: Set<String> = []
 
     var body: some View {
-        List {
-            // Project header section
-            projectHeaderSection
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Project header with archetype and context
+                projectHeaderCard
 
-            // Time invested - the core metric
-            progressSection
+                // Deadline card (prominent if exists)
+                if project.softDeadline != nil {
+                    deadlineCard
+                }
 
-            // Current phase with mental rule
-            currentPhaseSection
+                // Progress section
+                progressCard
 
-            // Phases with sessions
-            ForEach(project.sortedPhases) { phase in
-                PhaseSection(
-                    phase: phase,
-                    isEditing: editMode.isEditing,
-                    onSessionTap: { session in
-                        selectedSession = session
-                    }
-                )
+                // Phase list with indicator
+                phasesCard
+
+                // Attached documents
+                if !project.documents.isEmpty {
+                    documentsCard
+                }
+
+                // Actions
+                actionsCard
             }
-
-            // Attached documents
-            if !project.documents.isEmpty {
-                documentsSection
-            }
-
-            // Actions section
-            actionsSection
+            .padding()
         }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle(project.title)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -115,166 +114,257 @@ struct StrategicProjectDetailView: View {
         dismiss()
     }
 
-    // MARK: - Header Section
+    // MARK: - Header Card
 
-    private var projectHeaderSection: some View {
-        Section {
-            VStack(alignment: .leading, spacing: 12) {
-                // Archetype badge
-                if let archetype = project.archetype {
-                    HStack {
-                        Image(systemName: archetype.icon)
-                        Text(archetype.displayName)
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.purple.opacity(0.15))
-                    .foregroundStyle(.purple)
-                    .clipShape(Capsule())
+    private var projectHeaderCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Archetype badge
+            if let archetype = project.archetype {
+                HStack {
+                    Image(systemName: archetype.icon)
+                    Text(archetype.displayName)
+                        .font(.caption)
+                        .fontWeight(.semibold)
                 }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.purple.opacity(0.15))
+                .foregroundStyle(.purple)
+                .clipShape(Capsule())
+            }
 
-                // Description/context if available
-                if let context = project.planningContext, !context.isEmpty {
-                    Text(context)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                }
+            // Description/context if available
+            if let context = project.planningContext, !context.isEmpty {
+                Text(context)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
 
-                // Deadline if set
+    // MARK: - Deadline Card
+
+    private var deadlineCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: deadlineIcon)
+                .font(.title2)
+                .foregroundStyle(deadlineColor)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Deadline")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 if let deadline = project.softDeadline {
-                    Label(deadlineText(deadline), systemImage: "calendar")
-                        .font(.subheadline)
+                    Text(formattedDeadline(deadline))
+                        .font(.headline)
                         .foregroundStyle(deadlineColor)
                 }
             }
-            .padding(.vertical, 4)
+
+            Spacer()
+
+            if let deadline = project.softDeadline {
+                Text(daysUntilDeadline(deadline))
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(deadlineColor)
+            }
+        }
+        .padding()
+        .background(deadlineBackgroundColor)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var deadlineIcon: String {
+        switch project.deadlineStatus {
+        case .passed: return "exclamationmark.triangle.fill"
+        case .approaching: return "clock.fill"
+        default: return "calendar"
         }
     }
 
-    // MARK: - Progress Section
+    private var deadlineBackgroundColor: Color {
+        switch project.deadlineStatus {
+        case .passed: return Color.red.opacity(0.1)
+        case .approaching: return Color.orange.opacity(0.1)
+        default: return Color(.secondarySystemGroupedBackground)
+        }
+    }
 
-    private var progressSection: some View {
-        Section {
-            VStack(alignment: .leading, spacing: 16) {
-                // Time invested vs planned - the core metric
-                HStack(alignment: .firstTextBaseline) {
-                    Text("\(project.completedHours)")
-                        .font(.system(size: 42, weight: .bold, design: .rounded))
-                        .foregroundStyle(.purple)
+    private func formattedDeadline(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
+    }
 
-                    Text("/ \(project.totalPlannedHours) hrs")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
+    private func daysUntilDeadline(_ date: Date) -> String {
+        let days = Calendar.current.dateComponents([.day], from: Date(), to: date).day ?? 0
+        if days < 0 {
+            return "\(abs(days)) days overdue"
+        } else if days == 0 {
+            return "Due today"
+        } else if days == 1 {
+            return "1 day left"
+        } else {
+            return "\(days) days left"
+        }
+    }
 
-                    Spacer()
-                }
+    // MARK: - Progress Card
 
-                // Progress bar
-                ProgressView(value: project.progress)
-                    .tint(.purple)
-                    .scaleEffect(y: 2)
-                    .padding(.vertical, 4)
+    private var progressCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "chart.bar.fill")
+                    .foregroundStyle(.secondary)
+                Text("Progress")
+                    .font(.headline)
+                Spacer()
+            }
+
+            // Time invested vs planned
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(project.completedHours)")
+                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .foregroundStyle(.purple)
+
+                Text("/ \(project.totalPlannedHours) hrs")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
 
                 // Remaining time
                 if project.remainingHours > 0 {
-                    Text("\(project.remainingHours) hours remaining")
-                        .font(.subheadline)
+                    Text("\(project.remainingHours)h left")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("Goal reached!")
-                        .font(.subheadline)
+                    Text("Complete!")
+                        .font(.caption)
                         .foregroundStyle(.green)
                 }
             }
-            .padding(.vertical, 8)
-        } header: {
-            Text("Time Invested")
+
+            // Progress bar
+            ProgressView(value: project.progress)
+                .tint(.purple)
+                .scaleEffect(y: 1.5)
         }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    // MARK: - Current Phase Section
+    // MARK: - Phases Card
 
-    @ViewBuilder
-    private var currentPhaseSection: some View {
-        if let activePhase = project.activePhase {
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(activePhase.title)
-                            .font(.headline)
+    private var phasesCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "list.bullet")
+                    .foregroundStyle(.secondary)
+                Text("Phases")
+                    .font(.headline)
+                Spacer()
+            }
 
-                        Spacer()
-
-                        Text(activePhase.phaseType.displayName)
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.purple.opacity(0.15))
-                            .clipShape(Capsule())
-                    }
-
-                    if let rule = activePhase.mentalRule {
-                        Text("\"\(rule)\"")
-                            .font(.subheadline)
-                            .italic()
-                            .foregroundStyle(.purple)
-                    }
+            VStack(spacing: 0) {
+                ForEach(Array(project.sortedPhases.enumerated()), id: \.element.id) { index, phase in
+                    CollapsiblePhaseRow(
+                        phase: phase,
+                        isActive: phase.id == project.activePhase?.id,
+                        isExpanded: expandedPhases.contains(phase.id.uuidString),
+                        isLast: index == project.sortedPhases.count - 1,
+                        isEditing: editMode.isEditing,
+                        onToggleExpand: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                if expandedPhases.contains(phase.id.uuidString) {
+                                    expandedPhases.remove(phase.id.uuidString)
+                                } else {
+                                    expandedPhases.insert(phase.id.uuidString)
+                                }
+                            }
+                        },
+                        onSessionTap: { session in
+                            selectedSession = session
+                        }
+                    )
                 }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Current Phase")
             }
         }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    // MARK: - Documents Section
+    // MARK: - Documents Card
 
-    private var documentsSection: some View {
-        Section("Attached Documents") {
+    private var documentsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "doc.fill")
+                    .foregroundStyle(.secondary)
+                Text("Documents")
+                    .font(.headline)
+                Spacer()
+            }
+
             ForEach(project.documents) { document in
                 DocumentAttachmentRow(document: document) {
                     modelContext.delete(document)
                 }
             }
         }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    // MARK: - Actions Section
+    // MARK: - Actions Card
 
-    private var actionsSection: some View {
-        Section {
+    private var actionsCard: some View {
+        VStack(spacing: 12) {
             Button {
                 logTouch()
             } label: {
-                Label("Log Touch Now", systemImage: "hand.tap")
+                HStack {
+                    Image(systemName: "hand.tap.fill")
+                    Text("Log Touch Now")
+                        .fontWeight(.medium)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
             }
+            .buttonStyle(.borderedProminent)
+            .tint(.purple)
 
-            Toggle("Active", isOn: $project.isActive)
+            HStack {
+                Text("Active")
+                    .font(.subheadline)
+                Spacer()
+                Toggle("", isOn: $project.isActive)
+                    .labelsHidden()
+            }
+            .padding(.horizontal, 4)
         }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Helpers
 
     private var deadlineColor: Color {
         switch project.deadlineStatus {
-        case .none, .comfortable: return .secondary
+        case .none, .comfortable: return .primary
         case .approaching: return .orange
         case .passed: return .red
-        }
-    }
-
-    private func deadlineText(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        let dateStr = formatter.string(from: date)
-
-        switch project.deadlineStatus {
-        case .passed: return "Past target: \(dateStr)"
-        case .approaching: return "Target: \(dateStr) (soon)"
-        default: return "Target: \(dateStr)"
         }
     }
 
@@ -284,51 +374,136 @@ struct StrategicProjectDetailView: View {
     }
 }
 
-// MARK: - Phase Section
+// MARK: - Collapsible Phase Row
 
-struct PhaseSection: View {
+struct CollapsiblePhaseRow: View {
     @Bindable var phase: ProjectPhase
+    let isActive: Bool
+    let isExpanded: Bool
+    let isLast: Bool
     let isEditing: Bool
+    let onToggleExpand: () -> Void
     let onSessionTap: (PlannedSession) -> Void
 
+    private var completedCount: Int {
+        phase.sortedSessions.filter { $0.status == .completed }.count
+    }
+
+    private var totalCount: Int {
+        phase.sortedSessions.count
+    }
+
     var body: some View {
-        Section {
-            ForEach(phase.sortedSessions) { session in
-                EditableSessionRow(
-                    session: session,
-                    isEditing: isEditing,
-                    onTap: { onSessionTap(session) }
-                )
+        VStack(alignment: .leading, spacing: 0) {
+            // Phase header row
+            Button(action: onToggleExpand) {
+                HStack(spacing: 12) {
+                    // Active indicator
+                    Circle()
+                        .fill(isActive ? Color.purple : Color.gray.opacity(0.3))
+                        .frame(width: 8, height: 8)
+
+                    // Phase title
+                    Text(phase.title)
+                        .font(.subheadline)
+                        .fontWeight(isActive ? .semibold : .regular)
+                        .foregroundStyle(isActive ? .primary : .secondary)
+
+                    Spacer()
+
+                    // Session count
+                    Text("\(completedCount)/\(totalCount)")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+
+                    // Phase type badge
+                    Text(phase.phaseType.displayName)
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(isActive ? Color.purple.opacity(0.15) : Color.gray.opacity(0.1))
+                        .foregroundStyle(isActive ? .purple : .secondary)
+                        .clipShape(Capsule())
+
+                    // Expand/collapse chevron
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.vertical, 10)
             }
-        } header: {
-            phaseHeader
-        } footer: {
-            phaseFooter
+            .buttonStyle(.plain)
+
+            // Expanded sessions
+            if isExpanded {
+                VStack(spacing: 6) {
+                    // Mental rule if available
+                    if let rule = phase.mentalRule {
+                        Text("\"\(rule)\"")
+                            .font(.caption)
+                            .italic()
+                            .foregroundStyle(.purple)
+                            .padding(.leading, 20)
+                            .padding(.bottom, 4)
+                    }
+
+                    ForEach(phase.sortedSessions) { session in
+                        MinimalSessionRow(
+                            session: session,
+                            isEditing: isEditing,
+                            onTap: { onSessionTap(session) }
+                        )
+                    }
+                }
+                .padding(.bottom, 8)
+            }
+
+            // Divider (except for last item)
+            if !isLast {
+                Divider()
+                    .padding(.leading, 20)
+            }
         }
     }
+}
 
-    private var phaseHeader: some View {
-        HStack {
-            Text(phase.title)
-                .fontWeight(.medium)
+// MARK: - Minimal Session Row
 
-            Spacer()
+struct MinimalSessionRow: View {
+    @Bindable var session: PlannedSession
+    let isEditing: Bool
+    let onTap: () -> Void
 
-            Text(phase.phaseType.displayName)
-                .font(.caption2)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.purple.opacity(0.1))
-                .clipShape(Capsule())
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 8) {
+                // Status indicator
+                Image(systemName: session.status.icon)
+                    .font(.caption2)
+                    .foregroundStyle(colorForStatus)
+                    .frame(width: 16)
+
+                // Session title
+                Text(session.title)
+                    .font(.caption)
+                    .foregroundStyle(session.status == .skipped ? .secondary : .primary)
+                    .strikethrough(session.status == .skipped)
+                    .lineLimit(1)
+
+                Spacer()
+            }
+            .padding(.leading, 20)
+            .padding(.vertical, 4)
         }
+        .buttonStyle(.plain)
+        .opacity(session.status == .skipped ? 0.6 : 1.0)
     }
 
-    @ViewBuilder
-    private var phaseFooter: some View {
-        if let rule = phase.mentalRule {
-            Text("Rule: \"\(rule)\"")
-                .font(.caption)
-                .italic()
+    private var colorForStatus: Color {
+        switch session.status {
+        case .planned: return .secondary
+        case .completed: return .green
+        case .skipped: return .orange
         }
     }
 }
