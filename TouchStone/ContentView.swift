@@ -9,14 +9,14 @@ struct ContentView: View {
                     Label("Flow", systemImage: "drop.fill")
                 }
 
+            CalendarView()
+                .tabItem {
+                    Label("Calendar", systemImage: "calendar")
+                }
+
             ProjectsListView()
                 .tabItem {
                     Label("Plan", systemImage: "square.grid.2x2")
-                }
-
-            CalendarView()
-                .tabItem {
-                    Label("Stats", systemImage: "chart.bar.fill")
                 }
 
             SettingsView()
