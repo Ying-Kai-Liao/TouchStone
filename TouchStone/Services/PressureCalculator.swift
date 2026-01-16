@@ -148,6 +148,53 @@ struct PressureCalculator {
         return totalMinutes
     }
 
+    // MARK: - Load-Based Calculation (for CalendarView)
+
+    /// Calculate daily load percentage if user distributes work evenly to meet all deadlines.
+    /// Returns a value from 0.0 (empty) to 1.0+ (overloaded).
+    static func calculateDayLoad(
+        for date: Date,
+        projects: [Project],
+        dailyCapacityMinutes: Int = UserPreferences.shared.dailyProductiveHours * 60
+    ) -> Double {
+        let calendar = Calendar.current
+        let dayStart = calendar.startOfDay(for: date)
+        let today = calendar.startOfDay(for: Date())
+
+        // Only calculate for today and future days
+        guard dayStart >= today else { return 0 }
+
+        var totalAllocatedMinutes: Double = 0
+
+        for project in projects where project.isActive {
+            guard let deadline = project.deadline else { continue }
+
+            let deadlineStart = calendar.startOfDay(for: deadline)
+
+            // Skip if deadline already passed
+            guard deadlineStart >= today else { continue }
+
+            // Skip if this day is after the deadline
+            guard dayStart <= deadlineStart else { continue }
+
+            // Calculate days from today to deadline (inclusive)
+            let totalDays = max(1, (calendar.dateComponents([.day], from: today, to: deadlineStart).day ?? 0) + 1)
+
+            // Remaining work in minutes
+            let remainingMinutes = Double(project.remainingHours * 60)
+
+            // Daily allocation = remaining work / days until deadline
+            let dailyAllocation = remainingMinutes / Double(totalDays)
+
+            // Add this project's allocation to today's load
+            totalAllocatedMinutes += dailyAllocation
+        }
+
+        // Return load as percentage of capacity
+        guard dailyCapacityMinutes > 0 else { return 0 }
+        return totalAllocatedMinutes / Double(dailyCapacityMinutes)
+    }
+
     // MARK: - Simplified Methods (for CalendarView)
 
     /// Calculate the worst feasibility status for a given day (simplified)

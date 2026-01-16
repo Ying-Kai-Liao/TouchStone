@@ -123,7 +123,7 @@ struct CalendarView: View {
                     dayData: dayData,
                     stones: stonesForDay(dayData.date),
                     touchCount: touchCountForDay(dayData.date),
-                    pressureStatus: pressureForDay(dayData.date),
+                    dayLoad: loadForDay(dayData.date),
                     hasDeadline: hasDeadlineOnDay(dayData.date),
                     onTap: {
                         if dayData.isCurrentMonth {
@@ -184,8 +184,8 @@ struct CalendarView: View {
         }.count
     }
 
-    private func pressureForDay(_ date: Date) -> FeasibilityStatus {
-        return PressureCalculator.aggregateFeasibility(for: date, projects: Array(activeProjects))
+    private func loadForDay(_ date: Date) -> Double {
+        return PressureCalculator.calculateDayLoad(for: date, projects: Array(activeProjects))
     }
 
     private func hasDeadlineOnDay(_ date: Date) -> Bool {
@@ -210,11 +210,12 @@ struct DayCell: View {
     let dayData: DayData
     let stones: [StoneEvent]
     let touchCount: Int
-    let pressureStatus: FeasibilityStatus
+    let dayLoad: Double  // 0.0 = empty, 1.0 = full, >1.0 = overloaded
     let hasDeadline: Bool
     let onTap: () -> Void
 
     private let calendar = Calendar.current
+    private let accentColor = UserPreferences.shared.accentColor
 
     var body: some View {
         Button(action: onTap) {
@@ -259,7 +260,7 @@ struct DayCell: View {
                             .padding(.vertical, 2)
                             .background(
                                 Capsule()
-                                    .fill(pressureStatus != .noDeadline ? pressureStatus.color : Color.red)
+                                    .fill(loadColor)
                             )
                     } else {
                         Color.clear
@@ -283,14 +284,27 @@ struct DayCell: View {
         .buttonStyle(.plain)
     }
 
+    /// Color based on load - accent color gradient
+    private var loadColor: Color {
+        if dayLoad > 1.0 {
+            return .red  // Overloaded
+        } else if dayLoad > 0.8 {
+            return .orange  // Nearly full
+        } else {
+            return accentColor
+        }
+    }
+
     private var cellBackgroundColor: Color {
         if !dayData.isCurrentMonth {
             return Color.clear
         }
 
-        // Apply pressure color if there's deadline pressure
-        if pressureStatus != .noDeadline {
-            return pressureStatus.color.opacity(0.15)
+        // Show load-based color if there's any work allocated
+        if dayLoad > 0 {
+            // Opacity scales with load: 0.1 at 0% to 0.35 at 100%+
+            let opacity = min(0.35, 0.1 + (dayLoad * 0.25))
+            return loadColor.opacity(opacity)
         }
 
         if isWeekend {

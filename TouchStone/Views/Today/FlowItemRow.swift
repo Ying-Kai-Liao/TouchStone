@@ -55,19 +55,46 @@ struct StoneFlowRow: View {
                 // Content - expanded or compact based on tap
                 if isExpanded {
                     // Full content for expanded stone
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text(item.title)
                             .font(.title3)
                             .fontWeight(.bold)
                             .foregroundStyle(.primary)
 
-                        HStack(spacing: 6) {
-                            Image(systemName: "clock")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(item.timeRangeString)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                        // Time and duration row
+                        HStack(spacing: 16) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "clock")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text(item.timeRangeString)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            HStack(spacing: 6) {
+                                Image(systemName: "hourglass")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text("\(item.durationMinutes) min")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        // Recurrence info if applicable
+                        if let stoneInstance = item.stoneInstance {
+                            let recurrence = stoneInstance.event.recurrence
+                            if recurrence.type != .none {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "repeat")
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                    Text(recurrenceLabel(for: recurrence))
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -156,6 +183,17 @@ struct StoneFlowRow: View {
                 .padding(12)
         }
     }
+
+    private func recurrenceLabel(for recurrence: RecurrencePattern) -> String {
+        switch recurrence.type {
+        case .none: return ""
+        case .daily: return "Repeats daily"
+        case .weekdays: return "Repeats on weekdays"
+        case .weekends: return "Repeats on weekends"
+        case .weekly: return "Repeats weekly"
+        case .custom: return "Custom schedule"
+        }
+    }
 }
 
 // MARK: - Water Flow Row
@@ -214,7 +252,7 @@ struct WaterFlowRow: View {
             // Content - expanded or compact based on tap
             if isExpanded {
                 // Full content for expanded water block
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(item.title)
                             .font(.title3)
@@ -226,6 +264,36 @@ struct WaterFlowRow: View {
                             Text(subtitle)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    // Session goal and phase guardrail
+                    if let project = item.project {
+                        VStack(alignment: .leading, spacing: 8) {
+                            // Next session goal
+                            if let session = project.nextPlannedSession, let goal = session.goal, !goal.isEmpty {
+                                HStack(alignment: .top, spacing: 8) {
+                                    Image(systemName: "target")
+                                        .font(.caption)
+                                        .foregroundStyle(UserPreferences.shared.accentColor)
+                                    Text(goal)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.primary)
+                                }
+                            }
+
+                            // Phase guardrail (mental rule)
+                            if let phase = project.activePhase, let rule = phase.mentalRule, !rule.isEmpty {
+                                HStack(alignment: .top, spacing: 8) {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.caption)
+                                        .foregroundStyle(.orange)
+                                    Text(rule)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .italic()
+                                }
+                            }
                         }
                     }
 
