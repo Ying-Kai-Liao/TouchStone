@@ -116,7 +116,7 @@ struct TodayView: View {
                 let totalFree = dayState.freeSlots.reduce(0) { $0 + $1.durationMinutes }
                 Text("\(freeTimeLabel(totalFree)) available")
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(UserPreferences.shared.accentColor)
             }
         }
         .padding()
@@ -287,7 +287,7 @@ struct StoneRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(Color.green.opacity(0.3))
+                .fill(UserPreferences.shared.accentColor.opacity(0.3))
                 .frame(width: 8, height: 8)
 
             Text(instance.timeString)
@@ -345,7 +345,7 @@ struct ProjectTouchRow: View {
                     if touchCount > 0 {
                         Text("\(touchCount)x today")
                             .font(.caption)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(UserPreferences.shared.accentColor)
                     }
                 }
                 .padding(.leading, 16)

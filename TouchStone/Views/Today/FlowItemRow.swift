@@ -429,7 +429,7 @@ struct FlowPrepRow: View {
             HStack(spacing: 8) {
                 Image(systemName: "leaf.fill")
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(UserPreferences.shared.accentColor)
                 Text("Flow State Prep \u{00B7} \(minutes)m")
                     .font(.caption)
                     .fontWeight(.medium)
@@ -439,7 +439,7 @@ struct FlowPrepRow: View {
             .padding(.vertical, 10)
             .background(
                 Capsule()
-                    .fill(Color.green.opacity(0.12))
+                    .fill(UserPreferences.shared.accentColor.opacity(0.12))
             )
         }
         .frame(maxWidth: .infinity)
