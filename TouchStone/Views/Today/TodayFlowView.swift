@@ -84,20 +84,7 @@ struct TodayFlowView: View {
                         .padding(.top, 16)
 
                     // Main content
-                    ScrollView {
-                        FlowTimelineView(
-                            items: dayState.workflowItems,
-                            additionalProjects: additionalProjects,
-                            isToday: calendar.isDateInToday(selectedDate),
-                            onTouch: touchProject,
-                            onFocus: { project in focusProject = project },
-                            onDelete: isWorkDayActive ? deleteFlowItem : nil,
-                            onEditMode: isWorkDayActive ? { showEditMode = true } : nil
-                        )
-                        .padding(.top, 16)
-                        // Add padding at bottom when prompt is showing
-                        .padding(.bottom, showWorkPrompt ? 140 : 0)
-                    }
+                    scrollContent
                 }
 
                 // Work prompt overlay at bottom
@@ -217,6 +204,28 @@ struct TodayFlowView: View {
     private var upcomingDates: [Date] {
         (0..<7).compactMap { offset in
             calendar.date(byAdding: .day, value: offset, to: calendar.startOfDay(for: Date()))
+        }
+    }
+
+    // MARK: - Scroll Content
+
+    private var scrollContent: some View {
+        let deleteHandler: ((WorkflowItem) -> Void)? = isWorkDayActive ? { item in self.deleteFlowItem(item) } : nil
+        let editHandler: (() -> Void)? = isWorkDayActive ? { showEditMode = true } : nil
+        let bottomPadding: CGFloat = showWorkPrompt ? 140 : 0
+
+        return ScrollView(.vertical, showsIndicators: true) {
+            FlowTimelineView(
+                items: dayState.workflowItems,
+                additionalProjects: additionalProjects,
+                isToday: calendar.isDateInToday(selectedDate),
+                onTouch: touchProject,
+                onFocus: { project in focusProject = project },
+                onDelete: deleteHandler,
+                onEditMode: editHandler
+            )
+            .padding(.top, 16)
+            .padding(.bottom, bottomPadding)
         }
     }
 
