@@ -136,15 +136,6 @@ struct TodayFlowView: View {
 
     private var headerView: some View {
         HStack(alignment: .center) {
-            // Menu button
-            Button {
-                showAddStone = true
-            } label: {
-                Image(systemName: "line.3.horizontal")
-                    .font(.title3)
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-
             VStack(alignment: .leading, spacing: 2) {
                 Text("Today's Flow")
                     .font(.title2)
@@ -156,7 +147,6 @@ struct TodayFlowView: View {
                     .foregroundStyle(.white.opacity(0.6))
                     .textCase(.uppercase)
             }
-            .padding(.leading, 8)
 
             Spacer()
 
