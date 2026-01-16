@@ -316,14 +316,20 @@ class DayState {
         var slotIndex = 0
         var usableSlots = freeSlots.filter { $0.durationMinutes >= minSession }
 
-        // Adjust slots to start from now if we're in the middle of the day
+        // Adjust slots to start from now if we're viewing today
         let now = Date()
-        usableSlots = usableSlots.compactMap { slot -> TimeSlot? in
-            if slot.end <= now { return nil } // Slot already passed
-            if slot.start >= now { return slot } // Slot is in future
-            // Truncate slot to start from now
-            return TimeSlot(start: now, end: slot.end)
-        }.filter { $0.durationMinutes >= minSession }
+        let isToday = calendar.isDateInToday(date)
+
+        if isToday {
+            // For today, filter out past slots and truncate current slot
+            usableSlots = usableSlots.compactMap { slot -> TimeSlot? in
+                if slot.end <= now { return nil } // Slot already passed
+                if slot.start >= now { return slot } // Slot is in future
+                // Truncate slot to start from now
+                return TimeSlot(start: now, end: slot.end)
+            }.filter { $0.durationMinutes >= minSession }
+        }
+        // For future dates, keep all slots as-is
 
         // Pour projects into slots - track current position within slot
         var currentSlotStart = usableSlots.first?.start ?? now
@@ -397,15 +403,22 @@ class DayState {
     private func generateWorkflowItems(projects: [Project]) -> [WorkflowItem] {
         var items: [WorkflowItem] = []
         let now = Date()
+        let isToday = calendar.isDateInToday(date)
 
         // 1. Add all stone instances as workflow items
         for instance in stoneInstances {
             let status: WorkflowItemStatus
-            if instance.endTime <= now {
-                status = .completed
-            } else if instance.startTime <= now && now < instance.endTime {
-                status = .inProgress
+            if isToday {
+                // For today, calculate status based on current time
+                if instance.endTime <= now {
+                    status = .completed
+                } else if instance.startTime <= now && now < instance.endTime {
+                    status = .inProgress
+                } else {
+                    status = .upcoming
+                }
             } else {
+                // For future dates, all items are upcoming
                 status = .upcoming
             }
 

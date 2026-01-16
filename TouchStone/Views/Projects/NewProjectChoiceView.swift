@@ -131,8 +131,8 @@ struct QuickProjectFormView: View {
 
     @State private var title = ""
     @State private var currentPhase = ""
-    @State private var hasSoftDeadline = false
-    @State private var softDeadline = Date().addingTimeInterval(7 * 24 * 60 * 60)
+    @State private var hasDeadline = false
+    @State private var deadlineDate = Date().addingTimeInterval(7 * 24 * 60 * 60)
 
     let onSave: (Project) -> Void
 
@@ -154,12 +154,12 @@ struct QuickProjectFormView: View {
                 }
 
                 Section {
-                    Toggle("Soft Deadline", isOn: $hasSoftDeadline)
-                    if hasSoftDeadline {
-                        DatePicker("Date", selection: $softDeadline, displayedComponents: .date)
+                    Toggle("Deadline", isOn: $hasDeadline)
+                    if hasDeadline {
+                        DatePicker("Date", selection: $deadlineDate, displayedComponents: .date)
                     }
                 } footer: {
-                    Text("A gentle reminder, not pressure")
+                    Text("Set a deadline to track pressure and feasibility")
                 }
             }
             .navigationTitle("Quick Project")
@@ -175,7 +175,7 @@ struct QuickProjectFormView: View {
                         let project = Project(
                             title: title,
                             currentPhase: currentPhase.isEmpty ? nil : currentPhase,
-                            softDeadline: hasSoftDeadline ? softDeadline : nil
+                            deadline: hasDeadline ? deadlineDate : nil
                         )
                         onSave(project)
                         dismiss()

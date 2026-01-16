@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import SwiftUI
 
 // MARK: - Project Model
 
@@ -11,7 +12,7 @@ final class Project {
     var id: UUID
     var title: String
     var currentPhase: String?       // e.g., "Discovery", "Building", "Refinement" (for simple projects)
-    var softDeadline: Date?         // Optional gentle reminder, not pressure
+    var deadline: Date?              // Optional deadline set during strategic plan creation
     var isActive: Bool
     var createdAt: Date
     var archetypeRaw: String?       // Archetype for strategic projects
@@ -33,7 +34,7 @@ final class Project {
         id: UUID = UUID(),
         title: String,
         currentPhase: String? = nil,
-        softDeadline: Date? = nil,
+        deadline: Date? = nil,
         isActive: Bool = true,
         createdAt: Date = Date(),
         archetype: Archetype? = nil,
@@ -42,7 +43,7 @@ final class Project {
         self.id = id
         self.title = title
         self.currentPhase = currentPhase
-        self.softDeadline = softDeadline
+        self.deadline = deadline
         self.isActive = isActive
         self.createdAt = createdAt
         self.archetypeRaw = archetype?.rawValue
@@ -132,18 +133,42 @@ final class Project {
         return days > 7
     }
 
-    /// Soft deadline status
-    var deadlineStatus: DeadlineStatus {
-        guard let deadline = softDeadline else { return .none }
-        let calendar = Calendar.current
-        let daysUntil = calendar.dateComponents([.day], from: Date(), to: deadline).day ?? 0
+    // MARK: - Pressure Calculation
 
-        if daysUntil < 0 {
-            return .passed
-        } else if daysUntil <= 7 {
-            return .approaching
-        } else {
-            return .comfortable
+    /// Days remaining until deadline (nil if no deadline)
+    var daysUntilDeadline: Int? {
+        guard let dl = deadline else { return nil }
+        let calendar = Calendar.current
+        return calendar.dateComponents([.day], from: Date(), to: dl).day
+    }
+
+    /// Required daily hours to meet deadline
+    /// Formula: remainingHours / daysUntilDeadline
+    var requiredDailyHours: Double? {
+        guard let days = daysUntilDeadline, days > 0 else { return nil }
+        return Double(remainingHours) / Double(days)
+    }
+
+    /// Pressure ratio: required pace / available capacity
+    var pressureRatio: Double {
+        guard let required = requiredDailyHours else { return 0 }
+        let dailyCapacity = Double(UserPreferences.shared.dailyProductiveHours)
+        return required / dailyCapacity
+    }
+
+    /// Feasibility status based on pressure ratio
+    var feasibilityStatus: FeasibilityStatus {
+        guard deadline != nil else { return .noDeadline }
+
+        if let days = daysUntilDeadline, days < 0 {
+            return .overdue
+        }
+
+        switch pressureRatio {
+        case ...0.5: return .healthy      // GREEN - comfortable pace
+        case 0.5...0.8: return .tight     // YELLOW - manageable but busy
+        case 0.8...1.0: return .atRisk    // ORANGE - pushing limits
+        default: return .impossible       // RED - can't make it
         }
     }
 
@@ -240,13 +265,49 @@ final class Project {
     }
 }
 
-// MARK: - Deadline Status
+// MARK: - Feasibility Status
 
-enum DeadlineStatus {
-    case none
-    case comfortable   // > 7 days away
-    case approaching   // <= 7 days away
-    case passed        // Past deadline
+/// Pressure-based feasibility status for deadline tracking
+enum FeasibilityStatus: String, Codable {
+    case noDeadline     // No deadline set
+    case healthy        // Pressure ≤ 0.5 (GREEN)
+    case tight          // Pressure 0.5-0.8 (YELLOW)
+    case atRisk         // Pressure 0.8-1.0 (ORANGE)
+    case impossible     // Pressure > 1.0 (RED)
+    case overdue        // Past deadline (DARK RED)
+
+    var color: Color {
+        switch self {
+        case .noDeadline: return .clear
+        case .healthy: return .green
+        case .tight: return .yellow
+        case .atRisk: return .orange
+        case .impossible: return .red
+        case .overdue: return Color(red: 0.6, green: 0, blue: 0)
+        }
+    }
+
+    var severity: Int {
+        switch self {
+        case .noDeadline: return 0
+        case .healthy: return 1
+        case .tight: return 2
+        case .atRisk: return 3
+        case .impossible: return 4
+        case .overdue: return 5
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .noDeadline: return "No Deadline"
+        case .healthy: return "Healthy"
+        case .tight: return "Tight"
+        case .atRisk: return "At Risk"
+        case .impossible: return "Impossible"
+        case .overdue: return "Overdue"
+        }
+    }
 }
 
 // MARK: - Phase Template

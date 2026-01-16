@@ -14,8 +14,8 @@ struct ProjectFormView: View {
 
     @State private var title: String = ""
     @State private var currentPhase: String = ""
-    @State private var hasSoftDeadline: Bool = false
-    @State private var softDeadline: Date = Date().addingTimeInterval(30 * 24 * 60 * 60)
+    @State private var hasDeadline: Bool = false
+    @State private var deadlineDate: Date = Date().addingTimeInterval(30 * 24 * 60 * 60)
 
     private var isEditing: Bool {
         if case .edit = mode { return true }
@@ -41,17 +41,17 @@ struct ProjectFormView: View {
                 }
 
                 Section {
-                    Toggle("Soft deadline", isOn: $hasSoftDeadline)
+                    Toggle("Deadline", isOn: $hasDeadline)
 
-                    if hasSoftDeadline {
+                    if hasDeadline {
                         DatePicker(
                             "Target date",
-                            selection: $softDeadline,
+                            selection: $deadlineDate,
                             displayedComponents: .date
                         )
                     }
                 } footer: {
-                    Text("A soft deadline is a gentle reminder, not a hard constraint.")
+                    Text("Set a deadline to track pressure and feasibility.")
                 }
             }
             .navigationTitle(isEditing ? "Edit Project" : "New Project")
@@ -74,8 +74,8 @@ struct ProjectFormView: View {
                 if let project = existingProject {
                     title = project.title
                     currentPhase = project.currentPhase ?? ""
-                    hasSoftDeadline = project.softDeadline != nil
-                    softDeadline = project.softDeadline ?? Date().addingTimeInterval(30 * 24 * 60 * 60)
+                    hasDeadline = project.deadline != nil
+                    deadlineDate = project.deadline ?? Date().addingTimeInterval(30 * 24 * 60 * 60)
                 }
             }
         }
@@ -85,12 +85,12 @@ struct ProjectFormView: View {
         if let project = existingProject {
             project.title = title
             project.currentPhase = currentPhase.isEmpty ? nil : currentPhase
-            project.softDeadline = hasSoftDeadline ? softDeadline : nil
+            project.deadline = hasDeadline ? deadlineDate : nil
         } else {
             let project = Project(
                 title: title,
                 currentPhase: currentPhase.isEmpty ? nil : currentPhase,
-                softDeadline: hasSoftDeadline ? softDeadline : nil
+                deadline: hasDeadline ? deadlineDate : nil
             )
             onSave(project)
         }

@@ -5,6 +5,7 @@ struct CalendarView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var stones: [StoneEvent]
     @Query private var touchLogs: [TouchLog]
+    @Query(filter: #Predicate<Project> { $0.isActive }) private var activeProjects: [Project]
 
     @State private var selectedMonth = Date()
     @State private var selectedDay: SelectedDay?
@@ -23,14 +24,14 @@ struct CalendarView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: 12) {
                     monthNavigationHeader
                     weekdayHeader
                     calendarGrid
                 }
-                .padding(.vertical)
+                .padding(.vertical, 8)
             }
-            .navigationTitle("Calendar")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -39,6 +40,7 @@ struct CalendarView: View {
                         }
                     } label: {
                         Text("Today")
+                            .font(.subheadline)
                             .fontWeight(.medium)
                     }
                 }
@@ -65,60 +67,51 @@ struct CalendarView: View {
     }
 
     private var monthNavigationHeader: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 16) {
-                Button {
-                    withAnimation(.spring(response: 0.3)) {
-                        selectedMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
-                    }
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.title3)
-                        .foregroundStyle(.primary)
+        HStack(spacing: 12) {
+            Button {
+                withAnimation(.spring(response: 0.3)) {
+                    selectedMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
                 }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
 
-                Spacer()
+            Spacer()
 
-                VStack(spacing: 4) {
-                    Text(monthYearFormatter.string(from: selectedMonth))
-                        .font(.title2.bold())
-                        .foregroundStyle(.primary)
+            Text(monthYearFormatter.string(from: selectedMonth))
+                .font(.headline)
+                .foregroundStyle(.primary)
 
-                    Text("CALENDAR VIEW")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.blue)
-                        .tracking(1.2)
+            Spacer()
+
+            Button {
+                withAnimation(.spring(response: 0.3)) {
+                    selectedMonth = calendar.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
                 }
-
-                Spacer()
-
-                Button {
-                    withAnimation(.spring(response: 0.3)) {
-                        selectedMonth = calendar.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
-                    }
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.title3)
-                        .foregroundStyle(.primary)
-                }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+        .padding(.vertical, 8)
     }
 
     private var weekdayHeader: some View {
         HStack(spacing: 0) {
             ForEach(daysOfWeek, id: \.self) { day in
                 Text(day)
-                    .font(.callout.bold())
-                    .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity)
             }
         }
         .padding(.horizontal, 20)
-        .padding(.bottom, 16)
+        .padding(.bottom, 8)
     }
 
     private var calendarGrid: some View {
@@ -130,6 +123,8 @@ struct CalendarView: View {
                     dayData: dayData,
                     stones: stonesForDay(dayData.date),
                     touchCount: touchCountForDay(dayData.date),
+                    pressureStatus: pressureForDay(dayData.date),
+                    hasDeadline: hasDeadlineOnDay(dayData.date),
                     onTap: {
                         if dayData.isCurrentMonth {
                             selectedDay = SelectedDay(
@@ -189,6 +184,14 @@ struct CalendarView: View {
         }.count
     }
 
+    private func pressureForDay(_ date: Date) -> FeasibilityStatus {
+        return PressureCalculator.aggregateFeasibility(for: date, projects: Array(activeProjects))
+    }
+
+    private func hasDeadlineOnDay(_ date: Date) -> Bool {
+        return PressureCalculator.hasDeadline(on: date, projects: Array(activeProjects))
+    }
+
     private var monthYearFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM yyyy"
@@ -207,54 +210,74 @@ struct DayCell: View {
     let dayData: DayData
     let stones: [StoneEvent]
     let touchCount: Int
+    let pressureStatus: FeasibilityStatus
+    let hasDeadline: Bool
     let onTap: () -> Void
 
     private let calendar = Calendar.current
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 0) {
+            VStack(spacing: 2) {
                 if let day = dayData.day {
                     Spacer()
 
-                    // Day number
+                    // Day number - smaller
                     Text("\(day)")
-                        .font(.system(size: 20, weight: isToday ? .bold : .semibold))
-                        .foregroundStyle(isToday ? .white : (dayData.isCurrentMonth ? .primary : .secondary.opacity(0.3)))
-                        .frame(width: 36, height: 36)
+                        .font(.system(size: 14, weight: isToday ? .bold : .medium))
+                        .foregroundColor(dayData.isCurrentMonth ? .primary : Color.secondary.opacity(0.3))
+                        .frame(width: 26, height: 26)
                         .background(
                             Circle()
-                                .fill(isToday ? Color.accentColor : Color.clear)
+                                .fill(isToday ? Color(.systemGray5) : Color.clear)
+                        )
+                        .overlay(
+                            Circle()
+                                .strokeBorder(isToday ? Color(.systemGray3) : Color.clear, lineWidth: 1.5)
                         )
 
                     Spacer()
 
-                    // Event indicators
-                    HStack(spacing: 4) {
+                    // Event indicators (stone dots)
+                    HStack(spacing: 3) {
                         if !stones.isEmpty {
                             ForEach(stones.prefix(3)) { _ in
                                 Circle()
-                                    .fill(Color.blue)
-                                    .frame(width: 6, height: 6)
+                                    .fill(Color(.systemGray3))
+                                    .frame(width: 4, height: 4)
                             }
                         }
                     }
-                    .frame(height: 12)
-                    .padding(.bottom, 8)
+                    .frame(height: 6)
+
+                    // DUE tag for deadline days
+                    if hasDeadline {
+                        Text("DUE")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(pressureStatus != .noDeadline ? pressureStatus.color : Color.red)
+                            )
+                    } else {
+                        Color.clear
+                            .frame(height: 14)
+                    }
+
+                    Spacer()
+                        .frame(height: 4)
                 } else {
                     Color.clear
-                        .frame(height: 80)
+                        .frame(height: 60)
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 80)
+            .frame(height: 60)
             .background(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 12)
                     .fill(cellBackgroundColor)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(isToday ? Color.accentColor : Color.clear, lineWidth: isToday ? 2 : 0)
             )
         }
         .buttonStyle(.plain)
@@ -265,11 +288,16 @@ struct DayCell: View {
             return Color.clear
         }
 
-        if isWeekend {
-            return Color(.systemGray6).opacity(0.5)
+        // Apply pressure color if there's deadline pressure
+        if pressureStatus != .noDeadline {
+            return pressureStatus.color.opacity(0.15)
         }
 
-        return Color(.systemGray6).opacity(0.3)
+        if isWeekend {
+            return Color(.systemGray6).opacity(0.4)
+        }
+
+        return Color(.systemGray6).opacity(0.25)
     }
 
     private var isToday: Bool {

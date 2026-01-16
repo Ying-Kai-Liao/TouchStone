@@ -3,6 +3,8 @@ import SwiftData
 
 struct DayDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Query(filter: #Predicate<Project> { $0.isActive }) private var activeProjects: [Project]
+    @Query private var allStones: [StoneEvent]
 
     let date: Date
     let stones: [StoneEvent]
@@ -12,19 +14,25 @@ struct DayDetailView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Date header
-                dateHeader
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Date header
+                    dateHeader
 
-                Divider()
+                    Divider()
 
-                if stones.isEmpty {
-                    emptyState
-                } else {
-                    stonesList
+                    if stones.isEmpty {
+                        emptyState
+                    } else {
+                        stonesList
+                    }
+
+                    // Pressure details section at bottom
+                    pressureDetailsSection
                 }
-
-                Spacer()
+            }
+            .safeAreaInset(edge: .bottom) {
+                addStoneButton
             }
             .navigationTitle("Day Overview")
             .navigationBarTitleDisplayMode(.inline)
@@ -34,9 +42,6 @@ struct DayDetailView: View {
                         dismiss()
                     }
                 }
-            }
-            .safeAreaInset(edge: .bottom) {
-                addStoneButton
             }
         }
     }
@@ -122,6 +127,159 @@ struct DayDetailView: View {
         formatter.dateFormat = "EEEE, MMMM d"
         return formatter.string(from: date)
     }
+
+    // MARK: - Pressure Details
+
+    private var pressureDetailsSection: some View {
+        let dailyCapacity = UserPreferences.shared.dailyProductiveHours
+        let dayPressure = PressureCalculator.calculateDayPressure(
+            for: date,
+            projects: Array(activeProjects),
+            stones: Array(allStones),
+            dailyCapacityHours: dailyCapacity
+        )
+
+        return Group {
+            if dayPressure.projectPressures.isEmpty {
+                VStack(spacing: 8) {
+                    Text("PRESSURE ANALYSIS")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+                        .tracking(1)
+
+                    Text("No projects with deadlines")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding()
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("PRESSURE ANALYSIS")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+                        .tracking(1)
+
+                    // Day capacity summary
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Daily capacity:")
+                            Spacer()
+                            Text("\(dailyCapacity) hrs (\(dayPressure.dailyCapacityMinutes) min)")
+                        }
+                        HStack {
+                            Text("Stone time today:")
+                            Spacer()
+                            Text("\(dayPressure.stoneMinutes) min")
+                                .foregroundStyle(dayPressure.stoneMinutes > 0 ? .orange : .primary)
+                        }
+                        HStack {
+                            Text("Available capacity:")
+                            Spacer()
+                            Text("\(dayPressure.availableMinutes) min")
+                                .foregroundStyle(dayPressure.availableMinutes < 60 ? .red : .primary)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(8)
+                    .background(Color(.systemGray5).opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    ForEach(dayPressure.projectPressures, id: \.project.id) { pp in
+                        pressureCard(for: pp)
+                    }
+
+                    // Aggregate status
+                    HStack {
+                        Text("Day Status:")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Spacer()
+                        Text("\(dayPressure.worstPressure)%")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Text(dayPressure.aggregateStatus.displayName)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(dayPressure.aggregateStatus.color == .clear ? .secondary : dayPressure.aggregateStatus.color)
+                    }
+                    .padding(.top, 8)
+                }
+                .padding()
+                .background(Color(.systemGray6).opacity(0.3))
+            }
+        }
+    }
+
+    private func pressureCard(for pp: PressureCalculator.ProjectPressure) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(pp.project.title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                Spacer()
+                Text("\(pp.pressure)%")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundStyle(pp.status.color == .clear ? .secondary : pp.status.color)
+                Circle()
+                    .fill(pp.status.color == .clear ? Color.gray : pp.status.color)
+                    .frame(width: 10, height: 10)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text("Deadline:")
+                    Spacer()
+                    Text(deadlineFormatted(pp.deadline))
+                        .foregroundStyle(pp.daysRemaining < 0 ? .red : .primary)
+                }
+                HStack {
+                    Text("Days remaining:")
+                    Spacer()
+                    Text("\(pp.daysRemaining)")
+                        .foregroundStyle(pp.daysRemaining <= 0 ? .red : .primary)
+                }
+                HStack {
+                    Text("Work remaining:")
+                    Spacer()
+                    Text("\(pp.remainingMinutes / 60) hrs (\(pp.remainingMinutes) min)")
+                }
+                HStack {
+                    Text("With 25% buffer:")
+                    Spacer()
+                    Text("\(pp.requiredMinutesWithBuffer) min")
+                        .foregroundStyle(.orange)
+                }
+                HStack {
+                    Text("Available capacity:")
+                    Spacer()
+                    Text("\(pp.availableCapacityMinutes) min")
+                        .foregroundStyle(pp.availableCapacityMinutes < pp.requiredMinutesWithBuffer ? .red : .primary)
+                }
+                HStack {
+                    Text("Status:")
+                    Spacer()
+                    Text(pp.status.displayName)
+                        .fontWeight(.medium)
+                        .foregroundStyle(pp.status.color == .clear ? .secondary : pp.status.color)
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func deadlineFormatted(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter.string(from: date)
+    }
 }
 
 struct StoneRowView: View {
@@ -188,36 +346,12 @@ struct StoneRowView: View {
 }
 
 #Preview {
-    let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: StoneEvent.self, configurations: config)
+    @Previewable @State var stones: [StoneEvent] = []
 
-    let stone1 = StoneEvent(
-        title: "Morning Meeting",
-        startHour: 9,
-        startMinute: 0,
-        endHour: 10,
-        endMinute: 0,
-        specificDate: Date(),
-        recurrence: .none
-    )
-
-    let stone2 = StoneEvent(
-        title: "Lunch",
-        startHour: 12,
-        startMinute: 0,
-        endHour: 13,
-        endMinute: 0,
-        specificDate: nil,
-        recurrence: .daily
-    )
-
-    container.mainContext.insert(stone1)
-    container.mainContext.insert(stone2)
-
-    return DayDetailView(
+    DayDetailView(
         date: Date(),
-        stones: [stone1, stone2],
+        stones: stones,
         onAddStone: {}
     )
-    .modelContainer(container)
+    .modelContainer(for: [StoneEvent.self, Project.self], inMemory: true)
 }

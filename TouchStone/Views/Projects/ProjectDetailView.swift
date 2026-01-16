@@ -31,7 +31,7 @@ struct ProjectDetailView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    if let deadline = project.softDeadline {
+                    if let deadline = project.deadline {
                         Label(deadlineText(deadline), systemImage: "calendar")
                             .font(.subheadline)
                             .foregroundStyle(deadlineColor)
@@ -121,10 +121,11 @@ struct ProjectDetailView: View {
     }
 
     private var deadlineColor: Color {
-        switch project.deadlineStatus {
-        case .none, .comfortable: return .secondary
-        case .approaching: return .orange
-        case .passed: return .red
+        switch project.feasibilityStatus {
+        case .noDeadline, .healthy: return .secondary
+        case .tight: return .yellow
+        case .atRisk: return .orange
+        case .impossible, .overdue: return .red
         }
     }
 
@@ -133,10 +134,11 @@ struct ProjectDetailView: View {
         formatter.dateStyle = .medium
         let dateStr = formatter.string(from: date)
 
-        switch project.deadlineStatus {
-        case .passed: return "Past target: \(dateStr)"
-        case .approaching: return "Target: \(dateStr) (soon)"
-        default: return "Target: \(dateStr)"
+        switch project.feasibilityStatus {
+        case .overdue: return "Past deadline: \(dateStr)"
+        case .impossible: return "Deadline: \(dateStr) (tight)"
+        case .atRisk, .tight: return "Deadline: \(dateStr) (soon)"
+        default: return "Deadline: \(dateStr)"
         }
     }
 
