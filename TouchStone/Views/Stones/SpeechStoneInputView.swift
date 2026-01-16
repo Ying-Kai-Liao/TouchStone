@@ -127,7 +127,7 @@ struct SpeechStoneInputView: View {
         case .processing: return .orange
         case .finished: return .green
         case .error: return .gray
-        default: return .accentColor
+        default: return UserPreferences.shared.accentColor
         }
     }
 
@@ -364,6 +364,9 @@ struct SpeechStoneInputView: View {
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                         .padding()
+                        .background(UserPreferences.shared.accentColor)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.borderedProminent)
             }

@@ -265,12 +265,12 @@ struct WaterFlowRow: View {
                                         .font(.subheadline)
                                         .fontWeight(.medium)
                                 }
-                                .foregroundStyle(Color.teal)
+                                .foregroundStyle(UserPreferences.shared.accentColor)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 8)
                                 .background(
                                     Capsule()
-                                        .fill(Color.teal.opacity(0.15))
+                                        .fill(UserPreferences.shared.accentColor.opacity(0.15))
                                 )
                             }
                             .buttonStyle(.plain)
@@ -312,7 +312,7 @@ struct WaterFlowRow: View {
         .overlay(
             RoundedRectangle(cornerRadius: isExpanded ? 16 : 12, style: .continuous)
                 .strokeBorder(
-                    isGhost ? Color.teal.opacity(0.3) : Color.clear,
+                    isGhost ? UserPreferences.shared.accentColor.opacity(0.3) : Color.clear,
                     style: StrokeStyle(lineWidth: 1.5, dash: isGhost ? [6, 4] : [])
                 )
         )
@@ -364,7 +364,7 @@ struct WaterFlowRow: View {
                 .padding(.vertical, 5)
                 .background(
                     Capsule()
-                        .fill(Color.teal)
+                        .fill(UserPreferences.shared.accentColor)
                 )
                 .padding(12)
         }
@@ -556,7 +556,7 @@ struct AdditionalProjectRow: View {
                 // Touch count badge
                 Text("x\(touchCountToday)")
                     .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(touchCountToday > 0 ? .teal : Color(.systemGray))
+                    .foregroundStyle(touchCountToday > 0 ? UserPreferences.shared.accentColor : Color(.systemGray))
                     .frame(width: 36)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -583,12 +583,12 @@ struct AdditionalProjectRow: View {
                             .font(.caption)
                             .fontWeight(.medium)
                     }
-                    .foregroundStyle(Color.teal)
+                    .foregroundStyle(UserPreferences.shared.accentColor)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(
                         Capsule()
-                            .fill(Color.teal.opacity(0.15))
+                            .fill(UserPreferences.shared.accentColor.opacity(0.15))
                     )
                 }
                 .buttonStyle(.plain)

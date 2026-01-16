@@ -28,7 +28,7 @@ struct PhaseAllocationCard: View {
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: phaseType.icon)
-                        .foregroundStyle(Color.purple)
+                        .foregroundStyle(UserPreferences.shared.accentColor)
                     Text("\(index + 1). \(phaseName)")
                         .font(.headline)
                 }
@@ -73,7 +73,7 @@ struct PhaseAllocationCard: View {
                     onAdjust(-step)
                 } label: {
                     Image(systemName: "minus.circle")
-                        .foregroundColor(percent <= minPercent ? .secondary : .purple)
+                        .foregroundColor(percent <= minPercent ? .secondary : UserPreferences.shared.accentColor)
                 }
                 .disabled(percent <= minPercent)
 
@@ -96,7 +96,7 @@ struct PhaseAllocationCard: View {
                     onAdjust(step)
                 } label: {
                     Image(systemName: "plus.circle")
-                        .foregroundColor(percent >= maxPercent ? .secondary : .purple)
+                        .foregroundColor(percent >= maxPercent ? .secondary : UserPreferences.shared.accentColor)
                 }
                 .disabled(percent >= maxPercent)
             }
@@ -104,12 +104,12 @@ struct PhaseAllocationCard: View {
             // Mental rule
             HStack(alignment: .top, spacing: 6) {
                 Image(systemName: "brain.head.profile")
-                    .foregroundStyle(Color.purple.opacity(0.7))
+                    .foregroundStyle(UserPreferences.shared.accentColor.opacity(0.7))
                     .font(.caption)
                 Text("\"\(mentalRule)\"")
                     .font(.caption)
                     .italic()
-                    .foregroundStyle(Color.purple)
+                    .foregroundStyle(UserPreferences.shared.accentColor)
             }
         }
         .padding()

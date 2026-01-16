@@ -20,7 +20,7 @@ struct SessionGoalsList: View {
             HStack {
                 if index < phaseStructure.count {
                     Image(systemName: phaseStructure[index].type.icon)
-                        .foregroundStyle(Color.purple)
+                        .foregroundStyle(UserPreferences.shared.accentColor)
                 }
                 Text("Phase \(index + 1): \(phasePlan.name)")
                     .font(.headline)
@@ -49,7 +49,7 @@ struct SessionGoalsList: View {
                 .fontWeight(.medium)
                 .foregroundStyle(.white)
                 .frame(width: 20, height: 20)
-                .background(Color.purple.opacity(0.7))
+                .background(UserPreferences.shared.accentColor.opacity(0.7))
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 4) {

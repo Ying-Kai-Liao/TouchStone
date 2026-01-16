@@ -67,7 +67,7 @@ struct PhasedSessionLogSheet: View {
                         .font(.caption)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color.purple.opacity(0.15))
+                        .background(UserPreferences.shared.accentColor.opacity(0.15))
                         .clipShape(Capsule())
                 }
             }
@@ -75,7 +75,7 @@ struct PhasedSessionLogSheet: View {
             if let phase = project.activePhase {
                 HStack {
                     Image(systemName: phase.phaseType.icon)
-                        .foregroundStyle(Color.purple)
+                        .foregroundStyle(UserPreferences.shared.accentColor)
                     Text("Phase: \(phase.title)")
                         .foregroundStyle(.secondary)
                     Text("(\(phase.progressString))")
@@ -93,7 +93,7 @@ struct PhasedSessionLogSheet: View {
             // Session title
             HStack {
                 Image(systemName: "target")
-                    .foregroundStyle(Color.purple)
+                    .foregroundStyle(UserPreferences.shared.accentColor)
                 Text(session.title)
                     .font(.headline)
             }
@@ -102,10 +102,10 @@ struct PhasedSessionLogSheet: View {
             if let rule = session.mentalRule {
                 HStack(alignment: .top) {
                     Image(systemName: "brain.head.profile")
-                        .foregroundStyle(Color.purple.opacity(0.7))
+                        .foregroundStyle(UserPreferences.shared.accentColor.opacity(0.7))
                     Text("\"\(rule)\"")
                         .italic()
-                        .foregroundStyle(Color.purple)
+                        .foregroundStyle(UserPreferences.shared.accentColor)
                 }
                 .font(.subheadline)
             }
@@ -123,7 +123,7 @@ struct PhasedSessionLogSheet: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.purple.opacity(0.08))
+        .background(UserPreferences.shared.accentColor.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
@@ -145,7 +145,7 @@ struct PhasedSessionLogSheet: View {
                             .fontWeight(selectedDuration == duration ? .semibold : .regular)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
-                            .background(selectedDuration == duration ? Color.purple : Color(.secondarySystemGroupedBackground))
+                            .background(selectedDuration == duration ? UserPreferences.shared.accentColor : Color(.secondarySystemGroupedBackground))
                             .foregroundStyle(selectedDuration == duration ? .white : .primary)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
@@ -198,7 +198,7 @@ struct PhasedSessionLogSheet: View {
                     .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.purple)
+                    .background(UserPreferences.shared.accentColor)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }

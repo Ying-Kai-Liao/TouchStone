@@ -2,6 +2,8 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
+    private var prefs = UserPreferences.shared
+
     var body: some View {
         TabView {
             TodayFlowView()
@@ -24,6 +26,7 @@ struct ContentView: View {
                     Label("Settings", systemImage: "gear")
                 }
         }
+        .tint(prefs.accentColor)
     }
 }
 

@@ -1,6 +1,56 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Accent Color Option
+
+enum AccentColorOption: String, CaseIterable, Identifiable {
+    case blue = "blue"
+    case purple = "purple"
+    case pink = "pink"
+    case red = "red"
+    case orange = "orange"
+    case yellow = "yellow"
+    case green = "green"
+    case mint = "mint"
+    case teal = "teal"
+    case cyan = "cyan"
+    case indigo = "indigo"
+
+    var id: String { rawValue }
+
+    var color: Color {
+        switch self {
+        case .blue: return .blue
+        case .purple: return .purple
+        case .pink: return .pink
+        case .red: return .red
+        case .orange: return .orange
+        case .yellow: return .yellow
+        case .green: return .green
+        case .mint: return .mint
+        case .teal: return .teal
+        case .cyan: return .cyan
+        case .indigo: return .indigo
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .blue: return "Blue"
+        case .purple: return "Purple"
+        case .pink: return "Pink"
+        case .red: return "Red"
+        case .orange: return "Orange"
+        case .yellow: return "Yellow"
+        case .green: return "Green"
+        case .mint: return "Mint"
+        case .teal: return "Teal"
+        case .cyan: return "Cyan"
+        case .indigo: return "Indigo"
+        }
+    }
+}
+
 // MARK: - User Preferences
 
 /// Centralized preferences manager using UserDefaults for persistence.
@@ -22,6 +72,7 @@ class UserPreferences {
         static let workIntervalMinutes = "workIntervalMinutes"
         static let restDurationMinutes = "restDurationMinutes"
         static let appLanguage = "appLanguage"
+        static let accentColor = "accentColor"
     }
 
     // MARK: - Productive Hours
@@ -84,6 +135,18 @@ class UserPreferences {
         didSet { defaults.set(appLanguage, forKey: Keys.appLanguage) }
     }
 
+    // MARK: - Accent Color
+
+    /// Selected accent color option (default: teal)
+    var accentColorOption: AccentColorOption {
+        didSet { defaults.set(accentColorOption.rawValue, forKey: Keys.accentColor) }
+    }
+
+    /// Computed accent color for SwiftUI
+    var accentColor: Color {
+        accentColorOption.color
+    }
+
     // MARK: - Initialization
 
     init() {
@@ -97,6 +160,14 @@ class UserPreferences {
         self.workIntervalMinutes = defaults.object(forKey: Keys.workIntervalMinutes) as? Int ?? 60
         self.restDurationMinutes = defaults.object(forKey: Keys.restDurationMinutes) as? Int ?? 15
         self.appLanguage = defaults.string(forKey: Keys.appLanguage) ?? "system"
+
+        // Load accent color
+        if let colorString = defaults.string(forKey: Keys.accentColor),
+           let color = AccentColorOption(rawValue: colorString) {
+            self.accentColorOption = color
+        } else {
+            self.accentColorOption = .teal
+        }
     }
 
     // MARK: - Convenience Methods

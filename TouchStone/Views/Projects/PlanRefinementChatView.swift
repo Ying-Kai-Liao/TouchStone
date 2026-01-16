@@ -8,6 +8,8 @@ struct PlanRefinementChatView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
+    private var prefs: UserPreferences { UserPreferences.shared }
+
     @Bindable var project: Project
 
     @State private var step: RefinementStep = .context
@@ -133,7 +135,7 @@ struct PlanRefinementChatView: View {
                     .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(userRequest.isEmpty ? Color.gray : Color.purple)
+                    .background(userRequest.isEmpty ? Color.gray : prefs.accentColor)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
@@ -155,15 +157,15 @@ struct PlanRefinementChatView: View {
                         .font(.caption)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color.purple.opacity(0.15))
-                        .foregroundStyle(.purple)
+                        .background(prefs.accentColor.opacity(0.15))
+                        .foregroundStyle(prefs.accentColor)
                         .clipShape(Capsule())
                 }
             }
 
             // Progress bar
             ProgressView(value: project.progress)
-                .tint(.purple)
+                .tint(prefs.accentColor)
 
             Text(project.progressString)
                 .font(.subheadline)
@@ -197,7 +199,7 @@ struct PlanRefinementChatView: View {
             ForEach(pendingDocuments) { doc in
                 HStack {
                     Image(systemName: "doc.fill")
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(prefs.accentColor)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(doc.filename)
@@ -310,7 +312,7 @@ struct PlanRefinementChatView: View {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "circle")
                         .font(.caption2)
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(prefs.accentColor)
                         .padding(.top, 4)
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -345,7 +347,7 @@ struct PlanRefinementChatView: View {
             Text(text)
                 .font(.subheadline)
                 .padding(12)
-                .background(isAssistant ? Color(.secondarySystemGroupedBackground) : Color.purple.opacity(0.15))
+                .background(isAssistant ? Color(.secondarySystemGroupedBackground) : prefs.accentColor.opacity(0.15))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
 
             if isAssistant { Spacer() }

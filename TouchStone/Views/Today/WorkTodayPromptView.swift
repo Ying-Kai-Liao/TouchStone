@@ -39,7 +39,7 @@ struct WorkTodayPromptView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
-                    .background(Color.teal)
+                    .background(UserPreferences.shared.accentColor)
                     .clipShape(Capsule())
                 }
             }

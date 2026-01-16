@@ -6,6 +6,8 @@ struct DayDetailView: View {
     @Query(filter: #Predicate<Project> { $0.isActive }) private var activeProjects: [Project]
     @Query private var allStones: [StoneEvent]
 
+    private var prefs: UserPreferences { UserPreferences.shared }
+
     let date: Date
     let stones: [StoneEvent]
     let onAddStone: () -> Void
@@ -55,11 +57,11 @@ struct DayDetailView: View {
             if calendar.isDateInToday(date) {
                 Text("Today")
                     .font(.subheadline)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(prefs.accentColor)
             } else if calendar.isDateInTomorrow(date) {
                 Text("Tomorrow")
                     .font(.subheadline)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(prefs.accentColor)
             }
 
             if !stones.isEmpty {
@@ -115,7 +117,7 @@ struct DayDetailView: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(Color.blue)
+            .background(prefs.accentColor)
             .clipShape(RoundedRectangle(cornerRadius: 16))
         }
         .padding()
@@ -323,7 +325,7 @@ struct StoneRowView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
-            .background(Color.blue.opacity(0.1))
+            .background(UserPreferences.shared.accentColor.opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }

@@ -20,7 +20,7 @@ struct TotalTimeControl: View {
                 } label: {
                     Image(systemName: "minus.circle.fill")
                         .font(.title2)
-                        .foregroundStyle(Color.purple)
+                        .foregroundStyle(UserPreferences.shared.accentColor)
                 }
                 .disabled(totalHours <= minHours)
 
@@ -35,7 +35,7 @@ struct TotalTimeControl: View {
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.title2)
-                        .foregroundStyle(Color.purple)
+                        .foregroundStyle(UserPreferences.shared.accentColor)
                 }
                 .disabled(totalHours >= maxHours)
             }
@@ -48,7 +48,7 @@ struct TotalTimeControl: View {
                 in: Double(minHours)...Double(maxHours),
                 step: Double(step)
             )
-            .tint(.purple)
+            .tint(UserPreferences.shared.accentColor)
         }
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
