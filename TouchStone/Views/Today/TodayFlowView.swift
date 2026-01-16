@@ -18,7 +18,7 @@ struct TodayFlowView: View {
     @Query(filter: #Predicate<Rule> { $0.isActive })
     private var activeRules: [Rule]
 
-    @State private var dayState: DayState = .init()
+    @State private var dayState: DayState = DayState()
     @State private var selectedDate = Date()
     @State private var showZenMode = false
     @State private var focusProject: Project?
