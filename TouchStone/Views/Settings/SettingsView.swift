@@ -6,7 +6,7 @@ struct SettingsView: View {
     @State private var showSaveConfirmation = false
     @State private var showDeleteConfirmation = false
 
-    @State private var prefs = UserPreferences.shared
+    private var prefs = UserPreferences.shared
 
     private var hasExistingKey: Bool {
         APIKeyManager.shared.hasAPIKey
