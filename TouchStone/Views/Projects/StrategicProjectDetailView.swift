@@ -23,7 +23,7 @@ struct StrategicProjectDetailView: View {
                 projectHeaderCard
 
                 // Deadline card (prominent if exists)
-                if project.softDeadline != nil {
+                if project.deadline != nil {
                     deadlineCard
                 }
 
@@ -160,7 +160,7 @@ struct StrategicProjectDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                if let deadline = project.softDeadline {
+                if let deadline = project.deadline {
                     Text(formattedDeadline(deadline))
                         .font(.headline)
                         .foregroundStyle(deadlineColor)
@@ -169,7 +169,7 @@ struct StrategicProjectDetailView: View {
 
             Spacer()
 
-            if let deadline = project.softDeadline {
+            if let deadline = project.deadline {
                 Text(daysUntilDeadline(deadline))
                     .font(.subheadline)
                     .fontWeight(.medium)
@@ -182,17 +182,18 @@ struct StrategicProjectDetailView: View {
     }
 
     private var deadlineIcon: String {
-        switch project.deadlineStatus {
-        case .passed: return "exclamationmark.triangle.fill"
-        case .approaching: return "clock.fill"
+        switch project.feasibilityStatus {
+        case .overdue, .impossible: return "exclamationmark.triangle.fill"
+        case .atRisk, .tight: return "clock.fill"
         default: return "calendar"
         }
     }
 
     private var deadlineBackgroundColor: Color {
-        switch project.deadlineStatus {
-        case .passed: return Color.red.opacity(0.1)
-        case .approaching: return Color.orange.opacity(0.1)
+        switch project.feasibilityStatus {
+        case .overdue, .impossible: return Color.red.opacity(0.1)
+        case .atRisk: return Color.orange.opacity(0.1)
+        case .tight: return Color.yellow.opacity(0.1)
         default: return Color(.secondarySystemGroupedBackground)
         }
     }
@@ -361,10 +362,11 @@ struct StrategicProjectDetailView: View {
     // MARK: - Helpers
 
     private var deadlineColor: Color {
-        switch project.deadlineStatus {
-        case .none, .comfortable: return .primary
-        case .approaching: return .orange
-        case .passed: return .red
+        switch project.feasibilityStatus {
+        case .noDeadline, .healthy: return .secondary
+        case .tight: return .yellow
+        case .atRisk: return .orange
+        case .impossible, .overdue: return .red
         }
     }
 

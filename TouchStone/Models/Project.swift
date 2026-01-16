@@ -12,7 +12,7 @@ final class Project {
     var id: UUID
     var title: String
     var currentPhase: String?       // e.g., "Discovery", "Building", "Refinement" (for simple projects)
-    var softDeadline: Date?         // Optional gentle reminder, not pressure
+    var deadline: Date?              // Optional deadline set during strategic plan creation
     var isActive: Bool
     var createdAt: Date
     var archetypeRaw: String?       // Archetype for strategic projects
@@ -34,7 +34,7 @@ final class Project {
         id: UUID = UUID(),
         title: String,
         currentPhase: String? = nil,
-        softDeadline: Date? = nil,
+        deadline: Date? = nil,
         isActive: Bool = true,
         createdAt: Date = Date(),
         archetype: Archetype? = nil,
@@ -43,7 +43,7 @@ final class Project {
         self.id = id
         self.title = title
         self.currentPhase = currentPhase
-        self.softDeadline = softDeadline
+        self.deadline = deadline
         self.isActive = isActive
         self.createdAt = createdAt
         self.archetypeRaw = archetype?.rawValue
@@ -133,28 +133,13 @@ final class Project {
         return days > 7
     }
 
-    /// Soft deadline status
-    var deadlineStatus: DeadlineStatus {
-        guard let deadline = softDeadline else { return .none }
-        let calendar = Calendar.current
-        let daysUntil = calendar.dateComponents([.day], from: Date(), to: deadline).day ?? 0
-
-        if daysUntil < 0 {
-            return .passed
-        } else if daysUntil <= 7 {
-            return .approaching
-        } else {
-            return .comfortable
-        }
-    }
-
     // MARK: - Pressure Calculation
 
     /// Days remaining until deadline (nil if no deadline)
     var daysUntilDeadline: Int? {
-        guard let deadline = softDeadline else { return nil }
+        guard let dl = deadline else { return nil }
         let calendar = Calendar.current
-        return calendar.dateComponents([.day], from: Date(), to: deadline).day
+        return calendar.dateComponents([.day], from: Date(), to: dl).day
     }
 
     /// Required daily hours to meet deadline
@@ -173,7 +158,7 @@ final class Project {
 
     /// Feasibility status based on pressure ratio
     var feasibilityStatus: FeasibilityStatus {
-        guard softDeadline != nil else { return .noDeadline }
+        guard deadline != nil else { return .noDeadline }
 
         if let days = daysUntilDeadline, days < 0 {
             return .overdue
@@ -280,15 +265,6 @@ final class Project {
     }
 }
 
-// MARK: - Deadline Status
-
-enum DeadlineStatus {
-    case none
-    case comfortable   // > 7 days away
-    case approaching   // <= 7 days away
-    case passed        // Past deadline
-}
-
 // MARK: - Feasibility Status
 
 /// Pressure-based feasibility status for deadline tracking
@@ -319,6 +295,17 @@ enum FeasibilityStatus: String, Codable {
         case .atRisk: return 3
         case .impossible: return 4
         case .overdue: return 5
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .noDeadline: return "No Deadline"
+        case .healthy: return "Healthy"
+        case .tight: return "Tight"
+        case .atRisk: return "At Risk"
+        case .impossible: return "Impossible"
+        case .overdue: return "Overdue"
         }
     }
 }

@@ -428,5 +428,5 @@ struct DateTabButton: View {
 
 #Preview {
     TodayFlowView()
-        .modelContainer(for: [Project.self, StoneEvent.self, TouchLog.self, Rule.self], inMemory: true)
+        .modelContainer(for: [Project.self, StoneEvent.self, TouchLog.self, Rule.self, DayPlan.self, ScheduledSession.self], inMemory: true)
 }
