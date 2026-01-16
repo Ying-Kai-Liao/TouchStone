@@ -53,10 +53,10 @@ class DayState {
         // 2. Calculate free time slots (considering rules)
         freeSlots = calculateFreeSlots(rules: rules)
 
-        // 3. Calculate total minutes touched today across all projects
-        let today = calendar.startOfDay(for: Date())
+        // 3. Calculate total minutes touched for the computed date
+        // Use self.date (already start of day) to ensure future days show full schedule
         minutesTouchedToday = projects.flatMap { $0.touchLogs }
-            .filter { calendar.startOfDay(for: $0.timestamp) == today }
+            .filter { calendar.startOfDay(for: $0.timestamp) == date }
             .reduce(0) { $0 + $1.durationMinutes }
 
         // 4. Generate suggested sessions (pour water into slots)
