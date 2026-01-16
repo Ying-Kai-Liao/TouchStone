@@ -26,6 +26,7 @@ struct TodayFlowView: View {
     @State private var showUndoToast = false
     @State private var showAddStone = false
     @State private var showSpeechInput = false
+    @State private var showEditMode = false
 
     private let calendar = Calendar.current
 
@@ -89,7 +90,9 @@ struct TodayFlowView: View {
                             additionalProjects: additionalProjects,
                             isToday: calendar.isDateInToday(selectedDate),
                             onTouch: touchProject,
-                            onFocus: { project in focusProject = project }
+                            onFocus: { project in focusProject = project },
+                            onDelete: isWorkDayActive ? deleteFlowItem : nil,
+                            onEditMode: isWorkDayActive ? { showEditMode = true } : nil
                         )
                         .padding(.top, 16)
                         // Add padding at bottom when prompt is showing
@@ -126,6 +129,18 @@ struct TodayFlowView: View {
             .sheet(item: $focusProject) { project in
                 FocusModeView(project: project) {
                     focusProject = nil
+                }
+            }
+            .sheet(isPresented: $showEditMode) {
+                if let plan = todaysPlan {
+                    FlowEditModeView(
+                        dayPlan: plan,
+                        allProjects: Array(activeProjects),
+                        onDismiss: {
+                            showEditMode = false
+                            computeDayState()
+                        }
+                    )
                 }
             }
         }
@@ -321,6 +336,25 @@ struct TodayFlowView: View {
 
         // Don't recompute - items stay in place as daily summary
         // Ghost/solid styling updates automatically via SwiftData
+    }
+
+    private func deleteFlowItem(_ item: WorkflowItem) {
+        guard let plan = todaysPlan, plan.hasSchedule else { return }
+        guard let project = item.project else { return }
+
+        // Find the scheduled session matching this workflow item
+        if let session = plan.scheduledSessions.first(where: {
+            $0.project?.id == project.id &&
+            $0.scheduledStart == item.startTime &&
+            $0.scheduledEnd == item.endTime
+        }) {
+            modelContext.delete(session)
+
+            // Recompute to update the view
+            withAnimation(.easeInOut(duration: 0.3)) {
+                computeDayState()
+            }
+        }
     }
 
     private func undoTouch() {
