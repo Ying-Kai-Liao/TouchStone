@@ -3,10 +3,14 @@ import SwiftData
 
 struct DayDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<Project> { $0.isActive }) private var activeProjects: [Project]
     @Query private var allStones: [StoneEvent]
 
     private var prefs: UserPreferences { UserPreferences.shared }
+
+    @State private var stoneToDelete: StoneEvent?
+    @State private var showDeleteAlert = false
 
     let date: Date
     let stones: [StoneEvent]
@@ -45,7 +49,26 @@ struct DayDetailView: View {
                     }
                 }
             }
+            .alert("Delete Stone", isPresented: $showDeleteAlert, presenting: stoneToDelete) { stone in
+                Button("Cancel", role: .cancel) {
+                    stoneToDelete = nil
+                }
+                Button("Delete", role: .destructive) {
+                    deleteStone(stone)
+                }
+            } message: { stone in
+                if stone.recurrence.type != .none {
+                    Text("This is a recurring event. Deleting it will remove all occurrences of \"\(stone.title)\".")
+                } else {
+                    Text("Are you sure you want to delete \"\(stone.title)\"?")
+                }
+            }
         }
+    }
+
+    private func deleteStone(_ stone: StoneEvent) {
+        modelContext.delete(stone)
+        stoneToDelete = nil
     }
 
     private var dateHeader: some View {
@@ -94,14 +117,23 @@ struct DayDetailView: View {
     }
 
     private var stonesList: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                ForEach(stones.sorted(by: { $0.startHour * 60 + $0.startMinute < $1.startHour * 60 + $1.startMinute })) { stone in
-                    StoneRowView(stone: stone)
-                }
+        List {
+            ForEach(stones.sorted(by: { $0.startHour * 60 + $0.startMinute < $1.startHour * 60 + $1.startMinute })) { stone in
+                StoneRowView(stone: stone)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            stoneToDelete = stone
+                            showDeleteAlert = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
             }
-            .padding()
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
     private var addStoneButton: some View {
