@@ -10,6 +10,7 @@ struct SpeechStoneInputView: View {
     @State private var speechRecognizer = SpeechRecognizer()
     @State private var parsedStone: SpeechParser.ParsedStone?
     @State private var showManualForm = false
+    @State private var showEditSheet = false
 
     // Editable fields from parsed result
     @State private var title: String = ""
@@ -58,11 +59,20 @@ struct SpeechStoneInputView: View {
             .task {
                 await speechRecognizer.requestAuthorization()
             }
+            .onChange(of: speechRecognizer.state) { oldValue, newValue in
+                // Auto-parse when recognition finishes
+                if newValue == .finished {
+                    parseTranscript()
+                }
+            }
             .sheet(isPresented: $showManualForm) {
                 StoneEventFormView(onSave: { stone in
                     modelContext.insert(stone)
                     dismiss()
                 }, initialDate: initialDate)
+            }
+            .sheet(isPresented: $showEditSheet) {
+                editParsedResultSheet
             }
         }
     }
@@ -83,29 +93,39 @@ struct SpeechStoneInputView: View {
                         // Pulsing animation
                         Circle()
                             .stroke(Color.red.opacity(0.5), lineWidth: 4)
-                            .frame(width: 100, height: 100)
-                            .scaleEffect(1.2)
-                            .opacity(0.5)
-                            .animation(.easeInOut(duration: 1).repeatForever(), value: speechRecognizer.state)
+                            .frame(width: 120, height: 120)
+                            .scaleEffect(pulseScale)
+                            .opacity(0.6)
                     }
 
-                    Image(systemName: micIconName)
-                        .font(.system(size: 40))
-                        .foregroundStyle(.white)
+                    if case .processing = speechRecognizer.state {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.5)
+                    } else {
+                        Image(systemName: micIconName)
+                            .font(.system(size: 40))
+                            .foregroundStyle(.white)
+                    }
                 }
+                .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: speechRecognizer.state)
             }
             .disabled(!canRecord)
 
             Text(statusText)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
     }
+
+    @State private var pulseScale: CGFloat = 1.0
 
     private var micButtonColor: Color {
         switch speechRecognizer.state {
         case .recording: return .red
         case .processing: return .orange
+        case .finished: return .green
         case .error: return .gray
         default: return UserPreferences.shared.accentColor
         }
@@ -114,7 +134,7 @@ struct SpeechStoneInputView: View {
     private var micIconName: String {
         switch speechRecognizer.state {
         case .recording: return "stop.fill"
-        case .processing: return "ellipsis"
+        case .finished: return "checkmark"
         default: return "mic.fill"
         }
     }
@@ -124,14 +144,16 @@ struct SpeechStoneInputView: View {
         case .idle: return "Tap to speak"
         case .requesting: return "Requesting permission..."
         case .recording: return "Listening... Tap to stop"
-        case .processing: return "Processing..."
+        case .processing: return "Processing speech..."
+        case .finished: return parsedStone?.isValid == true ? "Ready to add!" : "Tap mic to try again"
         case .error(let message): return message
         }
     }
 
     private var canRecord: Bool {
         switch speechRecognizer.state {
-        case .idle, .recording: return true
+        case .idle, .finished, .error: return true
+        case .recording: return true
         default: return false
         }
     }
@@ -141,18 +163,35 @@ struct SpeechStoneInputView: View {
     private var transcriptSection: some View {
         VStack(spacing: 8) {
             if !speechRecognizer.transcript.isEmpty {
-                Text(speechRecognizer.transcript)
-                    .font(.title3)
-                    .multilineTextAlignment(.center)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                VStack(spacing: 8) {
+                    Text(speechRecognizer.transcript)
+                        .font(.title3)
+                        .multilineTextAlignment(.center)
+
+                    if speechRecognizer.state == .finished && parsedStone?.isValid != true {
+                        Text("Could not parse event. Try again or enter manually.")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             } else if case .idle = speechRecognizer.state {
-                Text("Say something like:\n\"Team meeting at 10 AM\"\n\"Lunch from 12 to 1 daily\"")
+                VStack(spacing: 8) {
+                    Text("Try saying:")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("• \"Team meeting at 10 AM\"")
+                        Text("• \"Lunch from 12 to 1 daily\"")
+                        Text("• \"Gym at 6 PM on weekdays\"")
+                    }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                }
             }
         }
     }
@@ -163,14 +202,24 @@ struct SpeechStoneInputView: View {
     private var parsedPreviewSection: some View {
         if let parsed = parsedStone, parsed.isValid {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Parsed Event")
+                HStack {
+                    Text("Parsed Event")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Button("Edit") {
+                        showEditSheet = true
+                    }
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Image(systemName: "calendar")
                             .foregroundStyle(.secondary)
+                            .frame(width: 20)
                         Text(title.isEmpty ? parsed.title : title)
                             .fontWeight(.medium)
                     }
@@ -178,6 +227,7 @@ struct SpeechStoneInputView: View {
                     HStack {
                         Image(systemName: "clock")
                             .foregroundStyle(.secondary)
+                            .frame(width: 20)
                         Text(timeRangeString)
                     }
 
@@ -185,6 +235,7 @@ struct SpeechStoneInputView: View {
                         HStack {
                             Image(systemName: "repeat")
                                 .foregroundStyle(.secondary)
+                                .frame(width: 20)
                             Text(recurrenceLabel)
                         }
                     }
@@ -223,6 +274,84 @@ struct SpeechStoneInputView: View {
         }
     }
 
+    // MARK: - Edit Sheet
+
+    private var editParsedResultSheet: some View {
+        NavigationStack {
+            Form {
+                Section("Event Name") {
+                    TextField("Title", text: $title)
+                }
+
+                Section("Time") {
+                    HStack {
+                        Text("Start")
+                        Spacer()
+                        Picker("Hour", selection: $startHour) {
+                            ForEach(0..<24, id: \.self) { h in
+                                Text(formatTime(hour: h, minute: 0)).tag(h)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+
+                        Picker("Minute", selection: $startMinute) {
+                            ForEach([0, 15, 30, 45], id: \.self) { m in
+                                Text(String(format: ":%02d", m)).tag(m)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                    }
+
+                    HStack {
+                        Text("End")
+                        Spacer()
+                        Picker("Hour", selection: $endHour) {
+                            ForEach(0..<24, id: \.self) { h in
+                                Text(formatTime(hour: h, minute: 0)).tag(h)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+
+                        Picker("Minute", selection: $endMinute) {
+                            ForEach([0, 15, 30, 45], id: \.self) { m in
+                                Text(String(format: ":%02d", m)).tag(m)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                    }
+                }
+
+                Section("Repeat") {
+                    Picker("Recurrence", selection: $recurrence) {
+                        Text("None").tag(RecurrenceType.none)
+                        Text("Daily").tag(RecurrenceType.daily)
+                        Text("Weekdays").tag(RecurrenceType.weekdays)
+                        Text("Weekends").tag(RecurrenceType.weekends)
+                        Text("Weekly").tag(RecurrenceType.weekly)
+                    }
+                }
+            }
+            .navigationTitle("Edit Event")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        showEditSheet = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        showEditSheet = false
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Action Buttons
 
     private var actionButtons: some View {
@@ -239,14 +368,27 @@ struct SpeechStoneInputView: View {
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
+                .buttonStyle(.borderedProminent)
             }
 
-            Button {
-                showManualForm = true
-            } label: {
-                Text("Enter Manually")
-                    .foregroundStyle(UserPreferences.shared.accentColor)
+            HStack(spacing: 16) {
+                if speechRecognizer.state == .finished || speechRecognizer.state != .idle {
+                    Button {
+                        speechRecognizer.reset()
+                        parsedStone = nil
+                        title = ""
+                    } label: {
+                        Label("Start Over", systemImage: "arrow.counterclockwise")
+                    }
+                }
+
+                Button {
+                    showManualForm = true
+                } label: {
+                    Label("Enter Manually", systemImage: "keyboard")
+                }
             }
+            .font(.subheadline)
         }
     }
 
@@ -256,11 +398,12 @@ struct SpeechStoneInputView: View {
         switch speechRecognizer.state {
         case .recording:
             speechRecognizer.stopRecording()
-            // Parse after a short delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                parseTranscript()
+        case .idle, .finished, .error:
+            // Reset if retrying
+            if speechRecognizer.state != .idle {
+                speechRecognizer.reset()
+                parsedStone = nil
             }
-        case .idle:
             do {
                 try speechRecognizer.startRecording()
             } catch {
@@ -272,7 +415,10 @@ struct SpeechStoneInputView: View {
     }
 
     private func parseTranscript() {
-        guard !speechRecognizer.transcript.isEmpty else { return }
+        guard !speechRecognizer.transcript.isEmpty else {
+            speechRecognizer.setIdle()
+            return
+        }
 
         let parsed = SpeechParser.parse(speechRecognizer.transcript)
         parsedStone = parsed
@@ -284,8 +430,6 @@ struct SpeechStoneInputView: View {
         endHour = parsed.endHour ?? (startHour + 1)
         endMinute = parsed.endMinute
         recurrence = parsed.recurrence
-
-        speechRecognizer.setIdle()
     }
 
     private func saveStone() {
