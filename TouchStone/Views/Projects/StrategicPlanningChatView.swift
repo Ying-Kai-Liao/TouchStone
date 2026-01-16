@@ -6,6 +6,8 @@ struct StrategicPlanningChatView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
+    private var prefs = UserPreferences.shared
+
     @State private var step: StrategyChatEngine.ChatStep = .idle
     @State private var goal = ""
     @State private var projectTitle = ""
@@ -108,7 +110,7 @@ struct StrategicPlanningChatView: View {
                     .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(goal.isEmpty ? Color.gray : Color.purple)
+                    .background(goal.isEmpty ? Color.gray : prefs.accentColor)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
@@ -133,7 +135,7 @@ struct StrategicPlanningChatView: View {
             if let arch = archetype {
                 HStack {
                     Image(systemName: arch.icon)
-                        .foregroundStyle(Color.purple)
+                        .foregroundStyle(prefs.accentColor)
                     Text(arch.displayName)
                         .fontWeight(.bold)
                     Text("Project Structure")
@@ -197,7 +199,7 @@ struct StrategicPlanningChatView: View {
                     .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.purple)
+                    .background(prefs.accentColor)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
@@ -228,7 +230,7 @@ struct StrategicPlanningChatView: View {
                             .font(.caption)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Color.purple.opacity(0.15))
+                            .background(prefs.accentColor.opacity(0.15))
                             .clipShape(Capsule())
                     }
                 }
@@ -271,7 +273,7 @@ struct StrategicPlanningChatView: View {
                     .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.purple)
+                    .background(prefs.accentColor)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
@@ -300,7 +302,7 @@ struct StrategicPlanningChatView: View {
 
             Text(try! AttributedString(markdown: message))
                 .padding()
-                .background(isAssistant ? Color(.secondarySystemGroupedBackground) : Color.purple.opacity(0.15))
+                .background(isAssistant ? Color(.secondarySystemGroupedBackground) : prefs.accentColor.opacity(0.15))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
 
             if isAssistant { Spacer() }

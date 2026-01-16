@@ -6,6 +6,9 @@ import SwiftData
 struct StrategicProjectDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+
+    private var prefs = UserPreferences.shared
+
     @Bindable var project: Project
 
     @State private var showingEditSheet = false
@@ -128,8 +131,8 @@ struct StrategicProjectDetailView: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(Color.purple.opacity(0.15))
-                .foregroundStyle(.purple)
+                .background(prefs.accentColor.opacity(0.15))
+                .foregroundStyle(prefs.accentColor)
                 .clipShape(Capsule())
             }
 
@@ -233,7 +236,7 @@ struct StrategicProjectDetailView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("\(project.completedHours)")
                     .font(.system(size: 36, weight: .bold, design: .rounded))
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(prefs.accentColor)
 
                 Text("/ \(project.totalPlannedHours) hrs")
                     .font(.subheadline)
@@ -255,7 +258,7 @@ struct StrategicProjectDetailView: View {
 
             // Progress bar
             ProgressView(value: project.progress)
-                .tint(.purple)
+                .tint(prefs.accentColor)
                 .scaleEffect(y: 1.5)
         }
         .padding()
@@ -343,7 +346,7 @@ struct StrategicProjectDetailView: View {
                 .padding(.vertical, 12)
             }
             .buttonStyle(.borderedProminent)
-            .tint(.purple)
+            .tint(prefs.accentColor)
 
             HStack {
                 Text("Active")
@@ -402,7 +405,7 @@ struct CollapsiblePhaseRow: View {
                 HStack(spacing: 12) {
                     // Active indicator
                     Circle()
-                        .fill(isActive ? Color.purple : Color.gray.opacity(0.3))
+                        .fill(isActive ? UserPreferences.shared.accentColor : Color.gray.opacity(0.3))
                         .frame(width: 8, height: 8)
 
                     // Phase title
@@ -423,8 +426,8 @@ struct CollapsiblePhaseRow: View {
                         .font(.caption2)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(isActive ? Color.purple.opacity(0.15) : Color.gray.opacity(0.1))
-                        .foregroundStyle(isActive ? .purple : .secondary)
+                        .background(isActive ? UserPreferences.shared.accentColor.opacity(0.15) : Color.gray.opacity(0.1))
+                        .foregroundStyle(isActive ? UserPreferences.shared.accentColor : .secondary)
                         .clipShape(Capsule())
 
                     // Expand/collapse chevron
@@ -444,7 +447,7 @@ struct CollapsiblePhaseRow: View {
                         Text("\"\(rule)\"")
                             .font(.caption)
                             .italic()
-                            .foregroundStyle(.purple)
+                            .foregroundStyle(UserPreferences.shared.accentColor)
                             .padding(.leading, 20)
                             .padding(.bottom, 4)
                     }

@@ -4,6 +4,8 @@ import SwiftData
 struct StrategicProjectInputView: View {
     @Environment(\.dismiss) private var dismiss
 
+    private var prefs = UserPreferences.shared
+
     @State private var goal = ""
     @State private var isGenerating = false
     @State private var generatedPlan: StrategyEngine.StrategyPlan?
@@ -47,7 +49,7 @@ struct StrategicProjectInputView: View {
             VStack(spacing: 12) {
                 Image(systemName: "brain.head.profile")
                     .font(.system(size: 50))
-                    .foregroundStyle(Color.purple)
+                    .foregroundStyle(prefs.accentColor)
 
                 Text("What do you want to accomplish?")
                     .font(.title3)
@@ -98,7 +100,7 @@ struct StrategicProjectInputView: View {
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(goal.isEmpty || isGenerating ? Color.gray : Color.purple)
+                .background(goal.isEmpty || isGenerating ? Color.gray : prefs.accentColor)
                 .foregroundStyle(.white)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
@@ -128,7 +130,7 @@ struct StrategicProjectInputView: View {
                             .font(.caption)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
-                            .background(Color.purple.opacity(0.15))
+                            .background(prefs.accentColor.opacity(0.15))
                             .clipShape(Capsule())
                     }
 
@@ -168,7 +170,7 @@ struct StrategicProjectInputView: View {
                             .fontWeight(.semibold)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(projectTitle.isEmpty ? Color.gray : Color.purple)
+                            .background(projectTitle.isEmpty ? Color.gray : prefs.accentColor)
                             .foregroundStyle(.white)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
@@ -263,7 +265,7 @@ struct PhaseReviewCard: View {
             Text("\"\(phase.mentalRule)\"")
                 .font(.caption)
                 .italic()
-                .foregroundStyle(Color.purple)
+                .foregroundStyle(UserPreferences.shared.accentColor)
 
             // Sessions
             if isExpanded {

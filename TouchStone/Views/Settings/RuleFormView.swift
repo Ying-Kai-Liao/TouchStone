@@ -215,7 +215,7 @@ struct DayButton: View {
                 .font(.caption)
                 .fontWeight(.medium)
                 .frame(width: 36, height: 36)
-                .background(isSelected ? Color.blue : Color(.systemGray5))
+                .background(isSelected ? UserPreferences.shared.accentColor : Color(.systemGray5))
                 .foregroundStyle(isSelected ? .white : .primary)
                 .clipShape(Circle())
         }

@@ -107,7 +107,7 @@ struct SpeechStoneInputView: View {
         case .recording: return .red
         case .processing: return .orange
         case .error: return .gray
-        default: return .blue
+        default: return UserPreferences.shared.accentColor
         }
     }
 
@@ -235,7 +235,7 @@ struct SpeechStoneInputView: View {
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.blue)
+                        .background(UserPreferences.shared.accentColor)
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
@@ -245,7 +245,7 @@ struct SpeechStoneInputView: View {
                 showManualForm = true
             } label: {
                 Text("Enter Manually")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(UserPreferences.shared.accentColor)
             }
         }
     }

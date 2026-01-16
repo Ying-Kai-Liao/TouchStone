@@ -132,7 +132,7 @@ struct StoneEventFormView: View {
                             .font(.caption)
                             .fontWeight(.medium)
                             .frame(width: 32, height: 32)
-                            .background(customDays.contains(day) ? Color.blue : Color(.tertiarySystemFill))
+                            .background(customDays.contains(day) ? UserPreferences.shared.accentColor : Color(.tertiarySystemFill))
                             .foregroundStyle(customDays.contains(day) ? .white : .primary)
                             .clipShape(Circle())
                     }

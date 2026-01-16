@@ -36,7 +36,7 @@ struct SuggestedSessionRow: View {
                         if let phase = session.project.activePhase {
                             Text(phase.title)
                                 .font(.caption)
-                                .foregroundStyle(.purple)
+                                .foregroundStyle(UserPreferences.shared.accentColor)
                         } else if let phase = session.project.currentPhase {
                             Text(phase)
                                 .font(.caption)

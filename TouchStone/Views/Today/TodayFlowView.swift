@@ -243,7 +243,7 @@ struct TodayFlowView: View {
                     undoTouch()
                 }
                 .fontWeight(.semibold)
-                .foregroundStyle(.teal)
+                .foregroundStyle(UserPreferences.shared.accentColor)
             }
             .padding()
             .background(
@@ -393,15 +393,15 @@ struct DateTabButton: View {
             Text(buttonLabel)
                 .font(.subheadline)
                 .fontWeight(isSelected ? .semibold : .regular)
-                .foregroundStyle(isSelected ? .teal : .white.opacity(0.6))
+                .foregroundStyle(isSelected ? UserPreferences.shared.accentColor : .white.opacity(0.6))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .background(
                     Capsule()
-                        .fill(isSelected ? Color.teal.opacity(0.2) : Color.clear)
+                        .fill(isSelected ? UserPreferences.shared.accentColor.opacity(0.2) : Color.clear)
                         .overlay(
                             Capsule()
-                                .strokeBorder(isSelected ? Color.teal.opacity(0.5) : Color.clear, lineWidth: 1)
+                                .strokeBorder(isSelected ? UserPreferences.shared.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
                         )
                 )
         }

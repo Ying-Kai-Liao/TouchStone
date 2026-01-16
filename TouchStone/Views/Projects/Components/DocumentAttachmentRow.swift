@@ -11,7 +11,7 @@ struct DocumentAttachmentRow: View {
             // File icon
             Image(systemName: document.iconName)
                 .font(.title2)
-                .foregroundStyle(.purple)
+                .foregroundStyle(UserPreferences.shared.accentColor)
                 .frame(width: 32)
 
             // File info
@@ -61,7 +61,7 @@ struct AddDocumentRow: View {
             HStack(spacing: 12) {
                 Image(systemName: "plus.circle.fill")
                     .font(.title2)
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(UserPreferences.shared.accentColor)
                     .frame(width: 32)
 
                 VStack(alignment: .leading, spacing: 2) {

@@ -74,7 +74,7 @@ struct FlowEditModeView: View {
                         onDismiss()
                     }
                     .fontWeight(.semibold)
-                    .foregroundStyle(.teal)
+                    .foregroundStyle(UserPreferences.shared.accentColor)
                 }
             }
         }
@@ -88,7 +88,7 @@ struct FlowEditModeView: View {
             HStack(spacing: 8) {
                 Image(systemName: "arrow.up.arrow.down")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.teal)
+                    .foregroundStyle(UserPreferences.shared.accentColor)
                 Text("Drag projects to swap or add to your flow")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -259,7 +259,7 @@ struct DraggableProjectCard: View {
                 .fill(cardBackground)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(Color.teal.opacity(0.4), lineWidth: 1.5)
+                        .strokeBorder(ColorUserPreferences.shared.accentColor.opacity(0.4), lineWidth: 1.5)
                 )
         )
         .opacity(isDragging ? 0.5 : 1.0)
@@ -334,7 +334,7 @@ struct FlowSessionDropTarget: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .strokeBorder(
-                            isHighlighted || isTargeted ? Color.teal : Color.clear,
+                            isHighlighted || isTargeted ? ColorUserPreferences.shared.accentColor : Color.clear,
                             lineWidth: 2
                         )
                 )

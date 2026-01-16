@@ -202,6 +202,39 @@ struct SettingsView: View {
                     Text("OpenAI powers strategic planning. Key stored in Keychain.")
                 }
 
+                // MARK: - Appearance Section
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Accent Color", systemImage: "paintpalette")
+
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 6), spacing: 12) {
+                            ForEach(AccentColorOption.allCases) { option in
+                                Button {
+                                    prefs.accentColorOption = option
+                                } label: {
+                                    Circle()
+                                        .fill(option.color)
+                                        .frame(width: 32, height: 32)
+                                        .overlay {
+                                            if prefs.accentColorOption == option {
+                                                Image(systemName: "checkmark")
+                                                    .font(.system(size: 14, weight: .bold))
+                                                    .foregroundStyle(.white)
+                                            }
+                                        }
+                                        .shadow(color: option.color.opacity(0.3), radius: 2, y: 1)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                } header: {
+                    Text("Appearance")
+                } footer: {
+                    Text("Choose your preferred accent color for the app.")
+                }
+
                 // MARK: - Preferences Section
                 Section {
                     Picker(selection: $prefs.appLanguage) {
@@ -240,7 +273,7 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
-            .tint(.accentColor)
+            .tint(prefs.accentColor)
             .alert("API Key Saved", isPresented: $showSaveConfirmation) {
                 Button("OK", role: .cancel) { }
             } message: {

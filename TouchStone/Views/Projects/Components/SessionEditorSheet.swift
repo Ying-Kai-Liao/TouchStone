@@ -78,7 +78,7 @@ struct SessionEditorSheet: View {
                                     .foregroundStyle(.secondary)
                                 Text("\"\(rule)\"")
                                     .italic()
-                                    .foregroundStyle(.purple)
+                                    .foregroundStyle(UserPreferences.shared.accentColor)
                             }
                         }
                     }

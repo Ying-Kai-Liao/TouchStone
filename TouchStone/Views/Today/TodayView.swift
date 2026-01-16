@@ -87,14 +87,14 @@ struct TodayView: View {
                     showSpeechInput = true
                 } label: {
                     Image(systemName: "mic.fill")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(UserPreferences.shared.accentColor)
                 }
 
                 Button {
                     showAddStone = true
                 } label: {
                     Image(systemName: "plus.circle")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(UserPreferences.shared.accentColor)
                 }
             }
 
@@ -153,7 +153,7 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: "wand.and.stars")
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(UserPreferences.shared.accentColor)
                     Text("Suggested workflow")
                         .font(.headline)
                     Spacer()
@@ -329,7 +329,7 @@ struct ProjectTouchRow: View {
                             if let phase = project.activePhase {
                                 Text(phase.title)
                                     .font(.caption)
-                                    .foregroundStyle(.purple)
+                                    .foregroundStyle(UserPreferences.shared.accentColor)
                             }
                         } else if let phase = project.currentPhase {
                             Text(phase)
