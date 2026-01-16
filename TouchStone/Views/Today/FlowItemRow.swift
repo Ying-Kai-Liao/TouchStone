@@ -242,23 +242,17 @@ struct WaterFlowRow: View {
 
                         Spacer()
 
-                        // Focus button - subtle styling
+                        // Play button
                         if let onFocus = onFocus {
                             Button(action: onFocus) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "scope")
-                                        .font(.system(size: 12, weight: .medium))
-                                    Text("Focus")
-                                        .font(.subheadline)
-                                        .fontWeight(.medium)
-                                }
-                                .foregroundStyle(UserPreferences.shared.accentColor)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(
-                                    Capsule()
-                                        .fill(UserPreferences.shared.accentColor.opacity(0.15))
-                                )
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(UserPreferences.shared.accentColor)
+                                    .frame(width: 36, height: 36)
+                                    .background(
+                                        Circle()
+                                            .fill(UserPreferences.shared.accentColor.opacity(0.15))
+                                    )
                             }
                             .buttonStyle(.plain)
                         }
@@ -561,22 +555,16 @@ struct AdditionalProjectRow: View {
 
                 Spacer()
 
-                // Focus button - subtle styling
+                // Play button
                 Button(action: onFocus) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "scope")
-                            .font(.system(size: 10, weight: .medium))
-                        Text("Focus")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                    }
-                    .foregroundStyle(UserPreferences.shared.accentColor)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(UserPreferences.shared.accentColor.opacity(0.15))
-                    )
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(UserPreferences.shared.accentColor)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Circle()
+                                .fill(UserPreferences.shared.accentColor.opacity(0.15))
+                        )
                 }
                 .buttonStyle(.plain)
             }
