@@ -28,79 +28,77 @@ struct FlowItemRow: View {
 // MARK: - Stone Flow Row
 
 /// Fixed event card with completion status
-/// Shows stone image header when current time is within the scheduled time
+/// Expands when tapped by user
 struct StoneFlowRow: View {
     let item: WorkflowItem
+
+    @State private var isExpanded: Bool = false
 
     private var isCompleted: Bool {
         item.status == .completed
     }
 
-    /// Check if current time falls within this block's scheduled time
-    private var isCurrentTimeSlot: Bool {
-        let now = Date()
-        return now >= item.startTime && now <= item.endTime
-    }
-
-    /// Expand only when current time is within the stone's time slot
-    private var isExpanded: Bool {
-        isCurrentTimeSlot && !isCompleted
-    }
-
     private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Stone image header when current time slot
-            if isExpanded {
-                stoneHeader
+        Button {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                isExpanded.toggle()
             }
-
-            // Content - expanded for current time slot, compact for others
-            if isExpanded {
-                // Full content for active stone
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.title)
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.primary)
-
-                    HStack(spacing: 6) {
-                        Image(systemName: "clock")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(item.timeRangeString)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                // Stone image header when expanded
+                if isExpanded {
+                    stoneHeader
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-            } else {
-                // Compact content for non-current stones
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
+
+                // Content - expanded or compact based on tap
+                if isExpanded {
+                    // Full content for expanded stone
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(item.title)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundStyle(isCompleted ? .secondary : .primary)
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.primary)
 
-                        Text(item.timeRangeString)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 6) {
+                            Image(systemName: "clock")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(item.timeRangeString)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                } else {
+                    // Compact content
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.title)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(isCompleted ? .secondary : .primary)
+
+                            Text(item.timeRangeString)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
             }
+            .background(
+                RoundedRectangle(cornerRadius: isExpanded ? 16 : 12, style: .continuous)
+                    .fill(cardBackground)
+                    .opacity(isCompleted ? 0.5 : 1)
+            )
         }
-        .background(
-            RoundedRectangle(cornerRadius: isExpanded ? 16 : 12, style: .continuous)
-                .fill(cardBackground)
-                .opacity(isCompleted ? 0.5 : 1)
-        )
+        .buttonStyle(.plain)
     }
 
     /// Stone/rock gradient header for active events
@@ -163,13 +161,14 @@ struct StoneFlowRow: View {
 // MARK: - Water Flow Row
 
 /// Suggested session card with touch and focus actions.
-/// - Ghost block (dashed, translucent) when not touched today - always compact
-/// - Solid block when touched today - expands only during its scheduled time
-/// - Can only be touched once in schedule - use "MORE TO TOUCH" for additional touches
+/// - Ghost block (dashed, translucent) when not touched today - tap to touch
+/// - Solid block when touched today - tap to expand/collapse
 struct WaterFlowRow: View {
     let item: WorkflowItem
     let onTouch: (() -> Void)?
     let onFocus: (() -> Void)?
+
+    @State private var isExpanded: Bool = false
 
     /// Check if this project was touched today
     private var hasTouchedToday: Bool {
@@ -186,47 +185,35 @@ struct WaterFlowRow: View {
         !hasTouchedToday
     }
 
-    /// Check if current time falls within this block's scheduled time
-    private var isCurrentTimeSlot: Bool {
-        let now = Date()
-        return now >= item.startTime && now <= item.endTime
-    }
-
-    /// Show expanded view only when:
-    /// 1. Current time is within block's time range AND
-    /// 2. Block is NOT ghost (has been touched today)
-    private var isExpanded: Bool {
-        isCurrentTimeSlot && !isGhost
-    }
-
     private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
 
     var body: some View {
-        // Only tappable if not yet touched today
-        Group {
+        // Ghost blocks: tap to touch
+        // Non-ghost blocks: tap to expand/collapse
+        Button {
             if isGhost {
-                // Tappable ghost block
-                Button(action: { onTouch?() }) {
-                    cardContent
-                }
-                .buttonStyle(.plain)
+                onTouch?()
             } else {
-                // Already touched - not tappable (use MORE TO TOUCH for additional)
-                cardContent
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    isExpanded.toggle()
+                }
             }
+        } label: {
+            cardContent
         }
+        .buttonStyle(.plain)
     }
 
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Water image header only when expanded (current time + touched)
+            // Water image header when expanded
             if isExpanded {
                 waterHeader
             }
 
-            // Content - expanded only when current time slot AND touched
+            // Content - expanded or compact based on tap
             if isExpanded {
-                // Full content for active water block
+                // Full content for expanded water block
                 VStack(alignment: .leading, spacing: 8) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(item.title)
@@ -280,7 +267,7 @@ struct WaterFlowRow: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
             } else {
-                // Compact content (ghost or non-current time slot)
+                // Compact content
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.title)

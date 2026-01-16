@@ -219,7 +219,7 @@ struct TimelineItemContainer: View {
                     onFocus: item.project.map { project in { onFocus(project) } }
                 )
                 .padding(.trailing, 16)
-                .padding(.vertical, isTransitionItem ? 2 : 6)
+                .padding(.vertical, isTransitionItem ? 4 : 12)
             }
             .offset(x: swipeOffset)
             .gesture(swipeGesture)
