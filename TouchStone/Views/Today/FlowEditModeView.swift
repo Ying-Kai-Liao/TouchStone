@@ -259,7 +259,7 @@ struct DraggableProjectCard: View {
                 .fill(cardBackground)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(ColorUserPreferences.shared.accentColor.opacity(0.4), lineWidth: 1.5)
+                        .strokeBorder(UserPreferences.shared.accentColor.opacity(0.4), lineWidth: 1.5)
                 )
         )
         .opacity(isDragging ? 0.5 : 1.0)
@@ -334,7 +334,7 @@ struct FlowSessionDropTarget: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .strokeBorder(
-                            isHighlighted || isTargeted ? ColorUserPreferences.shared.accentColor : Color.clear,
+                            isHighlighted || isTargeted ? UserPreferences.shared.accentColor : Color.clear,
                             lineWidth: 2
                         )
                 )
