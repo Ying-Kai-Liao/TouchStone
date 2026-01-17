@@ -18,6 +18,8 @@ struct TodayFlowView: View {
     @Query(filter: #Predicate<Rule> { $0.isActive })
     private var activeRules: [Rule]
 
+    @Query private var allTouchLogs: [TouchLog]
+
     @State private var dayState: DayState = DayState()
     @State private var selectedDate = Date()
     @State private var showZenMode = false
@@ -27,6 +29,8 @@ struct TodayFlowView: View {
     @State private var showAddStone = false
     @State private var showSpeechInput = false
     @State private var showEditMode = false
+    @State private var showCapacityAlert = false
+    @State private var pendingTouchProject: Project?
 
     private let calendar = Calendar.current
 
@@ -64,6 +68,17 @@ struct TodayFlowView: View {
             // Projects without planned hours are always included
             return true
         }
+    }
+
+    /// Today's touch logs
+    private var todayTouchLogs: [TouchLog] {
+        let today = calendar.startOfDay(for: Date())
+        return allTouchLogs.filter { calendar.isDate($0.timestamp, inSameDayAs: today) }
+    }
+
+    /// Total touched minutes today
+    private var todayTotalMinutes: Int {
+        todayTouchLogs.reduce(0) { $0 + $1.durationMinutes }
     }
 
     var body: some View {
@@ -104,6 +119,19 @@ struct TodayFlowView: View {
             .onChange(of: allStones.count) { computeDayState() }
             .onChange(of: selectedDate) { computeDayState() }
             .overlay(alignment: .bottom) { undoToast }
+            .alert("Great work today!", isPresented: $showCapacityAlert) {
+                Button("Take a break") {
+                    pendingTouchProject = nil
+                }
+                Button("Keep going") {
+                    if let project = pendingTouchProject {
+                        performTouch(project)
+                        pendingTouchProject = nil
+                    }
+                }
+            } message: {
+                Text("You've reached your daily goal. Consider doing something else, or continue if you'd like.")
+            }
             .sheet(isPresented: $showAddStone) {
                 StoneEventFormView(onSave: { stone in
                     modelContext.insert(stone)
@@ -256,6 +284,7 @@ struct TodayFlowView: View {
         }
     }
 
+
     // MARK: - Actions
 
     private func computeDayState() {
@@ -316,6 +345,26 @@ struct TodayFlowView: View {
     }
 
     private func touchProject(_ project: Project) {
+        // Check if this touch would exceed daily capacity
+        if calendar.isDateInToday(selectedDate) {
+            let defaultDuration = 60 // TouchLog default duration
+            let newTotal = todayTotalMinutes + defaultDuration
+            let capacity = UserPreferences.shared.dailyProductiveMinutes
+
+            if newTotal > capacity {
+                // Store pending project and show confirmation
+                pendingTouchProject = project
+                showCapacityAlert = true
+                return
+            }
+        }
+
+        // Proceed with touch
+        performTouch(project)
+    }
+
+    /// Actually perform the touch (called directly or after user confirms)
+    private func performTouch(_ project: Project) {
         let touch = TouchLog(project: project)
         modelContext.insert(touch)
         lastTouch = touch
