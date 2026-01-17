@@ -16,202 +16,142 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                // MARK: - Schedule
-                Section("Schedule") {
-                    HStack {
-                        Text("Working Hours")
-                        Spacer()
-                        Text("\(formatHour(prefs.workDayStartHour)) – \(formatHour(prefs.workDayEndHour))")
-                            .foregroundStyle(.secondary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // MARK: - Header
+                    HStack(spacing: 12) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.primary)
+                        Text("Settings")
+                            .font(.system(size: 32, weight: .bold))
                     }
-                    .background {
-                        NavigationLink("", destination: WorkingHoursView())
-                            .opacity(0)
-                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
 
-                    NavigationLink {
-                        RulesListView()
-                    } label: {
-                        Text("Time Blocks")
-                    }
-                }
+                    // MARK: - Schedule Section
+                    SettingsSectionHeader(title: "Schedule")
 
-                // MARK: - Focus
-                Section("Focus") {
-                    Stepper("Daily Goal: \(prefs.dailyProductiveHours) hrs",
-                            value: $prefs.dailyProductiveHours,
-                            in: 1...12)
-
-                    Stepper("Session: \(prefs.sessionMinMinutes)–\(prefs.sessionMaxMinutes) min",
-                            value: $prefs.sessionMaxMinutes,
-                            in: 60...120,
-                            step: 15)
-
-                    HStack {
-                        Text("Deadline Buffer")
-                        Spacer()
-                        Text("\(prefs.deadlineBufferPercent)%")
-                            .foregroundStyle(.secondary)
-                    }
-                    .background {
-                        NavigationLink("", destination: DeadlineBufferView())
-                            .opacity(0)
-                    }
-                }
-
-                // MARK: - Breaks
-                Section {
-                    Toggle("Breaks", isOn: $prefs.restBetweenSessionsEnabled)
-
-                    if prefs.restBetweenSessionsEnabled {
-                        Stepper("\(prefs.restDurationMinutes) min every \(prefs.workIntervalMinutes) min",
-                                value: $prefs.restDurationMinutes,
-                                in: 5...30,
-                                step: 5)
-                    }
-                }
-
-                // MARK: - AI
-                Section("AI Assistant") {
-                    if hasExistingKey {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                            Text("Connected")
-                            Spacer()
-                            Button("Remove", role: .destructive) {
-                                showDeleteConfirmation = true
-                            }
-                            .font(.subheadline)
-                        }
-                    } else {
-                        HStack {
-                            if showAPIKey {
-                                TextField("sk-...", text: $apiKey)
-                                    .textFieldStyle(.roundedBorder)
-                                    .autocorrectionDisabled()
-                                    .textInputAutocapitalization(.never)
-                            } else {
-                                SecureField("sk-...", text: $apiKey)
-                                    .textFieldStyle(.roundedBorder)
-                                    .autocorrectionDisabled()
-                                    .textInputAutocapitalization(.never)
-                            }
-
-                            Button {
-                                showAPIKey.toggle()
-                            } label: {
-                                Image(systemName: showAPIKey ? "eye.slash" : "eye")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        Button("Save Key") {
-                            saveAPIKey()
-                        }
-                        .disabled(apiKey.isEmpty)
+                    NavigationLink(destination: WorkingHoursView()) {
+                        SettingsRow(
+                            icon: "clock",
+                            title: "Working Hours",
+                            value: "\(formatHour(prefs.workDayStartHour)) – \(formatHour(prefs.workDayEndHour))"
+                        )
                     }
 
-                    Link(destination: URL(string: "https://platform.openai.com/api-keys")!) {
-                        HStack {
-                            Text("Get API Key")
-                            Spacer()
-                            Image(systemName: "arrow.up.right")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                }
+                    SettingsDivider()
 
-                // MARK: - Appearance
-                Section("Appearance") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Accent Color")
-                            .font(.subheadline)
-
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 6), spacing: 12) {
-                            ForEach(AccentColorOption.allCases) { option in
-                                Button {
-                                    prefs.accentColorOption = option
-                                } label: {
-                                    Circle()
-                                        .fill(option.color)
-                                        .frame(width: 28, height: 28)
-                                        .overlay {
-                                            if prefs.accentColorOption == option {
-                                                Image(systemName: "checkmark")
-                                                    .font(.system(size: 12, weight: .bold))
-                                                    .foregroundStyle(.white)
-                                            }
-                                        }
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
+                    NavigationLink(destination: RulesListView()) {
+                        SettingsRow(icon: "calendar.badge.clock", title: "Time Blocks")
                     }
-                    .padding(.vertical, 4)
-                }
 
-                // MARK: - About
-                Section {
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text("1.0.0")
-                            .foregroundStyle(.secondary)
+                    // MARK: - Focus Section
+                    SettingsSectionHeader(title: "Focus")
+
+                    NavigationLink(destination: DailyGoalView()) {
+                        SettingsRow(
+                            icon: "target",
+                            title: "Daily Goal",
+                            value: "\(prefs.dailyProductiveHours) hrs"
+                        )
                     }
+
+                    SettingsDivider()
+
+                    NavigationLink(destination: SessionLengthView()) {
+                        SettingsRow(
+                            icon: "hourglass",
+                            title: "Session Length",
+                            value: "\(prefs.sessionMinMinutes)–\(prefs.sessionMaxMinutes) min"
+                        )
+                    }
+
+                    SettingsDivider()
+
+                    NavigationLink(destination: DeadlineBufferView()) {
+                        SettingsRow(
+                            icon: "calendar.badge.exclamationmark",
+                            title: "Deadline Buffer",
+                            value: "\(prefs.deadlineBufferPercent)%"
+                        )
+                    }
+
+                    SettingsDivider()
+
+                    NavigationLink(destination: BreaksView()) {
+                        SettingsRow(
+                            icon: "leaf",
+                            title: "Breaks",
+                            value: prefs.restBetweenSessionsEnabled ? "On" : "Off"
+                        )
+                    }
+
+                    // MARK: - Appearance Section
+                    SettingsSectionHeader(title: "Appearance")
+
+                    NavigationLink(destination: AccentColorView()) {
+                        SettingsRow(
+                            icon: "circle.fill",
+                            iconColor: prefs.accentColor,
+                            title: "Accent Color",
+                            value: prefs.accentColorOption.displayName
+                        )
+                    }
+
+                    // MARK: - AI Section
+                    SettingsSectionHeader(title: "AI Assistant")
+
+                    NavigationLink(destination: AISettingsView()) {
+                        SettingsRow(
+                            icon: "sparkles",
+                            title: "OpenAI",
+                            value: hasExistingKey ? "Connected" : "Not Set"
+                        )
+                    }
+
+                    // MARK: - About Section
+                    SettingsSectionHeader(title: "About")
+
+                    SettingsRow(icon: "info.circle", title: "Version", value: "1.0.0", showChevron: false)
+
+                    SettingsDivider()
 
                     Link(destination: URL(string: "https://github.com/Ying-Kai-Liao/TouchStone")!) {
-                        HStack {
-                            Text("Source Code")
-                            Spacer()
-                            Image(systemName: "arrow.up.right")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        }
+                        SettingsRow(icon: "chevron.left.forwardslash.chevron.right", title: "Source Code", isLink: true)
                     }
+
+                    SettingsDivider()
 
                     Link(destination: URL(string: "https://github.com/Ying-Kai-Liao/TouchStone/blob/main/PRIVACY.md")!) {
-                        HStack {
-                            Text("Privacy Policy")
-                            Spacer()
-                            Image(systemName: "arrow.up.right")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        }
+                        SettingsRow(icon: "hand.raised", title: "Privacy Policy", isLink: true)
                     }
 
+                    SettingsDivider()
+
                     Link(destination: URL(string: "https://github.com/Ying-Kai-Liao/TouchStone/blob/main/TERMS.md")!) {
-                        HStack {
-                            Text("Terms of Service")
-                            Spacer()
-                            Image(systemName: "arrow.up.right")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        }
+                        SettingsRow(icon: "doc.text", title: "Terms of Service", isLink: true)
                     }
+
+                    Spacer(minLength: 40)
                 }
             }
-            .navigationTitle("Settings")
+            .background(Color(.systemBackground))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
                         dismiss()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 36, height: 36)
+                            .background(Color(.systemGray6))
+                            .clipShape(Circle())
                     }
-                    .fontWeight(.medium)
                 }
-            }
-            .tint(prefs.accentColor)
-            .alert("API Key Saved", isPresented: $showSaveConfirmation) {
-                Button("OK", role: .cancel) { }
-            }
-            .alert("Remove API Key?", isPresented: $showDeleteConfirmation) {
-                Button("Remove", role: .destructive) {
-                    deleteAPIKey()
-                }
-                Button("Cancel", role: .cancel) { }
             }
         }
         .offset(x: dragOffset)
@@ -242,31 +182,76 @@ struct SettingsView: View {
         )
     }
 
-    // MARK: - Helpers
-
     private func formatHour(_ hour: Int) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "h a"
         let date = Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date()) ?? Date()
         return formatter.string(from: date)
     }
+}
 
-    private func saveAPIKey() {
-        do {
-            try APIKeyManager.shared.setOpenAIKey(apiKey)
-            apiKey = ""
-            showSaveConfirmation = true
-        } catch {
-            print("Failed to save API key: \(error)")
+// MARK: - Settings Row Component
+
+private struct SettingsRow: View {
+    let icon: String
+    var iconColor: Color = .primary
+    let title: String
+    var value: String? = nil
+    var showChevron: Bool = true
+    var isLink: Bool = false
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundStyle(iconColor)
+                .frame(width: 24)
+
+            Text(title)
+                .font(.body)
+                .foregroundStyle(.primary)
+
+            Spacer()
+
+            if let value = value {
+                Text(value)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+
+            if showChevron {
+                Image(systemName: isLink ? "arrow.up.right" : "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color(.tertiaryLabel))
+            }
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
     }
+}
 
-    private func deleteAPIKey() {
-        do {
-            try APIKeyManager.shared.deleteOpenAIKey()
-        } catch {
-            print("Failed to delete API key: \(error)")
-        }
+// MARK: - Section Header
+
+private struct SettingsSectionHeader: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 20)
+            .padding(.top, 28)
+            .padding(.bottom, 8)
+    }
+}
+
+// MARK: - Divider
+
+private struct SettingsDivider: View {
+    var body: some View {
+        Divider()
+            .padding(.leading, 58)
     }
 }
 
@@ -305,6 +290,68 @@ private struct WorkingHoursView: View {
     }
 }
 
+// MARK: - Daily Goal View
+
+private struct DailyGoalView: View {
+    @Bindable private var prefs = UserPreferences.shared
+
+    var body: some View {
+        List {
+            Section {
+                Stepper("\(prefs.dailyProductiveHours) hours", value: $prefs.dailyProductiveHours, in: 1...12)
+            } footer: {
+                Text("Target productive hours per day.")
+            }
+        }
+        .navigationTitle("Daily Goal")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Session Length View
+
+private struct SessionLengthView: View {
+    @Bindable private var prefs = UserPreferences.shared
+
+    var body: some View {
+        List {
+            Section {
+                Stepper("Min: \(prefs.sessionMinMinutes) min", value: $prefs.sessionMinMinutes, in: 30...60, step: 15)
+                Stepper("Max: \(prefs.sessionMaxMinutes) min", value: $prefs.sessionMaxMinutes, in: 60...120, step: 15)
+            } footer: {
+                Text("Preferred focus session duration range.")
+            }
+        }
+        .navigationTitle("Session Length")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Breaks View
+
+private struct BreaksView: View {
+    @Bindable private var prefs = UserPreferences.shared
+
+    var body: some View {
+        List {
+            Section {
+                Toggle("Enable Breaks", isOn: $prefs.restBetweenSessionsEnabled)
+            }
+
+            if prefs.restBetweenSessionsEnabled {
+                Section {
+                    Stepper("Work: \(prefs.workIntervalMinutes) min", value: $prefs.workIntervalMinutes, in: 30...120, step: 15)
+                    Stepper("Break: \(prefs.restDurationMinutes) min", value: $prefs.restDurationMinutes, in: 5...30, step: 5)
+                } footer: {
+                    Text("Take a \(prefs.restDurationMinutes)-minute break every \(prefs.workIntervalMinutes) minutes.")
+                }
+            }
+        }
+        .navigationTitle("Breaks")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 // MARK: - Deadline Buffer View
 
 private struct DeadlineBufferView: View {
@@ -340,6 +387,156 @@ private struct DeadlineBufferView: View {
         }
         .navigationTitle("Deadline Buffer")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Accent Color View
+
+private struct AccentColorView: View {
+    @Bindable private var prefs = UserPreferences.shared
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(AccentColorOption.allCases) { option in
+                    Button {
+                        prefs.accentColorOption = option
+                    } label: {
+                        HStack(spacing: 14) {
+                            Circle()
+                                .fill(option.color)
+                                .frame(width: 24, height: 24)
+
+                            Text(option.displayName)
+                                .foregroundStyle(.primary)
+
+                            Spacer()
+
+                            if prefs.accentColorOption == option {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(prefs.accentColor)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Accent Color")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(prefs.accentColor)
+    }
+}
+
+// MARK: - AI Settings View
+
+private struct AISettingsView: View {
+    @Bindable private var prefs = UserPreferences.shared
+    @State private var apiKey = ""
+    @State private var showAPIKey = false
+    @State private var showSaveConfirmation = false
+    @State private var showDeleteConfirmation = false
+
+    private var hasExistingKey: Bool {
+        APIKeyManager.shared.hasAPIKey
+    }
+
+    var body: some View {
+        List {
+            if hasExistingKey {
+                Section {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("Connected")
+                        Spacer()
+                    }
+
+                    Button("Remove API Key", role: .destructive) {
+                        showDeleteConfirmation = true
+                    }
+                }
+            } else {
+                Section {
+                    HStack {
+                        if showAPIKey {
+                            TextField("sk-...", text: $apiKey)
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                        } else {
+                            SecureField("sk-...", text: $apiKey)
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                        }
+
+                        Button {
+                            showAPIKey.toggle()
+                        } label: {
+                            Image(systemName: showAPIKey ? "eye.slash" : "eye")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Button("Save Key") {
+                        saveAPIKey()
+                    }
+                    .disabled(apiKey.isEmpty)
+                } footer: {
+                    Text("Your API key is stored securely in the Keychain.")
+                }
+            }
+
+            Section {
+                Link(destination: URL(string: "https://platform.openai.com/api-keys")!) {
+                    HStack {
+                        Text("Get API Key")
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+
+                Link(destination: URL(string: "https://platform.openai.com/usage")!) {
+                    HStack {
+                        Text("View Usage")
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+        }
+        .navigationTitle("AI Assistant")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert("API Key Saved", isPresented: $showSaveConfirmation) {
+            Button("OK", role: .cancel) { }
+        }
+        .alert("Remove API Key?", isPresented: $showDeleteConfirmation) {
+            Button("Remove", role: .destructive) {
+                deleteAPIKey()
+            }
+            Button("Cancel", role: .cancel) { }
+        }
+    }
+
+    private func saveAPIKey() {
+        do {
+            try APIKeyManager.shared.setOpenAIKey(apiKey)
+            apiKey = ""
+            showSaveConfirmation = true
+        } catch {
+            print("Failed to save API key: \(error)")
+        }
+    }
+
+    private func deleteAPIKey() {
+        do {
+            try APIKeyManager.shared.deleteOpenAIKey()
+        } catch {
+            print("Failed to delete API key: \(error)")
+        }
     }
 }
 
