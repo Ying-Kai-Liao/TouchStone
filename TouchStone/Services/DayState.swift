@@ -265,17 +265,56 @@ class DayState {
 
     // MARK: - Handle New Stones (Auto-Adjust)
 
-    /// Adjust schedule when a new stone (meeting) conflicts with existing sessions.
-    /// Moves affected sessions to after the stone.
-    static func adjustScheduleForNewStone(dayPlan: DayPlan, stoneStart: Date, stoneEnd: Date) {
-        for session in dayPlan.scheduledSessions where session.status == .pending {
-            if session.conflicts(with: stoneStart, end: stoneEnd) {
-                // Reschedule to start after the stone
-                session.reschedule(to: stoneEnd)
-            }
+    /// Reschedule pending sessions when stones change.
+    /// Re-runs the scheduling algorithm while preserving completed sessions.
+    func rescheduleAroundStones(dayPlan: DayPlan, context: ModelContext, stones: [StoneEvent], projects: [Project]) {
+        print("[DayState] rescheduleAroundStones - stones: \(stones.count), projects: \(projects.count)")
+
+        // 1. Collect completed sessions to preserve
+        let completedSessions = dayPlan.scheduledSessions.filter { $0.status == .completed }
+        let completedMinutes = completedSessions.reduce(0) { $0 + $1.durationMinutes }
+        print("[DayState] Completed sessions: \(completedSessions.count), completed minutes: \(completedMinutes)")
+
+        // 2. Delete only pending/skipped sessions (they'll be regenerated)
+        let sessionsToDelete = dayPlan.scheduledSessions.filter { $0.status != .completed }
+        print("[DayState] Deleting \(sessionsToDelete.count) pending sessions")
+        for session in sessionsToDelete {
+            context.delete(session)
         }
-        // Note: This simple approach may create overlaps if multiple sessions are affected.
-        // A more sophisticated approach would re-run the full scheduling algorithm.
+
+        // 3. Recompute day state with new stones
+        print("[DayState] Recomputing with \(stones.count) stones...")
+        compute(stones: stones, projects: projects)
+        print("[DayState] Generated \(suggestedSessions.count) new suggestions")
+
+        // 4. Adjust minutes touched to account for completed work
+        let adjustedRemainingCapacity = max(0, availableMinutes - completedMinutes)
+
+        // 5. Get next sequence order after completed sessions
+        let nextOrder = (completedSessions.map { $0.sequenceOrder }.max() ?? -1) + 1
+
+        // 6. Create new sessions from suggestions (respecting remaining capacity)
+        var usedMinutes = 0
+        for (index, suggestion) in suggestedSessions.enumerated() {
+            guard usedMinutes < adjustedRemainingCapacity else { break }
+
+            // Skip if this slot conflicts with completed sessions
+            let conflicts = completedSessions.contains { completed in
+                suggestion.timeSlot.start < completed.scheduledEnd &&
+                suggestion.timeSlot.end > completed.scheduledStart
+            }
+            if conflicts { continue }
+
+            let scheduled = ScheduledSession(
+                project: suggestion.project,
+                start: suggestion.timeSlot.start,
+                end: suggestion.timeSlot.end,
+                order: nextOrder + index
+            )
+            scheduled.dayPlan = dayPlan
+            context.insert(scheduled)
+            usedMinutes += suggestion.suggestedMinutes
+        }
     }
 
     // MARK: - Liquid Scheduler (Pour Water into Slots)
