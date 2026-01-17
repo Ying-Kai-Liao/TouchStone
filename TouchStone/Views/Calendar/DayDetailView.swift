@@ -1,6 +1,16 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - Chart Slice Data
+
+struct ChartSlice: Identifiable {
+    let id = UUID()
+    let label: String
+    let hours: Double
+    let color: Color
+    let isProject: Bool
+}
+
 struct DayDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -21,21 +31,22 @@ struct DayDetailView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 0) {
+                VStack(spacing: 16) {
                     // Date header
                     dateHeader
 
-                    Divider()
-
-                    if stones.isEmpty {
-                        emptyState
+                    // Schedule section first (stones)
+                    if !stones.isEmpty {
+                        stonesSection
                     } else {
-                        stonesList
+                        emptyScheduleHint
                     }
 
-                    // Pressure details section at bottom
-                    pressureDetailsSection
+                    // Pie chart section
+                    dayAllocationChart
+                        .padding(.horizontal)
                 }
+                .padding(.bottom, 100)
             }
             .safeAreaInset(edge: .bottom) {
                 addStoneButton
@@ -96,44 +107,207 @@ struct DayDetailView: View {
         .padding(.vertical, 20)
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "calendar.badge.plus")
-                .font(.system(size: 60))
-                .foregroundStyle(.secondary)
-                .padding(.top, 60)
+    // MARK: - Pie Chart Data
 
-            Text("No events scheduled")
-                .font(.title3)
-                .fontWeight(.medium)
+    private var chartData: (slices: [ChartSlice], totalHours: Double, loadResult: PressureCalculator.DayLoadResult) {
+        let dailyCapacityMinutes = prefs.dailyProductiveMinutes
+        let loadResult = PressureCalculator.calculateDayLoadDetailed(
+            for: date,
+            projects: Array(activeProjects),
+            stones: Array(allStones)
+        )
 
-            Text("Tap the button below to add your first event")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+        let stoneMinutes = dailyCapacityMinutes - loadResult.availableMinutes
+        let totalHours = Double(dailyCapacityMinutes) / 60.0
+
+        var slices: [ChartSlice] = []
+
+        // Add stones (blocked time)
+        if stoneMinutes > 0 {
+            let stoneHours = roundToHalf(Double(stoneMinutes) / 60.0)
+            slices.append(ChartSlice(
+                label: "Stones",
+                hours: stoneHours,
+                color: .gray,
+                isProject: false
+            ))
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
 
-    private var stonesList: some View {
-        List {
-            ForEach(stones.sorted(by: { $0.startHour * 60 + $0.startMinute < $1.startHour * 60 + $1.startMinute })) { stone in
-                StoneRowView(stone: stone)
-                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                    .listRowSeparator(.hidden)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            stoneToDelete = stone
-                            showDeleteAlert = true
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
+        // Add project allocations (rounded to nearest 0.5 hour)
+        let projectColors: [Color] = [prefs.accentColor, .blue, .purple, .pink, .indigo, .cyan]
+        for (index, allocation) in loadResult.projectAllocations.enumerated() {
+            let hours = roundToHalf(allocation.allocatedMinutes / 60.0)
+            if hours > 0 {
+                slices.append(ChartSlice(
+                    label: allocation.project.title,
+                    hours: hours,
+                    color: projectColors[index % projectColors.count],
+                    isProject: true
+                ))
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
+
+        // Calculate free time
+        let usedHours = slices.reduce(0.0) { $0 + $1.hours }
+        let freeHours = max(0, totalHours - usedHours)
+        if freeHours > 0 {
+            slices.append(ChartSlice(
+                label: "Free",
+                hours: freeHours,
+                color: Color(.systemGray5),
+                isProject: false
+            ))
+        }
+
+        return (slices, totalHours, loadResult)
+    }
+
+    private func roundToHalf(_ value: Double) -> Double {
+        return (value * 2).rounded() / 2
+    }
+
+    // MARK: - Pie Chart View
+
+    private var dayAllocationChart: some View {
+        let data = chartData
+        let loadPercent = Int(data.loadResult.load * 100)
+
+        return VStack(spacing: 16) {
+            // Header with day type badge
+            HStack {
+                Text("TIME ALLOCATION")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .tracking(1)
+
+                Spacer()
+
+                if data.loadResult.isBufferDay {
+                    Text("BUFFER DAY")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.orange)
+                        .clipShape(Capsule())
+                } else {
+                    Text("WORK DAY")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(prefs.accentColor)
+                        .clipShape(Capsule())
+                }
+            }
+
+            // Buffer warning if needed
+            if data.loadResult.usedBufferDays {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text("Buffer days consumed due to high workload")
+                        .font(.caption)
+                }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            // Pie chart with center label
+            ZStack {
+                PieChartView(slices: data.slices, totalHours: data.totalHours)
+                    .frame(width: 200, height: 200)
+
+                // Center label
+                VStack(spacing: 2) {
+                    Text("\(loadPercent)%")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .foregroundStyle(loadColor(for: data.loadResult.load))
+                    Text("load")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 8)
+
+            // Legend
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(data.slices) { slice in
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(slice.color)
+                            .frame(width: 10, height: 10)
+                        Text(slice.label)
+                            .font(.caption)
+                            .lineLimit(1)
+                        Spacer()
+                        Text("\(formatHours(slice.hours))")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+        }
+        .padding()
+        .background(Color(.systemGray6).opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func formatHours(_ hours: Double) -> String {
+        if hours == floor(hours) {
+            return "\(Int(hours))h"
+        } else {
+            return String(format: "%.1fh", hours)
+        }
+    }
+
+    // MARK: - Stones Section
+
+    private var emptyScheduleHint: some View {
+        VStack(spacing: 8) {
+            Text("SCHEDULE")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .tracking(1)
+
+            Text("No events scheduled")
+                .font(.subheadline)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+    }
+
+    private var stonesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("SCHEDULE")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .tracking(1)
+                .padding(.horizontal)
+
+            ForEach(stones.sorted(by: { $0.startHour * 60 + $0.startMinute < $1.startHour * 60 + $1.startMinute })) { stone in
+                SwipeToDeleteRow(
+                    onDelete: {
+                        stoneToDelete = stone
+                        showDeleteAlert = true
+                    }
+                ) {
+                    StoneRowView(stone: stone)
+                }
+                .padding(.horizontal)
+            }
+        }
     }
 
     private var addStoneButton: some View {
@@ -162,308 +336,6 @@ struct DayDetailView: View {
         return formatter.string(from: date)
     }
 
-    // MARK: - Load Details
-
-    /// Projects with deadlines that include this day
-    private var projectsWithDeadlines: [Project] {
-        let calendar = Calendar.current
-        let dayStart = calendar.startOfDay(for: date)
-        return activeProjects.filter { project in
-            guard let deadline = project.deadline else { return false }
-            let deadlineStart = calendar.startOfDay(for: deadline)
-            return deadlineStart >= dayStart
-        }
-    }
-
-    private var pressureDetailsSection: some View {
-        let dailyCapacity = prefs.dailyProductiveMinutes
-        let loadResult = PressureCalculator.calculateDayLoadDetailed(
-            for: date,
-            projects: Array(activeProjects),
-            stones: Array(allStones)
-        )
-        let loadPercent = Int(loadResult.load * 100)
-        let stoneMinutes = dailyCapacity - loadResult.availableMinutes
-
-        return Group {
-            if projectsWithDeadlines.isEmpty {
-                VStack(spacing: 8) {
-                    Text("DAY LOAD")
-                        .font(.caption2)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.secondary)
-                        .tracking(1)
-
-                    Text("No projects with deadlines")
-                        .font(.subheadline)
-                        .foregroundStyle(.tertiary)
-                }
-                .padding()
-            } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("DAY LOAD")
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.secondary)
-                            .tracking(1)
-
-                        Spacer()
-
-                        // Day type badge
-                        if loadResult.isBufferDay {
-                            Text("BUFFER DAY")
-                                .font(.caption2)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.orange)
-                                .clipShape(Capsule())
-                        } else {
-                            Text("WORK DAY")
-                                .font(.caption2)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(prefs.accentColor)
-                                .clipShape(Capsule())
-                        }
-                    }
-
-                    // Buffer consumed warning
-                    if loadResult.usedBufferDays {
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
-                            Text("Buffer days consumed due to high workload")
-                                .font(.caption)
-                        }
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.orange.opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-
-                    // Day capacity summary
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Daily capacity:")
-                            Spacer()
-                            Text("\(dailyCapacity / 60) hrs (\(dailyCapacity) min)")
-                        }
-                        if stoneMinutes > 0 {
-                            HStack {
-                                Text("Stones (blocked):")
-                                Spacer()
-                                Text("-\(stoneMinutes) min")
-                                    .foregroundStyle(.orange)
-                            }
-                        }
-                        HStack {
-                            Text("Available:")
-                            Spacer()
-                            Text("\(loadResult.availableMinutes / 60) hrs (\(loadResult.availableMinutes) min)")
-                                .fontWeight(.medium)
-                        }
-                        Divider()
-                        HStack {
-                            Text("Allocated work:")
-                            Spacer()
-                            Text(formatDuration(Int(loadResult.allocatedMinutes)))
-                        }
-                        HStack {
-                            Text("Day load:")
-                            Spacer()
-                            Text("\(loadPercent)%")
-                                .fontWeight(.semibold)
-                                .foregroundStyle(loadColor(for: loadResult.load))
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(8)
-                    .background(Color(.systemGray5).opacity(0.5))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                    // Project allocations
-                    ForEach(loadResult.projectAllocations, id: \.project.id) { allocation in
-                        loadCardDetailed(for: allocation)
-                    }
-
-                    // Overall status
-                    HStack {
-                        Text("Day Status:")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Spacer()
-                        Text("\(loadPercent)%")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(loadColor(for: loadResult.load))
-                        Text(loadStatusText(for: loadResult.load))
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(loadColor(for: loadResult.load))
-                    }
-                    .padding(.top, 8)
-                }
-                .padding()
-                .background(Color(.systemGray6).opacity(0.3))
-            }
-        }
-    }
-
-    private func loadCard(for project: Project) -> some View {
-        let calendar = Calendar.current
-        let dayStart = calendar.startOfDay(for: date)
-        let deadlineStart = calendar.startOfDay(for: project.deadline!)
-        let daysRemaining = max(1, (calendar.dateComponents([.day], from: dayStart, to: deadlineStart).day ?? 0) + 1)
-        let remainingMinutes = project.remainingHours * 60
-        let dailyAllocation = remainingMinutes / daysRemaining
-
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(project.title)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                Spacer()
-                Text("\(formatDuration(dailyAllocation))/day")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundStyle(prefs.accentColor)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text("Deadline:")
-                    Spacer()
-                    Text(deadlineFormatted(project.deadline!))
-                }
-                HStack {
-                    Text("Days remaining:")
-                    Spacer()
-                    Text("\(daysRemaining)")
-                }
-                HStack {
-                    Text("Work remaining:")
-                    Spacer()
-                    Text("\(remainingMinutes / 60) hrs (\(remainingMinutes) min)")
-                }
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
-    private func loadCardDetailed(for allocation: PressureCalculator.DayLoadResult.ProjectAllocation) -> some View {
-        let project = allocation.project
-        let remainingMinutes = project.remainingHours * 60
-        let bufferReduced = allocation.effectiveBufferDays < allocation.bufferDays
-
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(project.title)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                Spacer()
-
-                // Status badges
-                if allocation.isOverloaded {
-                    Text("OVERLOADED")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.red)
-                        .clipShape(Capsule())
-                } else if allocation.isBufferDay {
-                    Text("BUFFER")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.orange)
-                        .clipShape(Capsule())
-                } else {
-                    Text(formatDuration(Int(allocation.allocatedMinutes)))
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundStyle(allocation.isOverloaded ? .red : prefs.accentColor)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text("Deadline:")
-                    Spacer()
-                    Text(deadlineFormatted(project.deadline!))
-                }
-                HStack {
-                    Text("Work remaining:")
-                    Spacer()
-                    Text("\(remainingMinutes / 60) hrs (\(remainingMinutes) min)")
-                }
-
-                // Show buffer info with reduction warning if applicable
-                HStack {
-                    Text("Schedule:")
-                    Spacer()
-                    if bufferReduced {
-                        Text("\(allocation.totalWorkDays) work + \(allocation.effectiveBufferDays) buffer")
-                        Text("(\(allocation.bufferDays - allocation.effectiveBufferDays) used)")
-                            .foregroundStyle(.orange)
-                    } else {
-                        Text("\(allocation.totalWorkDays) work days + \(allocation.bufferDays) buffer")
-                    }
-                }
-
-                if let dayIndex = allocation.workDayIndex {
-                    HStack {
-                        Text("This day:")
-                        Spacer()
-                        Text("Work day \(dayIndex + 1) of \(allocation.totalWorkDays)")
-                            .foregroundStyle(allocation.isOverloaded ? .red : prefs.accentColor)
-                    }
-                } else {
-                    HStack {
-                        Text("This day:")
-                        Spacer()
-                        Text("Buffer (no work scheduled)")
-                            .foregroundStyle(.orange)
-                    }
-                }
-
-                // Overload warning
-                if allocation.isOverloaded && !allocation.isBufferDay {
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.circle.fill")
-                            .foregroundStyle(.red)
-                        Text("Cannot complete by deadline")
-                            .foregroundStyle(.red)
-                    }
-                    .font(.caption)
-                    .padding(.top, 4)
-                }
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        .padding()
-        .background(
-            allocation.isOverloaded ? Color.red.opacity(0.1) :
-            allocation.isBufferDay ? Color.orange.opacity(0.1) :
-            Color(.systemBackground)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
     private func loadColor(for load: Double) -> Color {
         if load > 1.0 {
             return .red
@@ -473,35 +345,203 @@ struct DayDetailView: View {
             return prefs.accentColor
         }
     }
+}
 
-    private func loadStatusText(for load: Double) -> String {
-        if load > 1.0 {
-            return "Overloaded"
-        } else if load > 0.8 {
-            return "Busy"
-        } else if load > 0.5 {
-            return "Moderate"
-        } else {
-            return "Light"
+// MARK: - Pie Chart View
+
+struct PieChartView: View {
+    let slices: [ChartSlice]
+    let totalHours: Double
+
+    var body: some View {
+        GeometryReader { geometry in
+            let radius = min(geometry.size.width, geometry.size.height) / 2
+            let innerRadius = radius * 0.6
+
+            ZStack {
+                // Draw slices
+                ForEach(Array(sliceAngles.enumerated()), id: \.offset) { index, angles in
+                    PieSlice(
+                        startAngle: angles.start,
+                        endAngle: angles.end,
+                        innerRadius: innerRadius,
+                        outerRadius: radius
+                    )
+                    .fill(slices[index].color)
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
     }
 
-    private func deadlineFormatted(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, yyyy"
-        return formatter.string(from: date)
+    private var sliceAngles: [(start: Angle, end: Angle)] {
+        var angles: [(start: Angle, end: Angle)] = []
+        var currentAngle = Angle(degrees: -90) // Start from top
+
+        for slice in slices {
+            let sliceAngle = Angle(degrees: (slice.hours / totalHours) * 360)
+            angles.append((start: currentAngle, end: currentAngle + sliceAngle))
+            currentAngle = currentAngle + sliceAngle
+        }
+
+        return angles
+    }
+}
+
+struct PieSlice: Shape {
+    let startAngle: Angle
+    let endAngle: Angle
+    let innerRadius: CGFloat
+    let outerRadius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+
+        var path = Path()
+
+        // Start at inner radius
+        let innerStart = CGPoint(
+            x: center.x + innerRadius * cos(CGFloat(startAngle.radians)),
+            y: center.y + innerRadius * sin(CGFloat(startAngle.radians))
+        )
+        path.move(to: innerStart)
+
+        // Line to outer radius
+        let outerStart = CGPoint(
+            x: center.x + outerRadius * cos(CGFloat(startAngle.radians)),
+            y: center.y + outerRadius * sin(CGFloat(startAngle.radians))
+        )
+        path.addLine(to: outerStart)
+
+        // Arc along outer radius
+        path.addArc(
+            center: center,
+            radius: outerRadius,
+            startAngle: startAngle,
+            endAngle: endAngle,
+            clockwise: false
+        )
+
+        // Line to inner radius
+        let innerEnd = CGPoint(
+            x: center.x + innerRadius * cos(CGFloat(endAngle.radians)),
+            y: center.y + innerRadius * sin(CGFloat(endAngle.radians))
+        )
+        path.addLine(to: innerEnd)
+
+        // Arc along inner radius (clockwise to close)
+        path.addArc(
+            center: center,
+            radius: innerRadius,
+            startAngle: endAngle,
+            endAngle: startAngle,
+            clockwise: true
+        )
+
+        path.closeSubpath()
+        return path
+    }
+}
+
+// MARK: - Swipe to Delete Row
+
+struct SwipeToDeleteRow<Content: View>: View {
+    let onDelete: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    @GestureState private var dragOffset: CGFloat = 0
+    @State private var currentOffset: CGFloat = 0
+    @State private var isDeleting = false
+
+    private let deleteButtonWidth: CGFloat = 70
+
+    private var totalOffset: CGFloat {
+        if isDeleting {
+            return -500 // Slide far off screen
+        }
+        let raw = currentOffset + dragOffset
+        // Rubber band effect when swiping right from closed state
+        if raw > 0 {
+            return raw * 0.3
+        }
+        // Rubber band effect when over-swiping left
+        if raw < -deleteButtonWidth - 20 {
+            let overshoot = raw + deleteButtonWidth + 20
+            return -deleteButtonWidth - 20 + overshoot * 0.3
+        }
+        return raw
     }
 
-    private func formatDuration(_ minutes: Int) -> String {
-        let hours = minutes / 60
-        let mins = minutes % 60
-        if hours > 0 && mins > 0 {
-            return "\(hours) hrs \(mins) mins"
-        } else if hours > 0 {
-            return "\(hours) hrs"
-        } else {
-            return "\(mins) mins"
+    private var isOpen: Bool {
+        currentOffset < -10
+    }
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            // Delete button - always present but clipped
+            HStack(spacing: 0) {
+                Spacer()
+                Button(action: {
+                    // Animate row sliding out
+                    withAnimation(.easeIn(duration: 0.25)) {
+                        isDeleting = true
+                    }
+                    // Call onDelete after animation
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        onDelete()
+                    }
+                }) {
+                    Image(systemName: "trash.fill")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                        .frame(width: deleteButtonWidth, height: .infinity)
+                }
+                .frame(width: isDeleting ? 500 : max(0, -totalOffset), height: 70)
+                .background(Color.red)
+                .clipShape(RoundedRectangle(cornerRadius: isDeleting ? 0 : 12))
+            }
+
+            // Content
+            content()
+                .offset(x: totalOffset)
+                .opacity(isDeleting ? 0 : 1)
+                .gesture(
+                    DragGesture(minimumDistance: 10)
+                        .updating($dragOffset) { value, state, _ in
+                            if !isDeleting {
+                                state = value.translation.width
+                            }
+                        }
+                        .onEnded { value in
+                            if isDeleting { return }
+                            let velocity = value.predictedEndTranslation.width - value.translation.width
+                            let projected = currentOffset + value.translation.width + velocity * 0.5
+
+                            withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                                if projected < -deleteButtonWidth / 2 {
+                                    // Snap open
+                                    currentOffset = -deleteButtonWidth
+                                } else {
+                                    // Snap closed
+                                    currentOffset = 0
+                                }
+                            }
+                        }
+                )
+                .simultaneousGesture(
+                    TapGesture()
+                        .onEnded {
+                            if isOpen && !isDeleting {
+                                withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                                    currentOffset = 0
+                                }
+                            }
+                        }
+                )
         }
+        .frame(height: isDeleting ? 0 : nil)
+        .clipped()
+        .animation(.easeIn(duration: 0.25), value: isDeleting)
     }
 }
 
