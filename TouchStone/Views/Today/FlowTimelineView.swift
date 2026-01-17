@@ -12,6 +12,7 @@ struct FlowTimelineView: View {
     let onTouch: (Project) -> Void
     let onFocus: (Project) -> Void
     let onDelete: ((WorkflowItem) -> Void)?
+    let onDeleteStone: ((StoneEvent) -> Void)?
     let onEditMode: (() -> Void)?
 
     @State private var showMoreToTouch = false  // Collapsed by default
@@ -30,7 +31,7 @@ struct FlowTimelineView: View {
                             isLast: index == items.count - 1,
                             onTouch: { project in onTouch(project) },
                             onFocus: { project in onFocus(project) },
-                            onDelete: item.isWater ? { onDelete?(item) } : nil,
+                            onDelete: item.isWater ? { onDelete?(item) } : (item.isStone ? { if let stone = item.stoneInstance?.event { onDeleteStone?(stone) } } : nil),
                             onEditMode: item.isWater ? onEditMode : nil
                         )
                     }
@@ -149,11 +150,16 @@ struct TimelineItemContainer: View {
     let onDelete: (() -> Void)?
     let onEditMode: (() -> Void)?
 
-    @State private var swipeOffset: CGFloat = 0
+    @GestureState private var dragOffset: CGFloat = 0
+    @State private var currentOffset: CGFloat = 0
     @State private var showDeleteConfirm = false
 
     private let deleteThreshold: CGFloat = -80
     private let swipeSnapThreshold: CGFloat = -40
+
+    private var swipeOffset: CGFloat {
+        currentOffset + dragOffset
+    }
 
     private var lineColor: Color {
         switch item.status {
@@ -222,20 +228,20 @@ struct TimelineItemContainer: View {
                 .padding(.vertical, isTransitionItem ? 4 : 12)
             }
             .offset(x: swipeOffset)
-            .gesture(swipeGesture)
+            .highPriorityGesture(swipeGesture)
             .simultaneousGesture(longPressGesture)
         }
         .clipped()
         .confirmationDialog("Remove from flow?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Remove", role: .destructive) {
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    swipeOffset = 0
+                    currentOffset = 0
                 }
                 onDelete?()
             }
             Button("Cancel", role: .cancel) {
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    swipeOffset = 0
+                    currentOffset = 0
                 }
             }
         } message: {
@@ -246,26 +252,34 @@ struct TimelineItemContainer: View {
     // MARK: - Swipe Gesture
 
     private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 20, coordinateSpace: .local)
-            .onChanged { value in
+        DragGesture(minimumDistance: 15, coordinateSpace: .local)
+            .updating($dragOffset) { value, state, _ in
                 guard onDelete != nil else { return }
-                // Only allow left swipe (negative translation)
-                if value.translation.width < 0 {
-                    swipeOffset = max(value.translation.width, deleteThreshold * 1.2)
-                } else if swipeOffset < 0 {
-                    // Allow swiping back
-                    swipeOffset = min(0, swipeOffset + value.translation.width)
+                let translation = value.translation.width
+                // Only allow left swipe (negative translation) or swipe back when open
+                if translation < 0 || currentOffset < 0 {
+                    let raw = currentOffset + translation
+                    // Rubber band effect at limits
+                    if raw > 0 {
+                        state = -currentOffset + raw * 0.3
+                    } else if raw < deleteThreshold * 1.2 {
+                        let overshoot = raw - deleteThreshold * 1.2
+                        state = -currentOffset + deleteThreshold * 1.2 + overshoot * 0.3
+                    } else {
+                        state = translation
+                    }
                 }
             }
             .onEnded { value in
                 guard onDelete != nil else { return }
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    if swipeOffset < swipeSnapThreshold {
+                let projected = currentOffset + value.translation.width + value.predictedEndTranslation.width * 0.3
+                withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                    if projected < swipeSnapThreshold {
                         // Snap to show delete button
-                        swipeOffset = deleteThreshold
+                        currentOffset = deleteThreshold
                     } else {
                         // Snap back
-                        swipeOffset = 0
+                        currentOffset = 0
                     }
                 }
             }
@@ -362,6 +376,7 @@ struct TimelineItemContainer: View {
             onTouch: { _ in },
             onFocus: { _ in },
             onDelete: nil,
+            onDeleteStone: nil,
             onEditMode: nil
         )
     }

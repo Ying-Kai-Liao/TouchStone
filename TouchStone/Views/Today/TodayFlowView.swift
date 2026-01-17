@@ -250,6 +250,7 @@ struct TodayFlowView: View {
                 onTouch: touchProject,
                 onFocus: { project in focusProject = project },
                 onDelete: deleteHandler,
+                onDeleteStone: { stone in deleteStone(stone) },
                 onEditMode: editHandler
             )
             .padding(.top, 16)
@@ -412,6 +413,13 @@ struct TodayFlowView: View {
             withAnimation(.easeInOut(duration: 0.3)) {
                 computeDayState()
             }
+        }
+    }
+
+    private func deleteStone(_ stone: StoneEvent) {
+        modelContext.delete(stone)
+        withAnimation(.easeInOut(duration: 0.3)) {
+            computeDayState()
         }
     }
 

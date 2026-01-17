@@ -6,6 +6,9 @@ struct ProjectsListView: View {
     @Query(sort: \Project.createdAt, order: .reverse) private var projects: [Project]
 
     @State private var showingAddSheet = false
+    @State private var projectToDelete: Project?
+    @State private var showDeleteAlert = false
+    @State private var selectedProject: Project?
 
     private var activeProjects: [Project] {
         projects.filter { $0.isActive }
@@ -44,7 +47,25 @@ struct ProjectsListView: View {
             .sheet(isPresented: $showingAddSheet) {
                 NewProjectChoiceView()
             }
+            .alert("Delete Project", isPresented: $showDeleteAlert, presenting: projectToDelete) { project in
+                Button("Cancel", role: .cancel) {
+                    projectToDelete = nil
+                }
+                Button("Delete", role: .destructive) {
+                    deleteProject(project)
+                }
+            } message: { project in
+                Text("Delete \"\(project.title)\"? This cannot be undone.")
+            }
+            .navigationDestination(item: $selectedProject) { project in
+                ProjectDetailView(project: project)
+            }
         }
+    }
+
+    private func deleteProject(_ project: Project) {
+        modelContext.delete(project)
+        projectToDelete = nil
     }
 
     private var projectList: some View {
@@ -74,7 +95,16 @@ struct ProjectsListView: View {
                 .padding(.leading, 4)
 
             ForEach(projects) { project in
-                ProjectCard(project: project)
+                SwipeToDeleteRow(
+                    onDelete: {
+                        projectToDelete = project
+                        showDeleteAlert = true
+                    }
+                ) {
+                    ProjectCard(project: project) {
+                        selectedProject = project
+                    }
+                }
             }
         }
     }
@@ -100,6 +130,7 @@ struct ProjectsListView: View {
 
 struct ProjectCard: View {
     @Bindable var project: Project
+    let onTap: () -> Void
 
     private var hoursToday: Int {
         let calendar = Calendar.current
@@ -126,110 +157,110 @@ struct ProjectCard: View {
     }
 
     var body: some View {
-        NavigationLink {
-            ProjectDetailView(project: project)
-        } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                // Top row: Title and hours badge
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(project.title)
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
+        VStack(alignment: .leading, spacing: 12) {
+            // Top row: Title and hours badge
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(project.title)
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
 
-                        if let phase = phaseName {
-                            Text(phase)
-                                .font(.subheadline)
-                                .foregroundStyle(Color.white.opacity(0.6))
-                        }
-                    }
-
-                    Spacer()
-
-                    HStack(spacing: 4) {
-                        if hoursToday > 0 {
-                            Text("\(hoursToday) hr\(hoursToday == 1 ? "" : "s") today")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(UserPreferences.shared.accentColor)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(
-                                    Capsule()
-                                        .strokeBorder(UserPreferences.shared.accentColor.opacity(0.4), lineWidth: 1)
-                                )
-                        }
+                    if let phase = phaseName {
+                        Text(phase)
+                            .font(.subheadline)
+                            .foregroundStyle(Color.white.opacity(0.6))
                     }
                 }
 
                 Spacer()
 
-                // Bottom row: Progress bar and hours
-                HStack(alignment: .center, spacing: 12) {
-                    // Progress bar
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            // Background track
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.white.opacity(0.15))
-                                .frame(height: 8)
-
-                            // Progress fill
-                            if project.totalPlannedMinutes > 0 {
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(UserPreferences.shared.accentColor)
-                                    .frame(width: geometry.size.width * project.progress, height: 8)
-                            } else if completedHoursValue > 0 {
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(UserPreferences.shared.accentColor)
-                                    .frame(width: 20, height: 8)
-                            }
-                        }
-                    }
-                    .frame(height: 8)
-
-                    // Chevron and hours
-                    HStack(spacing: 8) {
-                        if project.totalPlannedMinutes > 0 {
-                            Text("\(completedHoursValue) / \(totalHours)h")
-                                .font(.caption)
-                                .foregroundStyle(Color.white.opacity(0.5))
-                        } else if completedHoursValue > 0 {
-                            Text("\(completedHoursValue)h")
-                                .font(.caption)
-                                .foregroundStyle(Color.white.opacity(0.5))
-                        }
-
-                        Image(systemName: "chevron.right")
+                HStack(spacing: 4) {
+                    if hoursToday > 0 {
+                        Text("\(hoursToday) hr\(hoursToday == 1 ? "" : "s") today")
                             .font(.caption)
-                            .foregroundStyle(Color.white.opacity(0.3))
+                            .fontWeight(.medium)
+                            .foregroundStyle(UserPreferences.shared.accentColor)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .strokeBorder(UserPreferences.shared.accentColor.opacity(0.4), lineWidth: 1)
+                            )
                     }
                 }
             }
-            .padding(16)
-            .frame(minHeight: 120)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(red: 0.1, green: 0.18, blue: 0.15))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .strokeBorder(Color(red: 0.2, green: 0.35, blue: 0.28), lineWidth: 1)
-                    )
-            )
+
+            Spacer()
+
+            // Bottom row: Progress bar and hours
+            HStack(alignment: .center, spacing: 12) {
+                // Progress bar
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        // Background track
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.white.opacity(0.15))
+                            .frame(height: 8)
+
+                        // Progress fill
+                        if project.totalPlannedMinutes > 0 {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(UserPreferences.shared.accentColor)
+                                .frame(width: geometry.size.width * project.progress, height: 8)
+                        } else if completedHoursValue > 0 {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(UserPreferences.shared.accentColor)
+                                .frame(width: 20, height: 8)
+                        }
+                    }
+                }
+                .frame(height: 8)
+
+                // Chevron and hours
+                HStack(spacing: 8) {
+                    if project.totalPlannedMinutes > 0 {
+                        Text("\(completedHoursValue) / \(totalHours)h")
+                            .font(.caption)
+                            .foregroundStyle(Color.white.opacity(0.5))
+                    } else if completedHoursValue > 0 {
+                        Text("\(completedHoursValue)h")
+                            .font(.caption)
+                            .foregroundStyle(Color.white.opacity(0.5))
+                    }
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(Color.white.opacity(0.3))
+                }
+            }
         }
-        .buttonStyle(.plain)
+        .padding(16)
+        .frame(minHeight: 120)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(red: 0.1, green: 0.18, blue: 0.15))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(Color(red: 0.2, green: 0.35, blue: 0.28), lineWidth: 1)
+                )
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
     }
 }
 
 // Keep the old ProjectRow for backwards compatibility if needed elsewhere
 struct ProjectRow: View {
     @Bindable var project: Project
+    var onTap: () -> Void = {}
 
     var body: some View {
-        ProjectCard(project: project)
+        ProjectCard(project: project, onTap: onTap)
     }
 }
 

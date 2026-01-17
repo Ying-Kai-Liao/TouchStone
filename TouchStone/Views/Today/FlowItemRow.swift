@@ -41,91 +41,90 @@ struct StoneFlowRow: View {
     private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
 
     var body: some View {
-        Button {
+        VStack(alignment: .leading, spacing: 0) {
+            // Stone image header when expanded
+            if isExpanded {
+                stoneHeader
+            }
+
+            // Content - expanded or compact based on tap
+            if isExpanded {
+                // Full content for expanded stone
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(item.title)
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.primary)
+
+                    // Time and duration row
+                    HStack(spacing: 16) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "clock")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(item.timeRangeString)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        HStack(spacing: 6) {
+                            Image(systemName: "hourglass")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("\(item.durationMinutes) min")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    // Recurrence info if applicable
+                    if let stoneInstance = item.stoneInstance {
+                        let recurrence = stoneInstance.event.recurrence
+                        if recurrence.type != .none {
+                            HStack(spacing: 6) {
+                                Image(systemName: "repeat")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                                Text(recurrenceLabel(for: recurrence))
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+            } else {
+                // Compact content
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundStyle(isCompleted ? .secondary : .primary)
+
+                        Text(item.timeRangeString)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: isExpanded ? 16 : 12, style: .continuous)
+                .fill(cardBackground)
+                .opacity(isCompleted ? 0.5 : 1)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
             withAnimation(.easeInOut(duration: 0.25)) {
                 isExpanded.toggle()
             }
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                // Stone image header when expanded
-                if isExpanded {
-                    stoneHeader
-                }
-
-                // Content - expanded or compact based on tap
-                if isExpanded {
-                    // Full content for expanded stone
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(item.title)
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .foregroundStyle(.primary)
-
-                        // Time and duration row
-                        HStack(spacing: 16) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "clock")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text(item.timeRangeString)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            HStack(spacing: 6) {
-                                Image(systemName: "hourglass")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text("\(item.durationMinutes) min")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        // Recurrence info if applicable
-                        if let stoneInstance = item.stoneInstance {
-                            let recurrence = stoneInstance.event.recurrence
-                            if recurrence.type != .none {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "repeat")
-                                        .font(.caption)
-                                        .foregroundStyle(.tertiary)
-                                    Text(recurrenceLabel(for: recurrence))
-                                        .font(.caption)
-                                        .foregroundStyle(.tertiary)
-                                }
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                } else {
-                    // Compact content
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.title)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundStyle(isCompleted ? .secondary : .primary)
-
-                            Text(item.timeRangeString)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                }
-            }
-            .background(
-                RoundedRectangle(cornerRadius: isExpanded ? 16 : 12, style: .continuous)
-                    .fill(cardBackground)
-                    .opacity(isCompleted ? 0.5 : 1)
-            )
         }
-        .buttonStyle(.plain)
     }
 
     /// Stone/rock gradient header for active events

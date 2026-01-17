@@ -15,6 +15,8 @@ struct TodayView: View {
     @State private var showAddStone = false
     @State private var showSpeechInput = false
     @State private var focusProject: Project?
+    @State private var stoneToDelete: StoneEvent?
+    @State private var showDeleteAlert = false
 
     var body: some View {
         NavigationStack {
@@ -47,6 +49,16 @@ struct TodayView: View {
                 FocusModeView(project: project) {
                     focusProject = nil
                 }
+            }
+            .alert("Delete Stone", isPresented: $showDeleteAlert, presenting: stoneToDelete) { stone in
+                Button("Cancel", role: .cancel) {
+                    stoneToDelete = nil
+                }
+                Button("Delete", role: .destructive) {
+                    deleteStone(stone)
+                }
+            } message: { stone in
+                Text("Delete \"\(stone.title)\"? This cannot be undone.")
             }
         }
     }
@@ -106,7 +118,14 @@ struct TodayView: View {
             } else {
                 VStack(spacing: 8) {
                     ForEach(dayState.stoneInstances) { instance in
-                        StoneRow(instance: instance)
+                        SwipeToDeleteRow(
+                            onDelete: {
+                                stoneToDelete = instance.event
+                                showDeleteAlert = true
+                            }
+                        ) {
+                            StoneRow(instance: instance)
+                        }
                     }
                 }
             }
@@ -276,6 +295,12 @@ struct TodayView: View {
                 lastTouch = nil
             }
         }
+    }
+
+    private func deleteStone(_ stone: StoneEvent) {
+        modelContext.delete(stone)
+        stoneToDelete = nil
+        computeDayState()
     }
 }
 
