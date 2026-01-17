@@ -113,10 +113,32 @@ struct TodayFlowView: View {
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
+
+                // Rest day - show option to change mind
+                if isRestDay && calendar.isDateInToday(selectedDate) {
+                    VStack {
+                        Spacer()
+                        Button {
+                            resetTodayPlan()
+                        } label: {
+                            Text("Changed my mind? Tap to start working")
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(0.7))
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 20)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.white.opacity(0.1))
+                                )
+                        }
+                        .padding(.bottom, 30)
+                    }
+                    .transition(.opacity)
+                }
             }
             .navigationBarHidden(true)
             .onAppear { computeDayState() }
-            .onChange(of: allStones.count) { computeDayState() }
+            .onChange(of: allStones.count) { rescheduleIfNeeded() }
             .onChange(of: selectedDate) { computeDayState() }
             .overlay(alignment: .bottom) { undoToast }
             .alert("Great work today!", isPresented: $showCapacityAlert) {
@@ -135,7 +157,7 @@ struct TodayFlowView: View {
             .sheet(isPresented: $showAddStone) {
                 StoneEventFormView(onSave: { stone in
                     modelContext.insert(stone)
-                    computeDayState()
+                    // Reschedule happens via onChange(of: allStones.count)
                 })
             }
             .sheet(isPresented: $showSpeechInput) {
@@ -250,6 +272,7 @@ struct TodayFlowView: View {
                 onTouch: touchProject,
                 onFocus: { project in focusProject = project },
                 onDelete: deleteHandler,
+                onDeleteStone: { stone in deleteStone(stone) },
                 onEditMode: editHandler
             )
             .padding(.top, 16)
@@ -334,6 +357,22 @@ struct TodayFlowView: View {
         }
     }
 
+    /// Reset today's plan (change mind after declining)
+    private func resetTodayPlan() {
+        if let plan = todaysPlan {
+            plan.wantsToWork = nil
+            plan.startedAt = nil
+            // Clear any scheduled sessions
+            for session in plan.scheduledSessions {
+                modelContext.delete(session)
+            }
+        }
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            computeDayState()
+        }
+    }
+
     /// Get or create today's DayPlan
     private func getOrCreateTodayPlan() -> DayPlan {
         if let existing = todaysPlan {
@@ -342,6 +381,33 @@ struct TodayFlowView: View {
         let newPlan = DayPlan(date: selectedDate)
         modelContext.insert(newPlan)
         return newPlan
+    }
+
+    /// Reschedule work sessions if there's an existing schedule
+    private func rescheduleIfNeeded() {
+        print("[Reschedule] Called - stones count: \(allStones.count)")
+
+        // Only reschedule if viewing today and there's a locked-in schedule
+        if let plan = todaysPlan {
+            print("[Reschedule] Has plan - isWorkDay: \(plan.isWorkDay), hasSchedule: \(plan.hasSchedule), isToday: \(calendar.isDateInToday(selectedDate))")
+
+            if plan.isWorkDay, plan.hasSchedule, calendar.isDateInToday(selectedDate) {
+                print("[Reschedule] Rescheduling around \(allStones.count) stones...")
+                dayState.rescheduleAroundStones(
+                    dayPlan: plan,
+                    context: modelContext,
+                    stones: Array(allStones),
+                    projects: Array(activeProjects)
+                )
+                print("[Reschedule] Done - sessions count: \(plan.scheduledSessions.count)")
+            }
+        } else {
+            print("[Reschedule] No plan for today")
+        }
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            computeDayState()
+        }
     }
 
     private func touchProject(_ project: Project) {
@@ -412,6 +478,13 @@ struct TodayFlowView: View {
             withAnimation(.easeInOut(duration: 0.3)) {
                 computeDayState()
             }
+        }
+    }
+
+    private func deleteStone(_ stone: StoneEvent) {
+        modelContext.delete(stone)
+        withAnimation(.easeInOut(duration: 0.3)) {
+            computeDayState()
         }
     }
 
