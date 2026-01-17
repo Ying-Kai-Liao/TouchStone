@@ -150,7 +150,8 @@ struct PressureCalculator {
 
     // MARK: - Load-Based Calculation (for CalendarView)
 
-    /// Calculate daily load percentage if user distributes work evenly to meet all deadlines.
+    /// Calculate daily load percentage for a specific day based on deadline-driven work allocation.
+    /// Each day calculates from ITS perspective (remaining work ÷ days from that day to deadline).
     /// Returns a value from 0.0 (empty) to 1.0+ (overloaded).
     static func calculateDayLoad(
         for date: Date,
@@ -171,22 +172,18 @@ struct PressureCalculator {
 
             let deadlineStart = calendar.startOfDay(for: deadline)
 
-            // Skip if deadline already passed
-            guard deadlineStart >= today else { continue }
+            // Skip if deadline already passed relative to THIS day
+            guard deadlineStart >= dayStart else { continue }
 
-            // Skip if this day is after the deadline
-            guard dayStart <= deadlineStart else { continue }
-
-            // Calculate days from today to deadline (inclusive)
-            let totalDays = max(1, (calendar.dateComponents([.day], from: today, to: deadlineStart).day ?? 0) + 1)
+            // Calculate days from THIS SPECIFIC DAY to deadline (inclusive)
+            let daysFromThisDay = max(1, (calendar.dateComponents([.day], from: dayStart, to: deadlineStart).day ?? 0) + 1)
 
             // Remaining work in minutes
             let remainingMinutes = Double(project.remainingHours * 60)
 
-            // Daily allocation = remaining work / days until deadline
-            let dailyAllocation = remainingMinutes / Double(totalDays)
+            // Daily allocation from this day's perspective
+            let dailyAllocation = remainingMinutes / Double(daysFromThisDay)
 
-            // Add this project's allocation to today's load
             totalAllocatedMinutes += dailyAllocation
         }
 

@@ -162,21 +162,31 @@ struct DayDetailView: View {
         return formatter.string(from: date)
     }
 
-    // MARK: - Pressure Details
+    // MARK: - Load Details
+
+    /// Projects with deadlines that include this day
+    private var projectsWithDeadlines: [Project] {
+        let calendar = Calendar.current
+        let dayStart = calendar.startOfDay(for: date)
+        return activeProjects.filter { project in
+            guard let deadline = project.deadline else { return false }
+            let deadlineStart = calendar.startOfDay(for: deadline)
+            return deadlineStart >= dayStart
+        }
+    }
 
     private var pressureDetailsSection: some View {
-        let dailyCapacity = UserPreferences.shared.dailyProductiveHours
-        let dayPressure = PressureCalculator.calculateDayPressure(
+        let dailyCapacity = prefs.dailyProductiveMinutes
+        let dayLoad = PressureCalculator.calculateDayLoad(
             for: date,
-            projects: Array(activeProjects),
-            stones: Array(allStones),
-            dailyCapacityHours: dailyCapacity
+            projects: Array(activeProjects)
         )
+        let loadPercent = Int(dayLoad * 100)
 
         return Group {
-            if dayPressure.projectPressures.isEmpty {
+            if projectsWithDeadlines.isEmpty {
                 VStack(spacing: 8) {
-                    Text("PRESSURE ANALYSIS")
+                    Text("DAY LOAD")
                         .font(.caption2)
                         .fontWeight(.semibold)
                         .foregroundStyle(.secondary)
@@ -189,7 +199,7 @@ struct DayDetailView: View {
                 .padding()
             } else {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("PRESSURE ANALYSIS")
+                    Text("DAY LOAD")
                         .font(.caption2)
                         .fontWeight(.semibold)
                         .foregroundStyle(.secondary)
@@ -200,19 +210,14 @@ struct DayDetailView: View {
                         HStack {
                             Text("Daily capacity:")
                             Spacer()
-                            Text("\(dailyCapacity) hrs (\(dayPressure.dailyCapacityMinutes) min)")
+                            Text("\(dailyCapacity / 60) hrs (\(dailyCapacity) min)")
                         }
                         HStack {
-                            Text("Stone time today:")
+                            Text("Day load:")
                             Spacer()
-                            Text("\(dayPressure.stoneMinutes) min")
-                                .foregroundStyle(dayPressure.stoneMinutes > 0 ? .orange : .primary)
-                        }
-                        HStack {
-                            Text("Available capacity:")
-                            Spacer()
-                            Text("\(dayPressure.availableMinutes) min")
-                                .foregroundStyle(dayPressure.availableMinutes < 60 ? .red : .primary)
+                            Text("\(loadPercent)%")
+                                .fontWeight(.semibold)
+                                .foregroundStyle(loadColor(for: dayLoad))
                         }
                     }
                     .font(.caption)
@@ -221,23 +226,24 @@ struct DayDetailView: View {
                     .background(Color(.systemGray5).opacity(0.5))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                    ForEach(dayPressure.projectPressures, id: \.project.id) { pp in
-                        pressureCard(for: pp)
+                    ForEach(projectsWithDeadlines, id: \.id) { project in
+                        loadCard(for: project)
                     }
 
-                    // Aggregate status
+                    // Overall status
                     HStack {
                         Text("Day Status:")
                             .font(.subheadline)
                             .fontWeight(.medium)
                         Spacer()
-                        Text("\(dayPressure.worstPressure)%")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Text(dayPressure.aggregateStatus.displayName)
+                        Text("\(loadPercent)%")
                             .font(.subheadline)
                             .fontWeight(.semibold)
-                            .foregroundStyle(dayPressure.aggregateStatus.color == .clear ? .secondary : dayPressure.aggregateStatus.color)
+                            .foregroundStyle(loadColor(for: dayLoad))
+                        Text(loadStatusText(for: dayLoad))
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(loadColor(for: dayLoad))
                     }
                     .padding(.top, 8)
                 }
@@ -247,58 +253,41 @@ struct DayDetailView: View {
         }
     }
 
-    private func pressureCard(for pp: PressureCalculator.ProjectPressure) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+    private func loadCard(for project: Project) -> some View {
+        let calendar = Calendar.current
+        let dayStart = calendar.startOfDay(for: date)
+        let deadlineStart = calendar.startOfDay(for: project.deadline!)
+        let daysRemaining = max(1, (calendar.dateComponents([.day], from: dayStart, to: deadlineStart).day ?? 0) + 1)
+        let remainingMinutes = project.remainingHours * 60
+        let dailyAllocation = remainingMinutes / daysRemaining
+
+        return VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(pp.project.title)
+                Text(project.title)
                     .font(.subheadline)
                     .fontWeight(.semibold)
                 Spacer()
-                Text("\(pp.pressure)%")
+                Text("\(formatDuration(dailyAllocation))/day")
                     .font(.caption)
                     .fontWeight(.bold)
-                    .foregroundStyle(pp.status.color == .clear ? .secondary : pp.status.color)
-                Circle()
-                    .fill(pp.status.color == .clear ? Color.gray : pp.status.color)
-                    .frame(width: 10, height: 10)
+                    .foregroundStyle(prefs.accentColor)
             }
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text("Deadline:")
                     Spacer()
-                    Text(deadlineFormatted(pp.deadline))
-                        .foregroundStyle(pp.daysRemaining < 0 ? .red : .primary)
+                    Text(deadlineFormatted(project.deadline!))
                 }
                 HStack {
                     Text("Days remaining:")
                     Spacer()
-                    Text("\(pp.daysRemaining)")
-                        .foregroundStyle(pp.daysRemaining <= 0 ? .red : .primary)
+                    Text("\(daysRemaining)")
                 }
                 HStack {
                     Text("Work remaining:")
                     Spacer()
-                    Text("\(pp.remainingMinutes / 60) hrs (\(pp.remainingMinutes) min)")
-                }
-                HStack {
-                    Text("With 25% buffer:")
-                    Spacer()
-                    Text("\(pp.requiredMinutesWithBuffer) min")
-                        .foregroundStyle(.orange)
-                }
-                HStack {
-                    Text("Available capacity:")
-                    Spacer()
-                    Text("\(pp.availableCapacityMinutes) min")
-                        .foregroundStyle(pp.availableCapacityMinutes < pp.requiredMinutesWithBuffer ? .red : .primary)
-                }
-                HStack {
-                    Text("Status:")
-                    Spacer()
-                    Text(pp.status.displayName)
-                        .fontWeight(.medium)
-                        .foregroundStyle(pp.status.color == .clear ? .secondary : pp.status.color)
+                    Text("\(remainingMinutes / 60) hrs (\(remainingMinutes) min)")
                 }
             }
             .font(.caption)
@@ -309,10 +298,44 @@ struct DayDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
+    private func loadColor(for load: Double) -> Color {
+        if load > 1.0 {
+            return .red
+        } else if load > 0.8 {
+            return .orange
+        } else {
+            return prefs.accentColor
+        }
+    }
+
+    private func loadStatusText(for load: Double) -> String {
+        if load > 1.0 {
+            return "Overloaded"
+        } else if load > 0.8 {
+            return "Busy"
+        } else if load > 0.5 {
+            return "Moderate"
+        } else {
+            return "Light"
+        }
+    }
+
     private func deadlineFormatted(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d, yyyy"
         return formatter.string(from: date)
+    }
+
+    private func formatDuration(_ minutes: Int) -> String {
+        let hours = minutes / 60
+        let mins = minutes % 60
+        if hours > 0 && mins > 0 {
+            return "\(hours) hrs \(mins) mins"
+        } else if hours > 0 {
+            return "\(hours) hrs"
+        } else {
+            return "\(mins) mins"
+        }
     }
 }
 
