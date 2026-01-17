@@ -21,9 +21,9 @@ struct ContentView: View {
                     Label("Plan", systemImage: "square.grid.2x2")
                 }
 
-            SettingsView()
+            MeView()
                 .tabItem {
-                    Label("Settings", systemImage: "gear")
+                    Label("Me", systemImage: "person")
                 }
         }
         .tint(prefs.accentColor)
