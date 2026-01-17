@@ -88,6 +88,34 @@ struct SettingsView: View {
                     Text("Daily target and preferred session lengths.")
                 }
 
+                // MARK: - Deadline Buffer Section
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Label("Deadline Buffer", systemImage: "calendar.badge.exclamationmark")
+                            Spacer()
+                            Text("\(prefs.deadlineBufferPercent)%")
+                                .font(.body)
+                                .fontWeight(.medium)
+                                .foregroundStyle(prefs.accentColor)
+                        }
+
+                        Slider(
+                            value: Binding(
+                                get: { Double(prefs.deadlineBufferPercent) },
+                                set: { prefs.deadlineBufferPercent = Int($0) }
+                            ),
+                            in: 0...50,
+                            step: 5
+                        )
+                        .tint(prefs.accentColor)
+                    }
+                } header: {
+                    Text("Deadline Planning")
+                } footer: {
+                    Text("Reserve \(prefs.deadlineBufferPercent)% of days before deadlines for unexpected issues. Work is distributed across remaining days based on available capacity.")
+                }
+
                 // MARK: - Rest & Recovery Section
                 Section {
                     Toggle(isOn: $prefs.restBetweenSessionsEnabled) {

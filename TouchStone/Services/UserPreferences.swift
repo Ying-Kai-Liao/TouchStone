@@ -73,6 +73,7 @@ class UserPreferences {
         static let restDurationMinutes = "restDurationMinutes"
         static let appLanguage = "appLanguage"
         static let accentColor = "accentColor"
+        static let deadlineBufferPercent = "deadlineBufferPercent"
     }
 
     // MARK: - Productive Hours
@@ -128,6 +129,13 @@ class UserPreferences {
         didSet { defaults.set(restDurationMinutes, forKey: Keys.restDurationMinutes) }
     }
 
+    // MARK: - Deadline Buffer
+
+    /// Percentage of days before deadline to reserve as buffer (default: 20%)
+    var deadlineBufferPercent: Int {
+        didSet { defaults.set(deadlineBufferPercent, forKey: Keys.deadlineBufferPercent) }
+    }
+
     // MARK: - Language (Future)
 
     /// App language setting (default: follow system)
@@ -159,6 +167,7 @@ class UserPreferences {
         self.restBetweenSessionsEnabled = defaults.object(forKey: Keys.restBetweenSessionsEnabled) as? Bool ?? true
         self.workIntervalMinutes = defaults.object(forKey: Keys.workIntervalMinutes) as? Int ?? 60
         self.restDurationMinutes = defaults.object(forKey: Keys.restDurationMinutes) as? Int ?? 15
+        self.deadlineBufferPercent = defaults.object(forKey: Keys.deadlineBufferPercent) as? Int ?? 20
         self.appLanguage = defaults.string(forKey: Keys.appLanguage) ?? "system"
 
         // Load accent color

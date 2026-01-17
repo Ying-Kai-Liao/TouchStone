@@ -185,7 +185,11 @@ struct CalendarView: View {
     }
 
     private func loadForDay(_ date: Date) -> Double {
-        return PressureCalculator.calculateDayLoad(for: date, projects: Array(activeProjects))
+        return PressureCalculator.calculateDayLoad(
+            for: date,
+            projects: Array(activeProjects),
+            stones: Array(stones)
+        )
     }
 
     private func hasDeadlineOnDay(_ date: Date) -> Bool {
