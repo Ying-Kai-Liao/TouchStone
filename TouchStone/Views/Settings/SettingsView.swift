@@ -14,9 +14,10 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "gearshape.fill")
                         .font(.system(size: 28))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.white.opacity(0.85))
                     Text("Settings")
                         .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.85))
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
@@ -33,8 +34,6 @@ struct SettingsView: View {
                         )
                     }
 
-                    SettingsDivider()
-
                     NavigationLink(destination: RulesListView()) {
                         SettingsRow(icon: "calendar.badge.clock", title: "Time Blocks")
                     }
@@ -50,8 +49,6 @@ struct SettingsView: View {
                         )
                     }
 
-                    SettingsDivider()
-
                     NavigationLink(destination: SessionLengthView()) {
                         SettingsRow(
                             icon: "hourglass",
@@ -60,8 +57,6 @@ struct SettingsView: View {
                         )
                     }
 
-                    SettingsDivider()
-
                     NavigationLink(destination: DeadlineBufferView()) {
                         SettingsRow(
                             icon: "calendar.badge.exclamationmark",
@@ -69,8 +64,6 @@ struct SettingsView: View {
                             value: "\(prefs.deadlineBufferPercent)%"
                         )
                     }
-
-                    SettingsDivider()
 
                     NavigationLink(destination: BreaksView()) {
                         SettingsRow(
@@ -108,19 +101,13 @@ struct SettingsView: View {
 
                     SettingsRow(icon: "info.circle", title: "Version", value: "1.0.0", showChevron: false)
 
-                    SettingsDivider()
-
                     Link(destination: URL(string: "https://github.com/Ying-Kai-Liao/TouchStone")!) {
                         SettingsRow(icon: "chevron.left.forwardslash.chevron.right", title: "Source Code", isLink: true)
                     }
 
-                    SettingsDivider()
-
                     Link(destination: URL(string: "https://github.com/Ying-Kai-Liao/TouchStone/blob/main/PRIVACY.md")!) {
                         SettingsRow(icon: "hand.raised", title: "Privacy Policy", isLink: true)
                     }
-
-                    SettingsDivider()
 
                     Link(destination: URL(string: "https://github.com/Ying-Kai-Liao/TouchStone/blob/main/TERMS.md")!) {
                         SettingsRow(icon: "doc.text", title: "Terms of Service", isLink: true)
@@ -145,35 +132,37 @@ struct SettingsView: View {
 
 private struct SettingsRow: View {
     let icon: String
-    var iconColor: Color = .primary
+    var iconColor: Color? = nil
     let title: String
     var value: String? = nil
     var showChevron: Bool = true
     var isLink: Bool = false
 
+    private let softWhite = Color.white.opacity(0.85)
+
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.system(size: 18))
-                .foregroundStyle(iconColor)
+                .foregroundStyle(iconColor ?? softWhite)
                 .frame(width: 24)
 
             Text(title)
                 .font(.body)
-                .foregroundStyle(.primary)
+                .foregroundStyle(softWhite)
 
             Spacer()
 
             if let value = value {
                 Text(value)
                     .font(.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(softWhite.opacity(0.7))
             }
 
             if showChevron {
                 Image(systemName: isLink ? "arrow.up.right" : "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color(.tertiaryLabel))
+                    .foregroundStyle(softWhite.opacity(0.5))
             }
         }
         .padding(.horizontal, 20)
@@ -186,23 +175,15 @@ private struct SettingsRow: View {
 
 private struct SettingsSectionHeader: View {
     let title: String
+    private let softWhite = Color.white.opacity(0.85)
 
     var body: some View {
         Text(title)
             .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(.primary)
+            .foregroundStyle(softWhite.opacity(0.6))
             .padding(.horizontal, 20)
             .padding(.top, 28)
             .padding(.bottom, 8)
-    }
-}
-
-// MARK: - Divider
-
-private struct SettingsDivider: View {
-    var body: some View {
-        Divider()
-            .padding(.leading, 58)
     }
 }
 
