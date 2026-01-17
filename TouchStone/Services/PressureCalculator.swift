@@ -150,46 +150,260 @@ struct PressureCalculator {
 
     // MARK: - Load-Based Calculation (for CalendarView)
 
-    /// Calculate daily load percentage for a specific day based on deadline-driven work allocation.
-    /// Each day calculates from ITS perspective (remaining work ÷ days from that day to deadline).
+    /// Result for day load calculation containing allocation details
+    struct DayLoadResult {
+        let load: Double                    // 0.0 = empty, 1.0 = full, >1.0 = overloaded
+        let isBufferDay: Bool               // True if this day is in the buffer period for any project
+        let allocatedMinutes: Double        // Total work allocated to this day
+        let availableMinutes: Int           // Capacity minus stones
+        let projectAllocations: [ProjectAllocation]
+        let usedBufferDays: Bool            // True if buffer days were consumed due to overload
+
+        struct ProjectAllocation {
+            let project: Project
+            let allocatedMinutes: Double
+            let isBufferDay: Bool
+            let workDayIndex: Int?          // nil if buffer day
+            let totalWorkDays: Int
+            let bufferDays: Int
+            let effectiveBufferDays: Int    // Actual buffer after auto-reduction
+            let isOverloaded: Bool          // True if this project can't fit
+        }
+    }
+
+    /// Calculate daily load percentage for a specific day using smart scheduling.
+    /// Algorithm:
+    /// 1. Reserve buffer days (% of total) before each deadline
+    /// 2. Account for stones reducing daily capacity
+    /// 3. Distribute work proportionally to available capacity across work days
+    /// 4. Auto-use buffer days when work exceeds 100% capacity
+    /// 5. Prioritize projects by deadline (earlier deadlines first)
     /// Returns a value from 0.0 (empty) to 1.0+ (overloaded).
     static func calculateDayLoad(
         for date: Date,
         projects: [Project],
-        dailyCapacityMinutes: Int = UserPreferences.shared.dailyProductiveHours * 60
+        stones: [StoneEvent] = [],
+        dailyCapacityMinutes: Int = UserPreferences.shared.dailyProductiveHours * 60,
+        bufferPercent: Int = UserPreferences.shared.deadlineBufferPercent
     ) -> Double {
+        return calculateDayLoadDetailed(
+            for: date,
+            projects: projects,
+            stones: stones,
+            dailyCapacityMinutes: dailyCapacityMinutes,
+            bufferPercent: bufferPercent
+        ).load
+    }
+
+    /// Calculate detailed daily load with breakdown by project
+    /// Uses smart scheduling with auto-buffer consumption and deadline prioritization
+    static func calculateDayLoadDetailed(
+        for date: Date,
+        projects: [Project],
+        stones: [StoneEvent] = [],
+        dailyCapacityMinutes: Int = UserPreferences.shared.dailyProductiveHours * 60,
+        bufferPercent: Int = UserPreferences.shared.deadlineBufferPercent
+    ) -> DayLoadResult {
         let calendar = Calendar.current
         let dayStart = calendar.startOfDay(for: date)
         let today = calendar.startOfDay(for: Date())
 
         // Only calculate for today and future days
-        guard dayStart >= today else { return 0 }
-
-        var totalAllocatedMinutes: Double = 0
-
-        for project in projects where project.isActive {
-            guard let deadline = project.deadline else { continue }
-
-            let deadlineStart = calendar.startOfDay(for: deadline)
-
-            // Skip if deadline already passed relative to THIS day
-            guard deadlineStart >= dayStart else { continue }
-
-            // Calculate days from THIS SPECIFIC DAY to deadline (inclusive)
-            let daysFromThisDay = max(1, (calendar.dateComponents([.day], from: dayStart, to: deadlineStart).day ?? 0) + 1)
-
-            // Remaining work in minutes
-            let remainingMinutes = Double(project.remainingHours * 60)
-
-            // Daily allocation from this day's perspective
-            let dailyAllocation = remainingMinutes / Double(daysFromThisDay)
-
-            totalAllocatedMinutes += dailyAllocation
+        guard dayStart >= today else {
+            return DayLoadResult(
+                load: 0,
+                isBufferDay: false,
+                allocatedMinutes: 0,
+                availableMinutes: dailyCapacityMinutes,
+                projectAllocations: [],
+                usedBufferDays: false
+            )
         }
 
-        // Return load as percentage of capacity
-        guard dailyCapacityMinutes > 0 else { return 0 }
-        return totalAllocatedMinutes / Double(dailyCapacityMinutes)
+        // Calculate stone minutes for THIS day
+        let stoneMinutes = calculateStoneMinutes(for: date, stones: stones)
+        let availableMinutes = max(0, dailyCapacityMinutes - stoneMinutes)
+        let dayIndex = calendar.dateComponents([.day], from: today, to: dayStart).day ?? 0
+
+        // Filter and sort projects by deadline (earlier first for priority)
+        let relevantProjects = projects
+            .filter { $0.isActive && $0.deadline != nil }
+            .filter { project in
+                let deadlineStart = calendar.startOfDay(for: project.deadline!)
+                return deadlineStart >= dayStart
+            }
+            .sorted { p1, p2 in
+                p1.deadline! < p2.deadline!
+            }
+
+        // Build project info with optimal buffers
+        struct ProjectInfo {
+            let project: Project
+            let totalDays: Int
+            let optimalBufferDays: Int
+            var effectiveBufferDays: Int
+            let remainingMinutes: Double
+        }
+
+        var projectInfos: [ProjectInfo] = relevantProjects.map { project in
+            let deadline = project.deadline!
+            let deadlineStart = calendar.startOfDay(for: deadline)
+            let totalDays = max(1, (calendar.dateComponents([.day], from: today, to: deadlineStart).day ?? 0) + 1)
+            let optimalBufferDays = Int(ceil(Double(totalDays) * Double(bufferPercent) / 100.0))
+            let remainingMinutes = Double(project.remainingHours * 60)
+            return ProjectInfo(
+                project: project,
+                totalDays: totalDays,
+                optimalBufferDays: optimalBufferDays,
+                effectiveBufferDays: optimalBufferDays,
+                remainingMinutes: remainingMinutes
+            )
+        }
+
+        // Helper to calculate allocation for a day given current buffer settings
+        func calculateDayAllocation(for info: ProjectInfo) -> Double {
+            let workDays = max(1, info.totalDays - info.effectiveBufferDays)
+
+            // If this day is in buffer period, no allocation
+            if dayIndex >= workDays {
+                return 0
+            }
+
+            // Calculate total available across all work days
+            var totalAvailable: Double = 0
+            for offset in 0..<workDays {
+                guard let workDate = calendar.date(byAdding: .day, value: offset, to: today) else { continue }
+                let dayStones = calculateStoneMinutes(for: workDate, stones: stones)
+                totalAvailable += Double(max(0, dailyCapacityMinutes - dayStones))
+            }
+
+            if totalAvailable > 0 {
+                return info.remainingMinutes * (Double(availableMinutes) / totalAvailable)
+            } else {
+                return info.remainingMinutes / Double(workDays)
+            }
+        }
+
+        // Calculate total load with current buffer settings
+        func calculateTotalLoad() -> Double {
+            let total = projectInfos.reduce(0.0) { $0 + calculateDayAllocation(for: $1) }
+            return availableMinutes > 0 ? total / Double(availableMinutes) : (total > 0 ? 2.0 : 0)
+        }
+
+        // Iteratively reduce buffers while load > 100% and buffers remain
+        var iterations = 0
+        let maxIterations = 100 // Safety limit
+
+        while calculateTotalLoad() > 1.0 && iterations < maxIterations {
+            iterations += 1
+
+            // Find projects that still have buffer days to reduce
+            // Prioritize reducing buffer from projects with later deadlines (preserve earlier deadline buffers)
+            var reducedAny = false
+
+            // Sort by deadline descending (later deadlines first) for buffer reduction
+            let sortedIndices = projectInfos.indices.sorted { i1, i2 in
+                projectInfos[i1].project.deadline! > projectInfos[i2].project.deadline!
+            }
+
+            for idx in sortedIndices {
+                if projectInfos[idx].effectiveBufferDays > 0 {
+                    projectInfos[idx].effectiveBufferDays -= 1
+                    reducedAny = true
+                    break // Reduce one buffer day at a time, then recalculate
+                }
+            }
+
+            if !reducedAny {
+                break // No more buffers to reduce
+            }
+        }
+
+        // Build final allocations
+        var totalAllocatedMinutes: Double = 0
+        var isAnyBufferDay = false
+        var usedBufferDays = false
+        var projectAllocations: [DayLoadResult.ProjectAllocation] = []
+
+        for info in projectInfos {
+            if info.effectiveBufferDays < info.optimalBufferDays {
+                usedBufferDays = true
+            }
+
+            let workDays = max(1, info.totalDays - info.effectiveBufferDays)
+            let isBufferDay = dayIndex >= workDays
+
+            if isBufferDay {
+                isAnyBufferDay = true
+                projectAllocations.append(DayLoadResult.ProjectAllocation(
+                    project: info.project,
+                    allocatedMinutes: 0,
+                    isBufferDay: true,
+                    workDayIndex: nil,
+                    totalWorkDays: workDays,
+                    bufferDays: info.optimalBufferDays,
+                    effectiveBufferDays: info.effectiveBufferDays,
+                    isOverloaded: false
+                ))
+                continue
+            }
+
+            // Calculate allocation
+            var totalAvailable: Double = 0
+            for offset in 0..<workDays {
+                guard let workDate = calendar.date(byAdding: .day, value: offset, to: today) else { continue }
+                let dayStones = calculateStoneMinutes(for: workDate, stones: stones)
+                totalAvailable += Double(max(0, dailyCapacityMinutes - dayStones))
+            }
+
+            let allocation: Double
+            if totalAvailable > 0 {
+                allocation = info.remainingMinutes * (Double(availableMinutes) / totalAvailable)
+            } else {
+                allocation = info.remainingMinutes / Double(workDays)
+            }
+
+            // Check if project is truly overloaded (can't fit even with 0 buffer)
+            let maxCapacity: Double = {
+                var total: Double = 0
+                for offset in 0..<info.totalDays {
+                    guard let workDate = calendar.date(byAdding: .day, value: offset, to: today) else { continue }
+                    let dayStones = calculateStoneMinutes(for: workDate, stones: stones)
+                    total += Double(max(0, dailyCapacityMinutes - dayStones))
+                }
+                return total
+            }()
+            let isOverloaded = info.remainingMinutes > maxCapacity
+
+            totalAllocatedMinutes += allocation
+            projectAllocations.append(DayLoadResult.ProjectAllocation(
+                project: info.project,
+                allocatedMinutes: allocation,
+                isBufferDay: false,
+                workDayIndex: dayIndex,
+                totalWorkDays: workDays,
+                bufferDays: info.optimalBufferDays,
+                effectiveBufferDays: info.effectiveBufferDays,
+                isOverloaded: isOverloaded
+            ))
+        }
+
+        // Return load as percentage of available capacity
+        let load: Double
+        if availableMinutes > 0 {
+            load = totalAllocatedMinutes / Double(availableMinutes)
+        } else {
+            load = totalAllocatedMinutes > 0 ? 2.0 : 0
+        }
+
+        return DayLoadResult(
+            load: load,
+            isBufferDay: isAnyBufferDay && totalAllocatedMinutes == 0,
+            allocatedMinutes: totalAllocatedMinutes,
+            availableMinutes: availableMinutes,
+            projectAllocations: projectAllocations,
+            usedBufferDays: usedBufferDays
+        )
     }
 
     // MARK: - Simplified Methods (for CalendarView)
