@@ -230,7 +230,7 @@ struct TimelineItemContainer: View {
                 .padding(.trailing, 16)
                 .padding(.vertical, isTransitionItem ? 4 : 12)
             }
-            .background(Color(.systemBackground))
+            .background(Color(uiColor: UIColor(red: 0.12, green: 0.14, blue: 0.15, alpha: 1.0)))
             .offset(x: swipeOffset)
             .highPriorityGesture(swipeGesture)
             .simultaneousGesture(longPressGesture)
