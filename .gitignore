@@ -47,3 +47,7 @@ iOSInjectionProject/
 *.env
 *.env.local
 credentials.json
+
+# Claude Code
+.claude/settings.local.json
+.claude/hooks/.approved_prs
