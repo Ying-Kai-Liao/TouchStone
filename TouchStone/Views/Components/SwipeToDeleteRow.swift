@@ -16,14 +16,12 @@ struct SwipeToDeleteRow<Content: View>: View {
 
     private var totalOffset: CGFloat {
         if isDeleting {
-            return -500 // Slide far off screen
+            return -500
         }
         let raw = currentOffset + dragOffset
-        // Rubber band effect when swiping right from closed state
         if raw > 0 {
             return raw * 0.3
         }
-        // Rubber band effect when over-swiping left
         if raw < -deleteButtonWidth - 20 {
             let overshoot = raw + deleteButtonWidth + 20
             return -deleteButtonWidth - 20 + overshoot * 0.3
@@ -36,70 +34,69 @@ struct SwipeToDeleteRow<Content: View>: View {
     }
 
     var body: some View {
-        ZStack(alignment: .trailing) {
-            // Delete button - always present but clipped
-            HStack(spacing: 0) {
-                Spacer()
-                Button(action: {
-                    // Animate row sliding out
-                    withAnimation(.easeIn(duration: 0.25)) {
-                        isDeleting = true
+        GeometryReader { geometry in
+            ZStack(alignment: .trailing) {
+                // Delete button - fixed position, revealed by content sliding
+                HStack {
+                    Spacer()
+                    Button(action: performDelete) {
+                        Image(systemName: "trash.fill")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                            .frame(width: deleteButtonWidth, height: geometry.size.height)
                     }
-                    // Call onDelete after animation
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        onDelete()
-                    }
-                }) {
-                    Image(systemName: "trash.fill")
-                        .font(.title3)
-                        .foregroundStyle(.white)
-                        .frame(width: deleteButtonWidth, height: .infinity)
+                    .frame(width: deleteButtonWidth)
+                    .background(Color.red)
                 }
-                .frame(width: isDeleting ? 500 : max(0, -totalOffset), height: 70)
-                .background(Color.red)
-                .clipShape(RoundedRectangle(cornerRadius: isDeleting ? 0 : 12))
+
+                // Content slides to reveal delete button
+                content()
+                    .frame(width: geometry.size.width)
+                    .background(Color(.systemBackground))
+                    .offset(x: totalOffset)
             }
-
-            // Content
-            content()
-                .offset(x: totalOffset)
-                .opacity(isDeleting ? 0 : 1)
-                .gesture(
-                    DragGesture(minimumDistance: 10)
-                        .updating($dragOffset) { value, state, _ in
-                            if !isDeleting {
-                                state = value.translation.width
-                            }
-                        }
-                        .onEnded { value in
-                            if isDeleting { return }
-                            let velocity = value.predictedEndTranslation.width - value.translation.width
-                            let projected = currentOffset + value.translation.width + velocity * 0.5
-
-                            withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
-                                if projected < -deleteButtonWidth / 2 {
-                                    // Snap open
-                                    currentOffset = -deleteButtonWidth
-                                } else {
-                                    // Snap closed
-                                    currentOffset = 0
-                                }
-                            }
-                        }
-                )
-                .simultaneousGesture(
-                    TapGesture()
-                        .onEnded {
-                            if isOpen && !isDeleting {
-                                withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
-                                    currentOffset = 0
-                                }
-                            }
-                        }
-                )
         }
         .frame(height: isDeleting ? 0 : nil)
         .clipped()
-        .animation(.easeIn(duration: 0.25), value: isDeleting)
+        .opacity(isDeleting ? 0 : 1)
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 8)
+                .updating($dragOffset) { value, state, _ in
+                    if !isDeleting {
+                        state = value.translation.width
+                    }
+                }
+                .onEnded { value in
+                    if isDeleting { return }
+                    let velocity = value.predictedEndTranslation.width - value.translation.width
+                    let projected = currentOffset + value.translation.width + velocity * 0.3
+
+                    withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                        if projected < -deleteButtonWidth / 2 {
+                            currentOffset = -deleteButtonWidth
+                        } else {
+                            currentOffset = 0
+                        }
+                    }
+                }
+        )
+        .onTapGesture {
+            if isOpen && !isDeleting {
+                withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                    currentOffset = 0
+                }
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: isDeleting)
+    }
+
+    private func performDelete() {
+        withAnimation(.easeOut(duration: 0.2)) {
+            isDeleting = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            onDelete()
+        }
     }
 }
