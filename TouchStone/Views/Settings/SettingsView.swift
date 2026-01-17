@@ -1,13 +1,6 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var apiKey = ""
-    @State private var showAPIKey = false
-    @State private var showSaveConfirmation = false
-    @State private var showDeleteConfirmation = false
-    @State private var dragOffset: CGFloat = 0
-
     @Bindable private var prefs = UserPreferences.shared
 
     private var hasExistingKey: Bool {
@@ -15,20 +8,19 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    // MARK: - Header
-                    HStack(spacing: 12) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(.primary)
-                        Text("Settings")
-                            .font(.system(size: 32, weight: .bold))
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    .padding(.bottom, 24)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                // MARK: - Header
+                HStack(spacing: 12) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.primary)
+                    Text("Settings")
+                        .font(.system(size: 32, weight: .bold))
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
 
                     // MARK: - Schedule Section
                     SettingsSectionHeader(title: "Schedule")
@@ -134,52 +126,11 @@ struct SettingsView: View {
                         SettingsRow(icon: "doc.text", title: "Terms of Service", isLink: true)
                     }
 
-                    Spacer(minLength: 40)
-                }
-            }
-            .background(Color(.systemBackground))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .frame(width: 36, height: 36)
-                            .background(Color(.systemGray6))
-                            .clipShape(Circle())
-                    }
-                }
+                Spacer(minLength: 40)
             }
         }
-        .offset(x: dragOffset)
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    if value.translation.width > 0 {
-                        dragOffset = value.translation.width
-                    }
-                }
-                .onEnded { value in
-                    let threshold: CGFloat = 100
-                    let velocity = value.predictedEndTranslation.width - value.translation.width
-
-                    if value.translation.width > threshold || velocity > 500 {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            dragOffset = UIScreen.main.bounds.width
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            dismiss()
-                        }
-                    } else {
-                        withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
-                            dragOffset = 0
-                        }
-                    }
-                }
-        )
+        .background(Color(.systemBackground))
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func formatHour(_ hour: Int) -> String {

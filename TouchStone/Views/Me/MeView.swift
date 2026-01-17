@@ -6,8 +6,6 @@ struct MeView: View {
     @Query private var allProjects: [Project]
     @Query private var allTouchLogs: [TouchLog]
 
-    @State private var showSettings = false
-
     private let prefs = UserPreferences.shared
     private let calendar = Calendar.current
 
@@ -85,17 +83,12 @@ struct MeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showSettings = true
-                    } label: {
+                    NavigationLink(destination: SettingsView()) {
                         Image(systemName: "gearshape")
                             .font(.body)
                             .foregroundStyle(.secondary)
                     }
                 }
-            }
-            .sheet(isPresented: $showSettings) {
-                SettingsView()
             }
         }
     }
