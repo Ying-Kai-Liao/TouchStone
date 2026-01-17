@@ -171,6 +171,26 @@ struct SettingsView: View {
                                 .foregroundStyle(.tertiary)
                         }
                     }
+
+                    Link(destination: URL(string: "https://github.com/Ying-Kai-Liao/TouchStone/blob/main/PRIVACY.md")!) {
+                        HStack {
+                            Text("Privacy Policy")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+
+                    Link(destination: URL(string: "https://github.com/Ying-Kai-Liao/TouchStone/blob/main/TERMS.md")!) {
+                        HStack {
+                            Text("Terms of Service")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
                 }
             }
             .navigationTitle("Settings")
