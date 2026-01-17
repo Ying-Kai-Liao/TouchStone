@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var showAPIKey = false
     @State private var showSaveConfirmation = false
     @State private var showDeleteConfirmation = false
+    @State private var dragOffset: CGFloat = 0
 
     @Bindable private var prefs = UserPreferences.shared
 
@@ -193,6 +194,32 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) { }
             }
         }
+        .offset(x: dragOffset)
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    if value.translation.width > 0 {
+                        dragOffset = value.translation.width
+                    }
+                }
+                .onEnded { value in
+                    let threshold: CGFloat = 100
+                    let velocity = value.predictedEndTranslation.width - value.translation.width
+
+                    if value.translation.width > threshold || velocity > 500 {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            dragOffset = UIScreen.main.bounds.width
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            dismiss()
+                        }
+                    } else {
+                        withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                            dragOffset = 0
+                        }
+                    }
+                }
+        )
     }
 
     // MARK: - Helpers
