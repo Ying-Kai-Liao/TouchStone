@@ -23,28 +23,27 @@ struct CalendarView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 12) {
-                    monthNavigationHeader
-                    weekdayHeader
-                    calendarGrid
-                }
-                .padding(.vertical, 8)
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        withAnimation(.spring(response: 0.3)) {
-                            selectedMonth = Date()
+            ZStack {
+                DesignSystem.Colors.background
+                    .ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    // Custom header
+                    headerView
+                        .padding(.horizontal, DesignSystem.Spacing.xl)
+                        .padding(.top, DesignSystem.Spacing.sm)
+
+                    ScrollView {
+                        VStack(spacing: DesignSystem.Spacing.md) {
+                            monthNavigationHeader
+                            weekdayHeader
+                            calendarGrid
                         }
-                    } label: {
-                        Text("Today")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
+                        .padding(.vertical, DesignSystem.Spacing.sm)
                     }
                 }
             }
+            .navigationBarHidden(true)
             .sheet(item: $selectedDay) { day in
                 DayDetailView(
                     date: day.date,
@@ -66,23 +65,56 @@ struct CalendarView: View {
         }
     }
 
+    // MARK: - Header View
+
+    private var headerView: some View {
+        HStack(alignment: .center) {
+            Text("Calendar")
+                .font(.system(size: 24, weight: .light))
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+            Spacer()
+
+            Button {
+                withAnimation(.spring(response: 0.3)) {
+                    selectedMonth = Date()
+                }
+            } label: {
+                Text("Today")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(DesignSystem.Colors.accent)
+                    .padding(.horizontal, DesignSystem.Spacing.md)
+                    .padding(.vertical, DesignSystem.Spacing.sm)
+                    .background(
+                        Capsule()
+                            .fill(DesignSystem.Colors.accent.opacity(0.15))
+                    )
+            }
+        }
+    }
+
     private var monthNavigationHeader: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignSystem.Spacing.md) {
             Button {
                 withAnimation(.spring(response: 0.3)) {
                     selectedMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
                 }
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        Circle()
+                            .fill(DesignSystem.Colors.cardBackground)
+                    )
             }
 
             Spacer()
 
             Text(monthYearFormatter.string(from: selectedMonth))
-                .font(.headline)
-                .foregroundStyle(.primary)
+                .font(DesignSystem.Typography.headline)
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
 
             Spacer()
 
@@ -92,32 +124,37 @@ struct CalendarView: View {
                 }
             } label: {
                 Image(systemName: "chevron.right")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        Circle()
+                            .fill(DesignSystem.Colors.cardBackground)
+                    )
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DesignSystem.Spacing.xl)
+        .padding(.vertical, DesignSystem.Spacing.sm)
     }
 
     private var weekdayHeader: some View {
         HStack(spacing: 0) {
             ForEach(daysOfWeek, id: \.self) { day in
                 Text(day)
-                    .font(.caption)
+                    .font(DesignSystem.Typography.caption)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                     .frame(maxWidth: .infinity)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 8)
+        .padding(.horizontal, DesignSystem.Spacing.xl)
+        .padding(.bottom, DesignSystem.Spacing.sm)
     }
 
     private var calendarGrid: some View {
         let days = generateCalendarDays()
 
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 7), spacing: 12) {
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DesignSystem.Spacing.sm), count: 7), spacing: DesignSystem.Spacing.md) {
             ForEach(days) { dayData in
                 DayCell(
                     dayData: dayData,
@@ -136,8 +173,8 @@ struct CalendarView: View {
                 )
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+        .padding(.horizontal, DesignSystem.Spacing.xl)
+        .padding(.bottom, DesignSystem.Spacing.xl)
     }
 
     private func generateCalendarDays() -> [DayData] {
@@ -219,7 +256,6 @@ struct DayCell: View {
     let onTap: () -> Void
 
     private let calendar = Calendar.current
-    private let accentColor = UserPreferences.shared.accentColor
 
     var body: some View {
         Button(action: onTap) {
@@ -227,18 +263,18 @@ struct DayCell: View {
                 if let day = dayData.day {
                     Spacer()
 
-                    // Day number - smaller
+                    // Day number
                     Text("\(day)")
                         .font(.system(size: 14, weight: isToday ? .bold : .medium))
-                        .foregroundColor(dayData.isCurrentMonth ? .primary : Color.secondary.opacity(0.3))
+                        .foregroundColor(dayData.isCurrentMonth ? DesignSystem.Colors.textPrimary : DesignSystem.Colors.textTertiary.opacity(0.3))
                         .frame(width: 26, height: 26)
                         .background(
                             Circle()
-                                .fill(isToday ? Color(.systemGray5) : Color.clear)
+                                .fill(isToday ? DesignSystem.Colors.accent.opacity(0.2) : Color.clear)
                         )
                         .overlay(
                             Circle()
-                                .strokeBorder(isToday ? Color(.systemGray3) : Color.clear, lineWidth: 1.5)
+                                .strokeBorder(isToday ? DesignSystem.Colors.accent : Color.clear, lineWidth: 1.5)
                         )
 
                     Spacer()
@@ -248,7 +284,7 @@ struct DayCell: View {
                         if !stones.isEmpty {
                             ForEach(stones.prefix(3)) { _ in
                                 Circle()
-                                    .fill(Color(.systemGray3))
+                                    .fill(DesignSystem.Colors.textTertiary)
                                     .frame(width: 4, height: 4)
                             }
                         }
@@ -259,7 +295,7 @@ struct DayCell: View {
                     if hasDeadline {
                         Text("DUE")
                             .font(.system(size: 7, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(DesignSystem.Colors.background)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 2)
                             .background(
@@ -281,7 +317,7 @@ struct DayCell: View {
             .frame(maxWidth: .infinity)
             .frame(height: 60)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .fill(cellBackgroundColor)
             )
         }
@@ -291,11 +327,11 @@ struct DayCell: View {
     /// Color based on load - accent color gradient
     private var loadColor: Color {
         if dayLoad > 1.0 {
-            return .red  // Overloaded
+            return DesignSystem.Colors.error  // Overloaded
         } else if dayLoad > 0.8 {
-            return .orange  // Nearly full
+            return DesignSystem.Colors.warning  // Nearly full
         } else {
-            return accentColor
+            return DesignSystem.Colors.accent
         }
     }
 
@@ -312,10 +348,10 @@ struct DayCell: View {
         }
 
         if isWeekend {
-            return Color(.systemGray6).opacity(0.4)
+            return DesignSystem.Colors.cardBackground.opacity(0.6)
         }
 
-        return Color(.systemGray6).opacity(0.25)
+        return DesignSystem.Colors.cardBackground.opacity(0.4)
     }
 
     private var isToday: Bool {
