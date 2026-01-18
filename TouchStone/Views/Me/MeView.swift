@@ -37,7 +37,6 @@ struct MeView: View {
         var streak = 0
         var checkDate = calendar.startOfDay(for: Date())
 
-        // Check if there's a touch today, if not start from yesterday
         let todayTouches = allTouchLogs.filter { calendar.startOfDay(for: $0.timestamp) == checkDate }
         if todayTouches.isEmpty {
             guard let yesterday = calendar.date(byAdding: .day, value: -1, to: checkDate) else { return 0 }
@@ -59,54 +58,137 @@ struct MeView: View {
         allProjects.filter { !$0.isActive && $0.totalTouchCount > 0 }.count
     }
 
+    private var weeklyGoal: Int {
+        prefs.dailyProductiveHours * 5
+    }
+
+    private var weeklyProgressValue: Double {
+        guard weeklyGoal > 0 else { return 0 }
+        return min(1.0, Double(thisWeekHours) / Double(weeklyGoal))
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 32) {
-                    // Header with greeting
-                    headerSection
-
-                    // Main stats grid
-                    statsGrid
-
-                    // Weekly overview
-                    weeklyProgress
-
-                    // Quick insights
-                    insightsSection
-
-                    Spacer(minLength: 40)
-                }
-                .padding()
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(destination: SettingsView()) {
-                        Image(systemName: "gearshape")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
+                VStack(spacing: DesignSystem.Spacing.xl) {
+                    // Settings button
+                    HStack {
+                        Spacer()
+                        NavigationLink(destination: SettingsView()) {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 20))
+                                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                                .frame(width: 44, height: 44)
+                                .background(DesignSystem.Colors.cardBackground)
+                                .clipShape(Circle())
+                        }
                     }
+                    .padding(.horizontal, DesignSystem.Spacing.lg)
+
+                    // Greeting
+                    VStack(spacing: DesignSystem.Spacing.sm) {
+                        Text(greetingText)
+                            .font(DesignSystem.Typography.largeTitle)
+                            .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                        Text("Keep touching your work")
+                            .font(DesignSystem.Typography.body)
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    }
+
+                    // Stats Grid
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: DesignSystem.Spacing.md) {
+                        MeStatCard(
+                            value: "\(todayHours)",
+                            unit: "HRS",
+                            label: "TODAY",
+                            icon: "sun.max.fill",
+                            iconColor: DesignSystem.Colors.warning
+                        )
+
+                        MeStatCard(
+                            value: "\(thisWeekHours)",
+                            unit: "HRS",
+                            label: "THIS WEEK",
+                            icon: "calendar",
+                            iconColor: DesignSystem.Colors.focus
+                        )
+
+                        MeStatCard(
+                            value: "\(currentStreak)",
+                            unit: "DAYS",
+                            label: "STREAK",
+                            icon: "flame.fill",
+                            iconColor: .orange
+                        )
+
+                        MeStatCard(
+                            value: "\(activeProjects)",
+                            unit: "ACTIVE",
+                            label: "PROJECTS",
+                            icon: "folder.fill",
+                            iconColor: .purple
+                        )
+                    }
+                    .padding(.horizontal, DesignSystem.Spacing.lg)
+
+                    // Weekly Goal
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+                        HStack {
+                            Text("WEEKLY GOAL")
+                                .sectionHeader()
+                            Spacer()
+                            Text("\(Int(weeklyProgressValue * 100))%")
+                                .font(DesignSystem.Typography.body)
+                                .foregroundStyle(DesignSystem.Colors.accent)
+                        }
+                        .padding(.horizontal, DesignSystem.Spacing.lg)
+
+                        VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+                            Text("\(thisWeekHours) / \(weeklyGoal) hours")
+                                .font(DesignSystem.Typography.headline)
+                                .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                            GeometryReader { geometry in
+                                ZStack(alignment: .leading) {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(DesignSystem.Colors.cardBackgroundLight)
+                                        .frame(height: 8)
+
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(DesignSystem.Colors.accent)
+                                        .frame(width: geometry.size.width * weeklyProgressValue, height: 8)
+                                }
+                            }
+                            .frame(height: 8)
+                        }
+                        .padding(DesignSystem.Spacing.lg)
+                        .cardStyle()
+                        .padding(.horizontal, DesignSystem.Spacing.lg)
+                    }
+
+                    // Journey Section
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+                        Text("JOURNEY")
+                            .sectionHeader()
+                            .padding(.horizontal, DesignSystem.Spacing.lg)
+
+                        VStack(spacing: 0) {
+                            JourneyRow(icon: "clock", title: "Total Time", value: "\(totalHours) hours")
+                            JourneyRow(icon: "checkmark.circle", title: "Completed", value: "\(completedProjects) projects")
+                            JourneyRow(icon: "hand.tap", title: "Total Touches", value: "\(allTouchLogs.count)", showDivider: false)
+                        }
+                        .cardStyle()
+                        .padding(.horizontal, DesignSystem.Spacing.lg)
+                    }
+
+                    Spacer(minLength: 100)
                 }
+                .padding(.top, DesignSystem.Spacing.lg)
             }
+            .background(DesignSystem.Colors.background)
+            .navigationBarHidden(true)
         }
-    }
-
-    // MARK: - Header Section
-
-    private var headerSection: some View {
-        VStack(spacing: 8) {
-            Text(greetingText)
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Text("Keep touching your work")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 20)
     }
 
     private var greetingText: String {
@@ -118,175 +200,81 @@ struct MeView: View {
         default: return "Hello"
         }
     }
-
-    // MARK: - Stats Grid
-
-    private var statsGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-            StatCard(
-                title: "Today",
-                value: "\(todayHours)",
-                unit: "hrs",
-                icon: "sun.max",
-                color: prefs.accentColor
-            )
-
-            StatCard(
-                title: "This Week",
-                value: "\(thisWeekHours)",
-                unit: "hrs",
-                icon: "calendar",
-                color: .blue
-            )
-
-            StatCard(
-                title: "Streak",
-                value: "\(currentStreak)",
-                unit: "days",
-                icon: "flame",
-                color: .orange
-            )
-
-            StatCard(
-                title: "Active",
-                value: "\(activeProjects)",
-                unit: "projects",
-                icon: "folder",
-                color: .purple
-            )
-        }
-    }
-
-    // MARK: - Weekly Progress
-
-    private var weeklyProgress: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("WEEKLY GOAL")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .tracking(1)
-
-            let weeklyGoal = prefs.dailyProductiveHours * 5 // 5 working days
-            let progress = min(1.0, Double(thisWeekHours) / Double(weeklyGoal))
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("\(thisWeekHours) / \(weeklyGoal) hours")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    Spacer()
-                    Text("\(Int(progress * 100))%")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color(.systemGray5))
-                            .frame(height: 8)
-
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(prefs.accentColor)
-                            .frame(width: geometry.size.width * progress, height: 8)
-                    }
-                }
-                .frame(height: 8)
-            }
-            .padding()
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        }
-    }
-
-    // MARK: - Insights Section
-
-    private var insightsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("JOURNEY")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .tracking(1)
-
-            VStack(spacing: 0) {
-                InsightRow(icon: "clock", title: "Total Time", value: "\(totalHours) hours")
-                Divider().padding(.leading, 44)
-                InsightRow(icon: "checkmark.circle", title: "Completed", value: "\(completedProjects) projects")
-                Divider().padding(.leading, 44)
-                InsightRow(icon: "hand.tap", title: "Total Touches", value: "\(allTouchLogs.count)")
-            }
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        }
-    }
 }
 
 // MARK: - Stat Card
 
-private struct StatCard: View {
-    let title: String
+private struct MeStatCard: View {
     let value: String
     let unit: String
+    let label: String
     let icon: String
-    let color: Color
+    let iconColor: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(color)
-                Spacer()
-            }
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(iconColor)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(value)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .font(DesignSystem.Typography.statMedium)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
                     Text(unit)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
 
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(label)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
             }
         }
-        .padding()
+        .padding(DesignSystem.Spacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .cardStyle()
     }
 }
 
-// MARK: - Insight Row
+// MARK: - Journey Row
 
-private struct InsightRow: View {
+private struct JourneyRow: View {
     let icon: String
     let title: String
     let value: String
+    var showDivider: Bool = true
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundStyle(.secondary)
-                .frame(width: 24)
+        VStack(spacing: 0) {
+            HStack(spacing: DesignSystem.Spacing.md) {
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    .frame(width: 32, height: 32)
+                    .background(DesignSystem.Colors.cardBackgroundLight)
+                    .clipShape(Circle())
 
-            Text(title)
-                .font(.subheadline)
+                Text(title)
+                    .font(DesignSystem.Typography.body)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
 
-            Spacer()
+                Spacer()
 
-            Text(value)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                Text(value)
+                    .font(DesignSystem.Typography.body)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+            }
+            .padding(.horizontal, DesignSystem.Spacing.lg)
+            .padding(.vertical, DesignSystem.Spacing.md)
+
+            if showDivider {
+                Divider()
+                    .background(DesignSystem.Colors.cardBackgroundLight)
+                    .padding(.leading, 60)
+            }
         }
-        .padding(.horizontal)
-        .padding(.vertical, 14)
     }
 }
 

@@ -20,30 +20,48 @@ struct ProjectsListView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if projects.isEmpty {
-                    emptyState
-                } else {
-                    projectList
-                }
-            }
-            .navigationTitle("Projects")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingAddSheet = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 36, height: 36)
-                            .background(
-                                Circle()
-                                    .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)
-                            )
+            ScrollView {
+                VStack(spacing: DesignSystem.Spacing.xl) {
+                    // Header
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Projects")
+                                .font(DesignSystem.Typography.title)
+                                .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                            Text("PLAN")
+                                .font(DesignSystem.Typography.captionBold)
+                                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                                .tracking(1.5)
+                        }
+
+                        Spacer()
+
+                        Button {
+                            showingAddSheet = true
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                                .frame(width: 44, height: 44)
+                                .background(DesignSystem.Colors.cardBackground)
+                                .clipShape(Circle())
+                        }
                     }
+                    .padding(.horizontal, DesignSystem.Spacing.lg)
+
+                    if projects.isEmpty {
+                        emptyState
+                    } else {
+                        projectListContent
+                    }
+
+                    Spacer(minLength: 100)
                 }
+                .padding(.top, DesignSystem.Spacing.xl)
             }
+            .background(DesignSystem.Colors.background)
+            .navigationBarHidden(true)
             .sheet(isPresented: $showingAddSheet) {
                 NewProjectChoiceView()
             }
@@ -68,31 +86,23 @@ struct ProjectsListView: View {
         projectToDelete = nil
     }
 
-    private var projectList: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if !activeProjects.isEmpty {
-                    projectSection(title: "ACTIVE", projects: activeProjects)
-                }
-
-                if !archivedProjects.isEmpty {
-                    projectSection(title: "ARCHIVED", projects: archivedProjects)
-                }
+    private var projectListContent: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.xl) {
+            if !activeProjects.isEmpty {
+                projectSection(title: "ACTIVE", projects: activeProjects)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
+
+            if !archivedProjects.isEmpty {
+                projectSection(title: "ARCHIVED", projects: archivedProjects)
+            }
         }
-        .background(Color(.systemBackground))
+        .padding(.horizontal, DesignSystem.Spacing.lg)
     }
 
     private func projectSection(title: String, projects: [Project]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             Text(title)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .tracking(1)
-                .padding(.leading, 4)
+                .sectionHeader()
 
             ForEach(projects) { project in
                 SwipeToDeleteRow(
@@ -157,62 +167,59 @@ struct ProjectCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             // Top row: Title and hours badge
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(project.title)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
+                        .font(DesignSystem.Typography.headline)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
 
                     if let phase = phaseName {
                         Text(phase)
-                            .font(.subheadline)
-                            .foregroundStyle(Color.white.opacity(0.6))
+                            .font(DesignSystem.Typography.body)
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
                     }
                 }
 
                 Spacer()
 
-                HStack(spacing: 4) {
-                    if hoursToday > 0 {
-                        Text("\(hoursToday) hr\(hoursToday == 1 ? "" : "s") today")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundStyle(UserPreferences.shared.accentColor)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                Capsule()
-                                    .strokeBorder(UserPreferences.shared.accentColor.opacity(0.4), lineWidth: 1)
-                            )
-                    }
+                if hoursToday > 0 {
+                    Text("\(hoursToday) hr\(hoursToday == 1 ? "" : "s") today")
+                        .font(DesignSystem.Typography.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(DesignSystem.Colors.accent)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .strokeBorder(DesignSystem.Colors.accent.opacity(0.4), lineWidth: 1)
+                        )
                 }
             }
 
             Spacer()
 
             // Bottom row: Progress bar and hours
-            HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: DesignSystem.Spacing.md) {
                 // Progress bar
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         // Background track
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.white.opacity(0.15))
+                            .fill(DesignSystem.Colors.cardBackgroundLight)
                             .frame(height: 8)
 
                         // Progress fill
                         if project.totalPlannedMinutes > 0 {
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(UserPreferences.shared.accentColor)
+                                .fill(DesignSystem.Colors.accent)
                                 .frame(width: geometry.size.width * project.progress, height: 8)
                         } else if completedHoursValue > 0 {
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(UserPreferences.shared.accentColor)
+                                .fill(DesignSystem.Colors.accent)
                                 .frame(width: 20, height: 8)
                         }
                     }
@@ -223,30 +230,23 @@ struct ProjectCard: View {
                 HStack(spacing: 8) {
                     if project.totalPlannedMinutes > 0 {
                         Text("\(completedHoursValue) / \(totalHours)h")
-                            .font(.caption)
-                            .foregroundStyle(Color.white.opacity(0.5))
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
                     } else if completedHoursValue > 0 {
                         Text("\(completedHoursValue)h")
-                            .font(.caption)
-                            .foregroundStyle(Color.white.opacity(0.5))
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
                     }
 
                     Image(systemName: "chevron.right")
                         .font(.caption)
-                        .foregroundStyle(Color.white.opacity(0.3))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                 }
             }
         }
-        .padding(16)
+        .padding(DesignSystem.Spacing.lg)
         .frame(minHeight: 120)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(red: 0.1, green: 0.18, blue: 0.15))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(Color(red: 0.2, green: 0.35, blue: 0.28), lineWidth: 1)
-                )
-        )
+        .cardStyle()
         .contentShape(Rectangle())
         .onTapGesture {
             onTap()
