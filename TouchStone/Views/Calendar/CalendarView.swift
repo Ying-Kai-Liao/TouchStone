@@ -38,6 +38,7 @@ struct CalendarView: View {
                             monthNavigationHeader
                             weekdayHeader
                             calendarGrid
+                            energyGradientLegend
                         }
                         .padding(.vertical, DesignSystem.Spacing.sm)
                     }
@@ -174,7 +175,66 @@ struct CalendarView: View {
             }
         }
         .padding(.horizontal, DesignSystem.Spacing.xl)
-        .padding(.bottom, DesignSystem.Spacing.xl)
+        .padding(.bottom, DesignSystem.Spacing.lg)
+    }
+
+    // MARK: - Energy Gradient Legend
+
+    private var energyGradientLegend: some View {
+        VStack(spacing: DesignSystem.Spacing.md) {
+            Text("ENERGY GRADIENT")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .tracking(1.5)
+
+            HStack(spacing: DesignSystem.Spacing.sm) {
+                ForEach(EnergyLevel.allCases, id: \.self) { level in
+                    VStack(spacing: DesignSystem.Spacing.sm) {
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                            .fill(level.color)
+                            .frame(height: 44)
+
+                        Text(level.label)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                            .tracking(0.5)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .padding(.horizontal, DesignSystem.Spacing.xl)
+        .padding(.top, DesignSystem.Spacing.lg)
+        .padding(.bottom, DesignSystem.Spacing.xxl)
+    }
+
+    private enum EnergyLevel: CaseIterable {
+        case still, ease, flow, power, peak
+
+        var label: String {
+            switch self {
+            case .still: return "STILL"
+            case .ease: return "EASE"
+            case .flow: return "FLOW"
+            case .power: return "POWER"
+            case .peak: return "PEAK"
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .still:
+                return DesignSystem.Colors.cardBackground
+            case .ease:
+                return DesignSystem.Colors.accent.opacity(0.3)
+            case .flow:
+                return DesignSystem.Colors.accent.opacity(0.5)
+            case .power:
+                return DesignSystem.Colors.accent.opacity(0.7)
+            case .peak:
+                return DesignSystem.Colors.accent
+            }
+        }
     }
 
     private func generateCalendarDays() -> [DayData] {
