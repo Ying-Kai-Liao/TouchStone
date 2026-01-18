@@ -24,25 +24,27 @@ struct CalendarView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: DesignSystem.Spacing.xl) {
-                    // Month Header
+                VStack(spacing: 12) {
                     monthNavigationHeader
-
-                    // Calendar Grid
-                    VStack(spacing: DesignSystem.Spacing.md) {
-                        weekdayHeader
-                        calendarGrid
-                    }
-
-                    // Energy Legend
-                    energyLegend
-
-                    Spacer(minLength: 100)
+                    weekdayHeader
+                    calendarGrid
                 }
-                .padding(.top, DesignSystem.Spacing.xl)
+                .padding(.vertical, 8)
             }
-            .background(DesignSystem.Colors.background)
-            .navigationBarHidden(true)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            selectedMonth = Date()
+                        }
+                    } label: {
+                        Text("Today")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
+                }
+            }
             .sheet(item: $selectedDay) { day in
                 DayDetailView(
                     date: day.date,
@@ -50,6 +52,7 @@ struct CalendarView: View {
                     onAddStone: {
                         let dateToUse = day.date
                         selectedDay = nil
+                        // Small delay to allow first sheet to dismiss
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             addStoneDate = dateToUse
                             showingAddStone = true
@@ -64,98 +67,57 @@ struct CalendarView: View {
     }
 
     private var monthNavigationHeader: some View {
-        HStack {
+        HStack(spacing: 12) {
             Button {
-                withAnimation {
+                withAnimation(.spring(response: 0.3)) {
                     selectedMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
                 }
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(DesignSystem.Colors.textSecondary)
-                    .frame(width: 44, height: 44)
-                    .background(DesignSystem.Colors.cardBackground)
-                    .clipShape(Circle())
+                    .font(.body)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            VStack(spacing: 4) {
-                Text(monthYearFormatter.string(from: selectedMonth))
-                    .font(DesignSystem.Typography.title)
-                    .foregroundStyle(DesignSystem.Colors.textPrimary)
-
-                Text("THE HORIZON")
-                    .font(DesignSystem.Typography.captionBold)
-                    .foregroundStyle(DesignSystem.Colors.textTertiary)
-                    .tracking(1.5)
-            }
+            Text(monthYearFormatter.string(from: selectedMonth))
+                .font(.headline)
+                .foregroundStyle(.primary)
 
             Spacer()
 
             Button {
-                withAnimation {
+                withAnimation(.spring(response: 0.3)) {
                     selectedMonth = calendar.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
                 }
             } label: {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(DesignSystem.Colors.textSecondary)
-                    .frame(width: 44, height: 44)
-                    .background(DesignSystem.Colors.cardBackground)
-                    .clipShape(Circle())
+                    .font(.body)
+                    .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, DesignSystem.Spacing.lg)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
     }
 
     private var weekdayHeader: some View {
         HStack(spacing: 0) {
             ForEach(daysOfWeek, id: \.self) { day in
                 Text(day)
-                    .font(DesignSystem.Typography.caption)
-                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity)
             }
         }
-    }
-
-    private var energyLegend: some View {
-        VStack(spacing: DesignSystem.Spacing.md) {
-            Text("ENERGY GRADIENT")
-                .sectionHeader()
-
-            HStack(spacing: DesignSystem.Spacing.md) {
-                ForEach(Array(zip(0..<5, ["STILL", "EASE", "FLOW", "POWER", "PEAK"])), id: \.0) { level, label in
-                    VStack(spacing: DesignSystem.Spacing.sm) {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(colorForEnergyLevel(level))
-                            .frame(width: 50, height: 40)
-
-                        Text(label)
-                            .font(DesignSystem.Typography.caption)
-                            .foregroundStyle(DesignSystem.Colors.textTertiary)
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, DesignSystem.Spacing.lg)
-    }
-
-    private func colorForEnergyLevel(_ level: Int) -> Color {
-        switch level {
-        case 0: return DesignSystem.Colors.energyStill
-        case 1: return DesignSystem.Colors.energyEase
-        case 2: return DesignSystem.Colors.energyFlow
-        case 3: return DesignSystem.Colors.energyPower
-        default: return DesignSystem.Colors.energyPeak
-        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
     }
 
     private var calendarGrid: some View {
         let days = generateCalendarDays()
 
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 7), spacing: 8) {
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 7), spacing: 12) {
             ForEach(days) { dayData in
                 DayCell(
                     dayData: dayData,
@@ -174,7 +136,8 @@ struct CalendarView: View {
                 )
             }
         }
-        .padding(.horizontal, DesignSystem.Spacing.lg)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
     }
 
     private func generateCalendarDays() -> [DayData] {
@@ -256,78 +219,113 @@ struct DayCell: View {
     let onTap: () -> Void
 
     private let calendar = Calendar.current
+    private let accentColor = UserPreferences.shared.accentColor
 
     var body: some View {
         Button(action: onTap) {
-            ZStack {
-                // Background circle with energy color
-                Circle()
-                    .fill(cellBackgroundColor)
-                    .frame(width: 40, height: 40)
-
-                // Day number
+            VStack(spacing: 2) {
                 if let day = dayData.day {
+                    Spacer()
+
+                    // Day number - smaller
                     Text("\(day)")
-                        .font(DesignSystem.Typography.body)
-                        .foregroundStyle(isToday ? DesignSystem.Colors.background : DesignSystem.Colors.textPrimary)
-                }
-
-                // Deadline indicator
-                if hasDeadline {
-                    Circle()
-                        .fill(DesignSystem.Colors.warning)
-                        .frame(width: 6, height: 6)
-                        .offset(y: 12)
-                }
-
-                // Stone indicator dots
-                if !stones.isEmpty {
-                    HStack(spacing: 2) {
-                        ForEach(stones.prefix(3)) { _ in
+                        .font(.system(size: 14, weight: isToday ? .bold : .medium))
+                        .foregroundColor(dayData.isCurrentMonth ? .primary : Color.secondary.opacity(0.3))
+                        .frame(width: 26, height: 26)
+                        .background(
                             Circle()
-                                .fill(DesignSystem.Colors.focus)
-                                .frame(width: 4, height: 4)
+                                .fill(isToday ? Color(.systemGray5) : Color.clear)
+                        )
+                        .overlay(
+                            Circle()
+                                .strokeBorder(isToday ? Color(.systemGray3) : Color.clear, lineWidth: 1.5)
+                        )
+
+                    Spacer()
+
+                    // Event indicators (stone dots)
+                    HStack(spacing: 3) {
+                        if !stones.isEmpty {
+                            ForEach(stones.prefix(3)) { _ in
+                                Circle()
+                                    .fill(Color(.systemGray3))
+                                    .frame(width: 4, height: 4)
+                            }
                         }
                     }
-                    .offset(y: -14)
+                    .frame(height: 6)
+
+                    // DUE tag for deadline days
+                    if hasDeadline {
+                        Text("DUE")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(loadColor)
+                            )
+                    } else {
+                        Color.clear
+                            .frame(height: 14)
+                    }
+
+                    Spacer()
+                        .frame(height: 4)
+                } else {
+                    Color.clear
+                        .frame(height: 60)
                 }
             }
-            .frame(width: 40, height: 40)
+            .frame(maxWidth: .infinity)
+            .frame(height: 60)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(cellBackgroundColor)
+            )
         }
         .buttonStyle(.plain)
-        .disabled(dayData.day == nil)
     }
 
-    /// Energy level based on load (0-4)
-    private var energyLevel: Int {
-        if dayLoad <= 0 { return 0 }
-        if dayLoad < 0.25 { return 1 }
-        if dayLoad < 0.5 { return 2 }
-        if dayLoad < 0.75 { return 3 }
-        return 4
+    /// Color based on load - accent color gradient
+    private var loadColor: Color {
+        if dayLoad > 1.0 {
+            return .red  // Overloaded
+        } else if dayLoad > 0.8 {
+            return .orange  // Nearly full
+        } else {
+            return accentColor
+        }
     }
 
     private var cellBackgroundColor: Color {
-        guard dayData.isCurrentMonth, dayData.day != nil else {
+        if !dayData.isCurrentMonth {
             return Color.clear
         }
 
-        if isToday {
-            return DesignSystem.Colors.accent
+        // Show load-based color if there's any work allocated
+        if dayLoad > 0 {
+            // Opacity scales with load: 0.1 at 0% to 0.35 at 100%+
+            let opacity = min(0.35, 0.1 + (dayLoad * 0.25))
+            return loadColor.opacity(opacity)
         }
 
-        switch energyLevel {
-        case 0: return DesignSystem.Colors.energyStill
-        case 1: return DesignSystem.Colors.energyEase
-        case 2: return DesignSystem.Colors.energyFlow
-        case 3: return DesignSystem.Colors.energyPower
-        default: return DesignSystem.Colors.energyPeak
+        if isWeekend {
+            return Color(.systemGray6).opacity(0.4)
         }
+
+        return Color(.systemGray6).opacity(0.25)
     }
 
     private var isToday: Bool {
         guard dayData.isCurrentMonth else { return false }
         return calendar.isDateInToday(dayData.date)
+    }
+
+    private var isWeekend: Bool {
+        let weekday = calendar.component(.weekday, from: dayData.date)
+        return weekday == 1 || weekday == 7  // Sunday or Saturday
     }
 }
 

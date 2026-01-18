@@ -85,18 +85,18 @@ struct TodayFlowView: View {
         NavigationStack {
             ZStack {
                 // Background
-                DesignSystem.Colors.background
+                Color(uiColor: UIColor(red: 0.12, green: 0.14, blue: 0.15, alpha: 1.0))
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     // Header
                     headerView
-                        .padding(.horizontal, DesignSystem.Spacing.lg)
-                        .padding(.top, DesignSystem.Spacing.sm)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
 
                     // Date tabs
                     dateTabsView
-                        .padding(.top, DesignSystem.Spacing.lg)
+                        .padding(.top, 16)
 
                     // Main content
                     scrollContent
@@ -188,15 +188,16 @@ struct TodayFlowView: View {
 
     private var headerView: some View {
         HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Today's Flow")
-                    .font(DesignSystem.Typography.title)
-                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
 
                 Text(headerDateString)
-                    .font(DesignSystem.Typography.captionBold)
-                    .foregroundStyle(DesignSystem.Colors.textTertiary)
-                    .tracking(1.5)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .textCase(.uppercase)
             }
 
             Spacer()
@@ -209,14 +210,15 @@ struct TodayFlowView: View {
                     Image(systemName: "leaf.fill")
                         .font(.caption)
                     Text("Zen Mode")
-                        .font(DesignSystem.Typography.captionBold)
+                        .font(.caption)
+                        .fontWeight(.medium)
                 }
-                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                .foregroundStyle(.white.opacity(0.8))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(
                     Capsule()
-                        .fill(DesignSystem.Colors.cardBackground)
+                        .fill(Color.white.opacity(0.15))
                 )
             }
         }
@@ -285,22 +287,22 @@ struct TodayFlowView: View {
         if showUndoToast, let touch = lastTouch {
             HStack {
                 Text("Logged touch for \(touch.projectTitle)")
-                    .font(DesignSystem.Typography.body)
-                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
                 Spacer()
                 Button("Undo") {
                     undoTouch()
                 }
                 .fontWeight(.semibold)
-                .foregroundStyle(DesignSystem.Colors.accent)
+                .foregroundStyle(UserPreferences.shared.accentColor)
             }
-            .padding(DesignSystem.Spacing.lg)
+            .padding()
             .background(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
-                    .fill(DesignSystem.Colors.cardBackground)
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemGray6).opacity(0.9))
             )
             .shadow(radius: 4)
-            .padding(DesignSystem.Spacing.lg)
+            .padding()
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
@@ -511,17 +513,17 @@ struct DateTabButton: View {
     var body: some View {
         Button(action: action) {
             Text(buttonLabel)
-                .font(DesignSystem.Typography.body)
+                .font(.subheadline)
                 .fontWeight(isSelected ? .semibold : .regular)
-                .foregroundStyle(isSelected ? DesignSystem.Colors.accent : DesignSystem.Colors.textSecondary)
+                .foregroundStyle(isSelected ? UserPreferences.shared.accentColor : .white.opacity(0.6))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .background(
                     Capsule()
-                        .fill(isSelected ? DesignSystem.Colors.accent.opacity(0.2) : Color.clear)
+                        .fill(isSelected ? UserPreferences.shared.accentColor.opacity(0.2) : Color.clear)
                         .overlay(
                             Capsule()
-                                .strokeBorder(isSelected ? DesignSystem.Colors.accent.opacity(0.5) : Color.clear, lineWidth: 1)
+                                .strokeBorder(isSelected ? UserPreferences.shared.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
                         )
                 )
         }
