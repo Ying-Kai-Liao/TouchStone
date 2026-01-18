@@ -9,19 +9,19 @@ enum DesignSystem {
 
     enum Colors {
         // Background colors
-        static let background = Color(red: 0.10, green: 0.14, blue: 0.12)
-        static let backgroundLight = Color(red: 0.12, green: 0.16, blue: 0.14)
-        static let cardBackground = Color(red: 0.14, green: 0.18, blue: 0.16)
-        static let cardBackgroundLight = Color(red: 0.16, green: 0.20, blue: 0.18)
+        static let background = Color(red: 0.04, green: 0.07, blue: 0.05)
+        static let backgroundLight = Color(red: 0.06, green: 0.09, blue: 0.07)
+        static let cardBackground = Color(red: 0.10, green: 0.14, blue: 0.12)
+        static let cardBackgroundLight = Color(red: 0.12, green: 0.16, blue: 0.14)
 
         // Accent colors
         static let accent = Color(red: 0.65, green: 0.78, blue: 0.65)  // Sage green
         static let accentMuted = Color(red: 0.55, green: 0.68, blue: 0.55)
 
         // Text colors
-        static let textPrimary = Color.white.opacity(0.9)
-        static let textSecondary = Color.white.opacity(0.6)
-        static let textTertiary = Color.white.opacity(0.4)
+        static let textPrimary = Color.white.opacity(0.95)
+        static let textSecondary = Color.white.opacity(0.65)
+        static let textTertiary = Color.white.opacity(0.45)
 
         // Status colors
         static let success = Color(red: 0.55, green: 0.75, blue: 0.55)
@@ -73,9 +73,10 @@ enum DesignSystem {
 
     enum CornerRadius {
         static let small: CGFloat = 8
-        static let medium: CGFloat = 12
-        static let large: CGFloat = 16
+        static let medium: CGFloat = 16
+        static let large: CGFloat = 20
         static let extraLarge: CGFloat = 24
+        static let card: CGFloat = 34  // For flow cards - very rounded
         static let circular: CGFloat = 100
     }
 }

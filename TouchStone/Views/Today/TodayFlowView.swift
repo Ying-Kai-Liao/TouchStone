@@ -22,7 +22,6 @@ struct TodayFlowView: View {
 
     @State private var dayState: DayState = DayState()
     @State private var selectedDate = Date()
-    @State private var showZenMode = false
     @State private var focusProject: Project?
     @State private var lastTouch: TouchLog?
     @State private var showUndoToast = false
@@ -190,7 +189,7 @@ struct TodayFlowView: View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Today's Flow")
-                    .font(DesignSystem.Typography.title)
+                    .font(.system(size: 24, weight: .light))
                     .foregroundStyle(DesignSystem.Colors.textPrimary)
 
                 Text(headerDateString)
@@ -200,25 +199,6 @@ struct TodayFlowView: View {
             }
 
             Spacer()
-
-            // Zen Mode button
-            Button {
-                showZenMode = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "leaf.fill")
-                        .font(.caption)
-                    Text("Zen Mode")
-                        .font(DesignSystem.Typography.captionBold)
-                }
-                .foregroundStyle(DesignSystem.Colors.textSecondary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(DesignSystem.Colors.cardBackground)
-                )
-            }
         }
     }
 

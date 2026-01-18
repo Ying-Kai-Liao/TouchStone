@@ -77,8 +77,8 @@ struct WorkflowItem: Identifiable {
 
     var timeRangeString: String {
         let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return "\(formatter.string(from: startTime)) - \(formatter.string(from: endTime))"
+        formatter.dateFormat = "HH:mm"
+        return "\(formatter.string(from: startTime)) — \(formatter.string(from: endTime))"
     }
 
     var isStone: Bool {
