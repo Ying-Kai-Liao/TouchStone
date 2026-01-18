@@ -100,8 +100,8 @@ struct StoneFlowRow: View {
                         .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.7))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 22)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 26)
             }
         }
         .background(
@@ -316,8 +316,8 @@ struct WaterFlowRow: View {
                         .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.7))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 22)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 26)
             }
         }
         .background(
