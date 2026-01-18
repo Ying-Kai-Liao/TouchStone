@@ -61,34 +61,64 @@ struct MeView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 32) {
-                    // Header with greeting
-                    headerSection
+            ZStack {
+                DesignSystem.Colors.background
+                    .ignoresSafeArea()
 
-                    // Main stats grid
-                    statsGrid
+                VStack(spacing: 0) {
+                    // Custom header
+                    headerView
+                        .padding(.horizontal, DesignSystem.Spacing.xl)
+                        .padding(.top, DesignSystem.Spacing.sm)
 
-                    // Weekly overview
-                    weeklyProgress
+                    ScrollView {
+                        VStack(spacing: DesignSystem.Spacing.xl) {
+                            // Header with greeting
+                            headerSection
 
-                    // Quick insights
-                    insightsSection
+                            // Main stats grid
+                            statsGrid
 
-                    Spacer(minLength: 40)
-                }
-                .padding()
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(destination: SettingsView()) {
-                        Image(systemName: "gearshape")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
+                            // Weekly overview
+                            weeklyProgress
+
+                            // Quick insights
+                            insightsSection
+
+                            Spacer(minLength: 40)
+                        }
+                        .padding(.horizontal, DesignSystem.Spacing.xl)
+                        .padding(.vertical, DesignSystem.Spacing.md)
                     }
                 }
+            }
+            .navigationBarHidden(true)
+        }
+    }
+
+    // MARK: - Header View
+
+    private var headerView: some View {
+        HStack(alignment: .center) {
+            Text("Me")
+                .font(.system(size: 24, weight: .light))
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+            Spacer()
+
+            NavigationLink(destination: SettingsView()) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(DesignSystem.Colors.cardBackground)
+                    )
+                    .overlay(
+                        Circle()
+                            .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.3), lineWidth: 1)
+                    )
             }
         }
     }
@@ -96,17 +126,17 @@ struct MeView: View {
     // MARK: - Header Section
 
     private var headerSection: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: DesignSystem.Spacing.sm) {
             Text(greetingText)
-                .font(.title2)
-                .fontWeight(.semibold)
+                .font(DesignSystem.Typography.title)
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
 
             Text("Keep touching your work")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(DesignSystem.Typography.body)
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 20)
+        .padding(.top, DesignSystem.Spacing.lg)
     }
 
     private var greetingText: String {
@@ -122,13 +152,13 @@ struct MeView: View {
     // MARK: - Stats Grid
 
     private var statsGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: DesignSystem.Spacing.md) {
             StatCard(
                 title: "Today",
                 value: "\(todayHours)",
                 unit: "hrs",
                 icon: "sun.max",
-                color: prefs.accentColor
+                color: DesignSystem.Colors.accent
             )
 
             StatCard(
@@ -136,7 +166,7 @@ struct MeView: View {
                 value: "\(thisWeekHours)",
                 unit: "hrs",
                 icon: "calendar",
-                color: .blue
+                color: DesignSystem.Colors.focus
             )
 
             StatCard(
@@ -144,7 +174,7 @@ struct MeView: View {
                 value: "\(currentStreak)",
                 unit: "days",
                 icon: "flame",
-                color: .orange
+                color: DesignSystem.Colors.warning
             )
 
             StatCard(
@@ -152,7 +182,7 @@ struct MeView: View {
                 value: "\(activeProjects)",
                 unit: "projects",
                 icon: "folder",
-                color: .purple
+                color: DesignSystem.Colors.social
             )
         }
     }
@@ -160,65 +190,80 @@ struct MeView: View {
     // MARK: - Weekly Progress
 
     private var weeklyProgress: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             Text("WEEKLY GOAL")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .tracking(1)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .tracking(1.5)
 
             let weeklyGoal = prefs.dailyProductiveHours * 5 // 5 working days
             let progress = min(1.0, Double(thisWeekHours) / Double(weeklyGoal))
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
                 HStack {
                     Text("\(thisWeekHours) / \(weeklyGoal) hours")
-                        .font(.subheadline)
+                        .font(DesignSystem.Typography.body)
                         .fontWeight(.medium)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
                     Spacer()
                     Text("\(Int(progress * 100))%")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
 
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color(.systemGray5))
+                        RoundedRectangle(cornerRadius: DesignSystem.Spacing.xs)
+                            .fill(DesignSystem.Colors.textTertiary.opacity(0.2))
                             .frame(height: 8)
 
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(prefs.accentColor)
+                        RoundedRectangle(cornerRadius: DesignSystem.Spacing.xs)
+                            .fill(DesignSystem.Colors.accent)
                             .frame(width: geometry.size.width * progress, height: 8)
                     }
                 }
                 .frame(height: 8)
             }
-            .padding()
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(DesignSystem.Spacing.lg)
+            .background(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                    .fill(DesignSystem.Colors.cardBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                    .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+            )
         }
     }
 
     // MARK: - Insights Section
 
     private var insightsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             Text("JOURNEY")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .tracking(1)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .tracking(1.5)
 
             VStack(spacing: 0) {
                 InsightRow(icon: "clock", title: "Total Time", value: "\(totalHours) hours")
-                Divider().padding(.leading, 44)
+                Divider()
+                    .background(DesignSystem.Colors.textTertiary.opacity(0.2))
+                    .padding(.leading, 44)
                 InsightRow(icon: "checkmark.circle", title: "Completed", value: "\(completedProjects) projects")
-                Divider().padding(.leading, 44)
+                Divider()
+                    .background(DesignSystem.Colors.textTertiary.opacity(0.2))
+                    .padding(.leading, 44)
                 InsightRow(icon: "hand.tap", title: "Total Touches", value: "\(allTouchLogs.count)")
             }
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                    .fill(DesignSystem.Colors.cardBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                    .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+            )
         }
     }
 }
@@ -233,7 +278,7 @@ private struct StatCard: View {
     let color: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             HStack {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .medium))
@@ -241,24 +286,31 @@ private struct StatCard: View {
                 Spacer()
             }
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                HStack(alignment: .firstTextBaseline, spacing: DesignSystem.Spacing.xs) {
                     Text(value)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .font(DesignSystem.Typography.statMedium)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
                     Text(unit)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                 }
 
                 Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
         }
-        .padding()
+        .padding(DesignSystem.Spacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                .fill(DesignSystem.Colors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+        )
     }
 }
 
@@ -270,23 +322,24 @@ private struct InsightRow: View {
     let value: String
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignSystem.Spacing.md) {
             Image(systemName: icon)
                 .font(.system(size: 16))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .frame(width: 24)
 
             Text(title)
-                .font(.subheadline)
+                .font(DesignSystem.Typography.body)
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
 
             Spacer()
 
             Text(value)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(DesignSystem.Typography.body)
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
         }
-        .padding(.horizontal)
-        .padding(.vertical, 14)
+        .padding(.horizontal, DesignSystem.Spacing.lg)
+        .padding(.vertical, DesignSystem.Spacing.md + 2)
     }
 }
 
