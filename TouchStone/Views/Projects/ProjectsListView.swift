@@ -67,16 +67,9 @@ struct ProjectsListView: View {
 
     private var headerView: some View {
         HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Projects")
-                    .font(.system(size: 24, weight: .light))
-                    .foregroundStyle(DesignSystem.Colors.textPrimary)
-
-                Text("DIGITAL ZEN SPACE")
-                    .font(DesignSystem.Typography.captionBold)
-                    .foregroundStyle(DesignSystem.Colors.textTertiary)
-                    .tracking(1.5)
-            }
+            Text("Projects")
+                .font(.system(size: 24, weight: .light))
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
 
             Spacer()
 
