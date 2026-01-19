@@ -79,74 +79,23 @@ jobs:
         run: |
           mkdir -p screenshots
           if [ -d "TestResults.xcresult" ]; then
-            echo "=== Extracting attachments using xcresulttool ==="
+            echo "=== Exporting attachments using xcresulttool ==="
 
-            # Get the test results as JSON and extract attachment IDs
-            xcrun xcresulttool get --path TestResults.xcresult --format json > results.json 2>/dev/null || true
-
-            # Export all attachments from the test results
-            # First, get the actions invocation record
-            ACTIONS_ID=$(cat results.json | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          actions = data.get('actions', {}).get('_values', [])
-          for action in actions:
-              result = action.get('actionResult', {}).get('testsRef', {}).get('id', {}).get('_value')
-              if result:
-                  print(result)
-                  break
-          " 2>/dev/null || true)
-
-            if [ -n "$ACTIONS_ID" ]; then
-              echo "Found actions ID: $ACTIONS_ID"
-              xcrun xcresulttool get --path TestResults.xcresult --format json --id "$ACTIONS_ID" > tests.json 2>/dev/null || true
-            fi
-
-            # Try direct export of all attachments
-            echo "=== Trying xcresulttool export ==="
-            xcrun xcresulttool export --path TestResults.xcresult --output-path screenshots --type directory 2>/dev/null || true
-
-            # Also try getting attachments from summaries
-            echo "=== Getting test summaries ==="
-            xcrun xcresulttool get --path TestResults.xcresult --format json 2>/dev/null | python3 -c "
-          import json, sys, subprocess, os
-
-          def find_attachments(obj, path=''):
-              attachments = []
-              if isinstance(obj, dict):
-                  # Check if this is an attachment reference
-                  if obj.get('_type', {}).get('_name') == 'ActionTestAttachment':
-                      payload_ref = obj.get('payloadRef', {}).get('id', {}).get('_value')
-                      name = obj.get('name', {}).get('_value', 'unnamed')
-                      if payload_ref:
-                          attachments.append((payload_ref, name))
-                  # Recurse into all values
-                  for k, v in obj.items():
-                      attachments.extend(find_attachments(v, f'{path}.{k}'))
-              elif isinstance(obj, list):
-                  for i, v in enumerate(obj):
-                      attachments.extend(find_attachments(v, f'{path}[{i}]'))
-              return attachments
-
-          try:
-              data = json.load(sys.stdin)
-              attachments = find_attachments(data)
-              print(f'Found {len(attachments)} attachments', file=sys.stderr)
-              for ref_id, name in attachments:
-                  print(f'{ref_id}|{name}')
-          except Exception as e:
-              print(f'Error: {e}', file=sys.stderr)
-          " 2>&1 | while IFS='|' read -r ref_id name; do
-              if [ -n "$ref_id" ] && [ "$ref_id" != "Found"* ]; then
-                # Clean the name for filename
-                clean_name=$(echo "$name" | tr ' ' '_' | tr -cd '[:alnum:]_-')
-                echo "Exporting attachment: $name (ID: $ref_id)"
-                xcrun xcresulttool export --path TestResults.xcresult --output-path "screenshots/${clean_name}.png" --type file --id "$ref_id" 2>/dev/null || true
-              fi
-            done
+            # Use the new export attachments command (Xcode 16+)
+            xcrun xcresulttool export attachments \
+              --path TestResults.xcresult \
+              --output-path screenshots
 
             echo "=== Screenshots directory ==="
-            ls -la screenshots/ 2>/dev/null || echo "Screenshots dir empty"
+            ls -la screenshots/
+
+            # Show the manifest if it exists
+            if [ -f "screenshots/manifest.json" ]; then
+              echo "=== Manifest content ==="
+              cat screenshots/manifest.json
+            fi
+
+            # Count image files
             COUNT=$(find screenshots -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \) 2>/dev/null | wc -l | tr -d ' ')
             echo "Found $COUNT screenshots"
             echo "screenshot_count=$COUNT" >> $GITHUB_OUTPUT
