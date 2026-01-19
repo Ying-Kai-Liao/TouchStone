@@ -105,6 +105,7 @@ final class ProjectDocument {
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             )
+
             return bookmarkData
         } catch {
             return nil
