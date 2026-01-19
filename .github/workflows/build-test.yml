@@ -108,18 +108,8 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Find available simulator
-        id: simulator
-        run: |
-          # Find an available iPhone simulator
-          SIMULATOR=$(xcrun simctl list devices available | grep "iPhone" | head -1 | sed 's/.*(\([^)]*\)).*/\1/')
-          echo "Found simulator: $SIMULATOR"
-          echo "udid=$SIMULATOR" >> $GITHUB_OUTPUT
-
-      - name: Boot simulator
-        run: |
-          xcrun simctl boot "${{ steps.simulator.outputs.udid }}" || true
-          xcrun simctl bootstatus "${{ steps.simulator.outputs.udid }}" -b
+      - name: List available simulators
+        run: xcrun simctl list devices available
 
       - name: Run UI tests for screenshots
         run: |
@@ -128,7 +118,7 @@ jobs:
             -project TouchStone.xcodeproj \
             -scheme TouchStoneUITests \
             -sdk iphonesimulator \
-            -destination "id=${{ steps.simulator.outputs.udid }}" \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
             -resultBundlePath TestResults.xcresult \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -232,7 +222,3 @@ jobs:
                 body: body
               });
             }
-
-      - name: Shutdown simulator
-        if: always()
-        run: xcrun simctl shutdown "${{ steps.simulator.outputs.udid }}" || true
