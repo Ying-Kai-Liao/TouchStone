@@ -191,9 +191,9 @@ struct TimelineItemContainer: View {
         }
     }
 
-    /// Whether this is a transition item (breathing space, flow prep, or rest)
+    /// Whether this is a transition item (breathing space, flow prep, rest, or meal)
     private var isTransitionItem: Bool {
-        item.isBreathingSpace || item.isFlowPrep || item.isRest
+        item.isBreathingSpace || item.isFlowPrep || item.isRest || item.isMeal
     }
 
     var body: some View {

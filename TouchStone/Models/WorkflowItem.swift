@@ -8,7 +8,8 @@ enum WorkflowItemType {
     case water(SuggestedSession)             // Flexible work session
     case breathingSpace(minutes: Int)        // Short break between activities
     case flowPrep(minutes: Int)              // Preparation time before work
-    case rest(minutes: Int)                  // Rest break between work sessions
+    case rest(minutes: Int)                  // Break between work sessions
+    case meal(Rule)                          // Meal time (lunch, dinner) from rules
 }
 
 /// Status of a workflow item
@@ -52,7 +53,9 @@ struct WorkflowItem: Identifiable {
         case .flowPrep:
             return "Flow State Prep"
         case .rest(let minutes):
-            return "Rest · \(minutes)m"
+            return "Break · \(minutes)m"
+        case .meal(let rule):
+            return rule.title
         }
     }
 
@@ -68,6 +71,8 @@ struct WorkflowItem: Identifiable {
             return nil
         case .rest:
             return "Take a short break"
+        case .meal:
+            return nil
         }
     }
 
@@ -104,6 +109,18 @@ struct WorkflowItem: Identifiable {
     var isRest: Bool {
         if case .rest = type { return true }
         return false
+    }
+
+    var isMeal: Bool {
+        if case .meal = type { return true }
+        return false
+    }
+
+    var rule: Rule? {
+        if case .meal(let rule) = type {
+            return rule
+        }
+        return nil
     }
 
     var project: Project? {

@@ -294,8 +294,8 @@ struct TodayFlowView: View {
         if let plan = todaysPlan, plan.isWorkDay, plan.hasSchedule {
             // Auto-skip expired sessions first
             DayState.autoSkipExpiredSessions(dayPlan: plan)
-            // Load from persisted schedule (locked-in times)
-            dayState.loadFromPersistedSchedule(dayPlan: plan, stones: Array(allStones))
+            // Load from persisted schedule (locked-in times) with rules for meal badges
+            dayState.loadFromPersistedSchedule(dayPlan: plan, stones: Array(allStones), rules: Array(activeRules))
         } else if isRestDay && calendar.isDateInToday(selectedDate) {
             // Rest day - only show stones (no work suggestions)
             dayState.computeStonesOnly(stones: Array(allStones))
