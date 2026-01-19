@@ -45,7 +45,7 @@ jobs:
     runs-on: macos-14
     if: github.event_name == 'pull_request'
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
 
     steps:
@@ -92,20 +92,68 @@ jobs:
             echo "=== Screenshots directory ==="
             ls -la screenshots/
 
-            # Show the manifest if it exists
+            # Rename files using manifest
             if [ -f "screenshots/manifest.json" ]; then
-              echo "=== Manifest content ==="
-              cat screenshots/manifest.json
+              echo "=== Renaming screenshots ==="
+              python3 << 'EOF'
+          import json
+          import os
+          import shutil
+
+          with open('screenshots/manifest.json', 'r') as f:
+              manifest = json.load(f)
+
+          for test in manifest:
+              for attachment in test.get('attachments', []):
+                  exported = attachment.get('exportedFileName', '')
+                  suggested = attachment.get('suggestedHumanReadableName', '')
+                  if exported and suggested:
+                      # Extract the base name (e.g., "01-Flow" from "01-Flow_0_UUID.png")
+                      parts = suggested.split('_')
+                      if parts:
+                          simple_name = parts[0] + '.png'
+                          src = f'screenshots/{exported}'
+                          dst = f'screenshots/{simple_name}'
+                          if os.path.exists(src):
+                              shutil.copy(src, dst)
+                              print(f'Renamed: {exported} -> {simple_name}')
+          EOF
+              ls -la screenshots/
             fi
 
             # Count image files
-            COUNT=$(find screenshots -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \) 2>/dev/null | wc -l | tr -d ' ')
+            COUNT=$(find screenshots -type f -name "*.png" 2>/dev/null | wc -l | tr -d ' ')
             echo "Found $COUNT screenshots"
             echo "screenshot_count=$COUNT" >> $GITHUB_OUTPUT
           else
             echo "No xcresult bundle found"
             echo "screenshot_count=0" >> $GITHUB_OUTPUT
           fi
+
+      - name: Push screenshots to branch
+        if: steps.extract.outputs.screenshot_count != '0'
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          BRANCH_NAME="screenshots/pr-${PR_NUMBER}"
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create orphan branch for screenshots
+          git checkout --orphan "$BRANCH_NAME"
+          git reset --hard
+
+          # Copy only the renamed screenshots (01-Flow.png, etc.)
+          mkdir -p screenshots
+          cp /Users/runner/work/TouchStone/TouchStone/screenshots/0*.png screenshots/ 2>/dev/null || true
+
+          # Commit and push
+          git add screenshots/
+          git commit -m "Screenshots for PR #${PR_NUMBER}" || echo "No changes to commit"
+          git push -f origin "$BRANCH_NAME"
+
+          echo "Screenshots pushed to branch: $BRANCH_NAME"
 
       - name: Upload screenshots artifact
         uses: actions/upload-artifact@v4
@@ -119,6 +167,10 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const prNumber = context.issue.number;
+            const branch = `screenshots/pr-${prNumber}`;
+            const baseUrl = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/${branch}/screenshots`;
+
             const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -131,15 +183,22 @@ jobs:
               : null;
 
             let body = `## 📸 UI Screenshots\n\n`;
-            body += `Screenshots have been captured for this PR.\n\n`;
+
+            // Add images in a 2x2 grid using HTML table
+            body += `<table>\n`;
+            body += `<tr>\n`;
+            body += `<td align="center"><strong>Flow</strong><br><img src="${baseUrl}/01-Flow.png" width="300"/></td>\n`;
+            body += `<td align="center"><strong>Calendar</strong><br><img src="${baseUrl}/02-Calendar.png" width="300"/></td>\n`;
+            body += `</tr>\n`;
+            body += `<tr>\n`;
+            body += `<td align="center"><strong>Plan</strong><br><img src="${baseUrl}/03-Plan.png" width="300"/></td>\n`;
+            body += `<td align="center"><strong>Me</strong><br><img src="${baseUrl}/04-Me.png" width="300"/></td>\n`;
+            body += `</tr>\n`;
+            body += `</table>\n\n`;
+
             if (artifactUrl) {
-              body += `**[Download Screenshots](${artifactUrl})**\n\n`;
+              body += `**[📥 Download Full Resolution](${artifactUrl})**\n\n`;
             }
-            body += `### Captured Screens:\n`;
-            body += `- 01-Flow (Today's Flow view)\n`;
-            body += `- 02-Calendar (Calendar view)\n`;
-            body += `- 03-Plan (Projects list)\n`;
-            body += `- 04-Me (User profile)\n\n`;
             body += `*Screenshots captured at: ${new Date().toISOString()}*`;
 
             const { data: comments } = await github.rest.issues.listComments({
