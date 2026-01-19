@@ -79,10 +79,23 @@ jobs:
         run: |
           mkdir -p screenshots
           if [ -d "TestResults.xcresult" ]; then
-            find TestResults.xcresult -name "*.png" -exec cp {} screenshots/ \; 2>/dev/null || true
-            COUNT=$(find screenshots -name "*.png" 2>/dev/null | wc -l | tr -d ' ')
+            # Find attachments in xcresult bundle (they're in Data folder with refs)
+            find TestResults.xcresult -type f \( -name "*.png" -o -name "*.jpg" \) -exec cp {} screenshots/ \; 2>/dev/null || true
+
+            # Also check the Attachments directory structure
+            if [ -d "TestResults.xcresult/Data" ]; then
+              for f in TestResults.xcresult/Data/*; do
+                if file "$f" 2>/dev/null | grep -q "PNG\|JPEG"; then
+                  cp "$f" "screenshots/$(basename $f).png" 2>/dev/null || true
+                fi
+              done
+            fi
+
+            COUNT=$(ls -1 screenshots/*.png 2>/dev/null | wc -l | tr -d ' ')
+            echo "Found $COUNT screenshots"
             echo "screenshot_count=$COUNT" >> $GITHUB_OUTPUT
           else
+            echo "No xcresult bundle found"
             echo "screenshot_count=0" >> $GITHUB_OUTPUT
           fi
 
