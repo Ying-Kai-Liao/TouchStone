@@ -178,17 +178,17 @@ struct CalendarView: View {
         .padding(.bottom, DesignSystem.Spacing.lg)
     }
 
-    // MARK: - Energy Gradient Legend
+    // MARK: - Workload Legend
 
     private var energyGradientLegend: some View {
         VStack(spacing: DesignSystem.Spacing.md) {
-            Text("ENERGY GRADIENT")
+            Text("WORKLOAD")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .tracking(1.5)
 
             HStack(spacing: DesignSystem.Spacing.sm) {
-                ForEach(EnergyLevel.allCases, id: \.self) { level in
+                ForEach(WorkloadLevel.allCases, id: \.self) { level in
                     VStack(spacing: DesignSystem.Spacing.sm) {
                         RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                             .fill(level.color)
@@ -208,31 +208,42 @@ struct CalendarView: View {
         .padding(.bottom, DesignSystem.Spacing.xxl)
     }
 
-    private enum EnergyLevel: CaseIterable {
-        case still, ease, flow, power, peak
+    enum WorkloadLevel: CaseIterable {
+        case free, light, busy, full, over
 
         var label: String {
             switch self {
-            case .still: return "STILL"
-            case .ease: return "EASE"
-            case .flow: return "FLOW"
-            case .power: return "POWER"
-            case .peak: return "PEAK"
+            case .free: return "FREE"
+            case .light: return "LIGHT"
+            case .busy: return "BUSY"
+            case .full: return "FULL"
+            case .over: return "OVER"
             }
         }
 
         var color: Color {
             switch self {
-            case .still:
+            case .free:
                 return DesignSystem.Colors.cardBackground
-            case .ease:
-                return DesignSystem.Colors.accent.opacity(0.3)
-            case .flow:
+            case .light:
+                return DesignSystem.Colors.accent.opacity(0.25)
+            case .busy:
                 return DesignSystem.Colors.accent.opacity(0.5)
-            case .power:
-                return DesignSystem.Colors.accent.opacity(0.7)
-            case .peak:
-                return DesignSystem.Colors.accent
+            case .full:
+                return DesignSystem.Colors.warning.opacity(0.6)
+            case .over:
+                return DesignSystem.Colors.error.opacity(0.7)
+            }
+        }
+
+        /// Returns the workload level for a given load value
+        static func forLoad(_ load: Double) -> WorkloadLevel {
+            switch load {
+            case ..<0.01: return .free
+            case ..<0.4: return .light
+            case ..<0.8: return .busy
+            case ..<1.0: return .full
+            default: return .over
             }
         }
     }
@@ -384,34 +395,27 @@ struct DayCell: View {
         .buttonStyle(.plain)
     }
 
-    /// Color based on load - accent color gradient
-    private var loadColor: Color {
-        if dayLoad > 1.0 {
-            return DesignSystem.Colors.error  // Overloaded
-        } else if dayLoad > 0.8 {
-            return DesignSystem.Colors.warning  // Nearly full
-        } else {
-            return DesignSystem.Colors.accent
-        }
-    }
-
+    /// Color based on workload level - matches the legend exactly
     private var cellBackgroundColor: Color {
         if !dayData.isCurrentMonth {
             return Color.clear
         }
 
-        // Show load-based color if there's any work allocated
-        if dayLoad > 0 {
-            // Opacity scales with load: 0.1 at 0% to 0.35 at 100%+
-            let opacity = min(0.35, 0.1 + (dayLoad * 0.25))
-            return loadColor.opacity(opacity)
-        }
+        // Use WorkloadLevel to get consistent colors with legend
+        return CalendarView.WorkloadLevel.forLoad(dayLoad).color
+    }
 
-        if isWeekend {
-            return DesignSystem.Colors.cardBackground.opacity(0.6)
+    /// Color for deadline badges
+    private var loadColor: Color {
+        let level = CalendarView.WorkloadLevel.forLoad(dayLoad)
+        switch level {
+        case .over:
+            return DesignSystem.Colors.error
+        case .full:
+            return DesignSystem.Colors.warning
+        default:
+            return DesignSystem.Colors.accent
         }
-
-        return DesignSystem.Colors.cardBackground.opacity(0.4)
     }
 
     private var isToday: Bool {
