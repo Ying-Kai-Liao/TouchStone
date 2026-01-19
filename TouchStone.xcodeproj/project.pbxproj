@@ -8,6 +8,7 @@
 
 /* Begin PBXFileReference section */
 		6D31B5792F129914001FC9D3 /* TouchStone.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TouchStone.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AABB001122334455EEFF0001 /* TouchStoneUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TouchStoneUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -34,10 +35,22 @@
 			path = docs;
 			sourceTree = "<group>";
 		};
+		AABB001122334455EEFF0002 /* TouchStoneUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TouchStoneUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		6D31B5762F129914001FC9D3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AABB001122334455EEFF0003 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -52,6 +65,7 @@
 			children = (
 				6D31B5E82F1526BB001FC9D3 /* docs */,
 				6D31B57B2F129914001FC9D3 /* TouchStone */,
+				AABB001122334455EEFF0002 /* TouchStoneUITests */,
 				6D31B57A2F129914001FC9D3 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -60,11 +74,22 @@
 			isa = PBXGroup;
 			children = (
 				6D31B5792F129914001FC9D3 /* TouchStone.app */,
+				AABB001122334455EEFF0001 /* TouchStoneUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
+
+/* Begin PBXContainerItemProxy section */
+		AABB001122334455EEFF0010 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6D31B5712F129914001FC9D3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6D31B5782F129914001FC9D3;
+			remoteInfo = TouchStone;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXNativeTarget section */
 		6D31B5782F129914001FC9D3 /* TouchStone */ = {
@@ -90,7 +115,38 @@
 			productReference = 6D31B5792F129914001FC9D3 /* TouchStone.app */;
 			productType = "com.apple.product-type.application";
 		};
+		AABB001122334455EEFF0004 /* TouchStoneUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AABB001122334455EEFF0009 /* Build configuration list for PBXNativeTarget "TouchStoneUITests" */;
+			buildPhases = (
+				AABB001122334455EEFF0005 /* Sources */,
+				AABB001122334455EEFF0003 /* Frameworks */,
+				AABB001122334455EEFF0006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AABB001122334455EEFF0011 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AABB001122334455EEFF0002 /* TouchStoneUITests */,
+			);
+			name = TouchStoneUITests;
+			packageProductDependencies = (
+			);
+			productName = TouchStoneUITests;
+			productReference = AABB001122334455EEFF0001 /* TouchStoneUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXTargetDependency section */
+		AABB001122334455EEFF0011 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6D31B5782F129914001FC9D3 /* TouchStone */;
+			targetProxy = AABB001122334455EEFF0010 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		6D31B5712F129914001FC9D3 /* Project object */ = {
@@ -120,6 +176,7 @@
 			projectRoot = "";
 			targets = (
 				6D31B5782F129914001FC9D3 /* TouchStone */,
+				AABB001122334455EEFF0004 /* TouchStoneUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -132,10 +189,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AABB001122334455EEFF0006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		6D31B5752F129914001FC9D3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AABB001122334455EEFF0005 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -342,6 +413,42 @@
 			};
 			name = Release;
 		};
+		AABB001122334455EEFF0007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T6DWQUSF55;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "-.TouchStoneUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TouchStone;
+			};
+			name = Debug;
+		};
+		AABB001122334455EEFF0008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T6DWQUSF55;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "-.TouchStoneUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TouchStone;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -359,6 +466,15 @@
 			buildConfigurations = (
 				6D31B5872F129917001FC9D3 /* Debug */,
 				6D31B5882F129917001FC9D3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AABB001122334455EEFF0009 /* Build configuration list for PBXNativeTarget "TouchStoneUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AABB001122334455EEFF0007 /* Debug */,
+				AABB001122334455EEFF0008 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

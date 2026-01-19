@@ -81,3 +81,158 @@ jobs:
         with:
           name: build-logs
           path: ~/Library/Logs/DiagnosticReports/
+
+  screenshots:
+    name: Capture UI Screenshots
+    runs-on: macos-14
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Select Xcode version
+        run: |
+          if [ -d "/Applications/Xcode_16.1.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_16.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_15.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_15.3.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_15.3.app/Contents/Developer
+          else
+            sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
+          fi
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Find available simulator
+        id: simulator
+        run: |
+          # Find an available iPhone simulator
+          SIMULATOR=$(xcrun simctl list devices available | grep "iPhone" | head -1 | sed 's/.*(\([^)]*\)).*/\1/')
+          echo "Found simulator: $SIMULATOR"
+          echo "udid=$SIMULATOR" >> $GITHUB_OUTPUT
+
+      - name: Boot simulator
+        run: |
+          xcrun simctl boot "${{ steps.simulator.outputs.udid }}" || true
+          xcrun simctl bootstatus "${{ steps.simulator.outputs.udid }}" -b
+
+      - name: Run UI tests for screenshots
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project TouchStone.xcodeproj \
+            -scheme TouchStoneUITests \
+            -sdk iphonesimulator \
+            -destination "id=${{ steps.simulator.outputs.udid }}" \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:TouchStoneUITests/ScreenshotTests/testCaptureAllScreenshots || true
+
+      - name: Extract screenshots from xcresult
+        id: extract
+        run: |
+          mkdir -p screenshots
+
+          # Extract attachments from xcresult bundle
+          if [ -d "TestResults.xcresult" ]; then
+            # Get test reference IDs
+            xcrun xcresulttool get --path TestResults.xcresult --format json > result.json
+
+            # Find and extract PNG attachments
+            find TestResults.xcresult -name "*.png" -exec cp {} screenshots/ \; 2>/dev/null || true
+
+            # Alternative: use xcresulttool to export attachments
+            xcrun xcresulttool export --type file --path TestResults.xcresult --output-path screenshots --legacy 2>/dev/null || true
+
+            # List extracted files
+            ls -la screenshots/ || echo "No screenshots found"
+
+            # Count screenshots
+            COUNT=$(find screenshots -name "*.png" 2>/dev/null | wc -l | tr -d ' ')
+            echo "screenshot_count=$COUNT" >> $GITHUB_OUTPUT
+          else
+            echo "No xcresult bundle found"
+            echo "screenshot_count=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload screenshots artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: screenshots/
+          if-no-files-found: ignore
+
+      - name: Post screenshots to PR
+        if: steps.extract.outputs.screenshot_count != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Get artifact URL
+            const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId
+            });
+
+            const screenshotArtifact = artifacts.artifacts.find(a => a.name === 'ui-screenshots');
+            const artifactUrl = screenshotArtifact
+              ? `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/artifacts/${screenshotArtifact.id}`
+              : null;
+
+            // Build comment body
+            let body = `## 📸 UI Screenshots\n\n`;
+            body += `Screenshots have been captured for this PR.\n\n`;
+
+            if (artifactUrl) {
+              body += `**[Download Screenshots](${artifactUrl})**\n\n`;
+            }
+
+            body += `### Captured Screens:\n`;
+            body += `- 01-Flow (Today's Flow view)\n`;
+            body += `- 02-Calendar (Calendar view)\n`;
+            body += `- 03-Plan (Projects list)\n`;
+            body += `- 04-Me (User profile)\n\n`;
+            body += `*Screenshots captured at: ${new Date().toISOString()}*`;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('📸 UI Screenshots')
+            );
+
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+      - name: Shutdown simulator
+        if: always()
+        run: xcrun simctl shutdown "${{ steps.simulator.outputs.udid }}" || true
