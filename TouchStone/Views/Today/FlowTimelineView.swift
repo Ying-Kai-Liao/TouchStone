@@ -162,7 +162,7 @@ struct TimelineItemContainer: View {
     }
 
     private var lineColor: Color {
-        DesignSystem.Colors.cardBackgroundLight
+        DesignSystem.Colors.textTertiary
     }
 
     private var statusIcon: String {
