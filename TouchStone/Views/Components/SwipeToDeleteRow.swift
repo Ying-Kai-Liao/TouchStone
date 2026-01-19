@@ -43,7 +43,7 @@ struct SwipeToDeleteRow<Content: View>: View {
             // Content - at front, fills width, with background that slides
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.systemBackground))
+                .background(DesignSystem.Colors.background)
                 .offset(x: totalOffset)
         }
         .clipped()
