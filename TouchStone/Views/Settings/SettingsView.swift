@@ -14,10 +14,10 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "gearshape.fill")
                         .font(.system(size: 28))
-                        .foregroundStyle(Color.white.opacity(0.85))
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
                     Text("Settings")
                         .font(.system(size: 32, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.85))
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
@@ -146,31 +146,29 @@ private struct SettingsRow: View {
     var showChevron: Bool = true
     var isLink: Bool = false
 
-    private let softWhite = Color.white.opacity(0.85)
-
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.system(size: 18))
-                .foregroundStyle(iconColor ?? softWhite)
+                .foregroundStyle(iconColor ?? DesignSystem.Colors.textPrimary)
                 .frame(width: 24)
 
             Text(title)
-                .font(.body)
-                .foregroundStyle(softWhite)
+                .font(DesignSystem.Typography.body)
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
 
             Spacer()
 
             if let value = value {
                 Text(value)
-                    .font(.body)
-                    .foregroundStyle(softWhite.opacity(0.7))
+                    .font(DesignSystem.Typography.body)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
 
             if showChevron {
                 Image(systemName: isLink ? "arrow.up.right" : "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(softWhite.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
             }
         }
         .padding(.horizontal, 20)
@@ -183,12 +181,11 @@ private struct SettingsRow: View {
 
 private struct SettingsSectionHeader: View {
     let title: String
-    private let softWhite = Color.white.opacity(0.85)
 
     var body: some View {
         Text(title)
             .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(softWhite.opacity(0.6))
+            .foregroundStyle(DesignSystem.Colors.textSecondary)
             .padding(.horizontal, 20)
             .padding(.top, 28)
             .padding(.bottom, 8)
