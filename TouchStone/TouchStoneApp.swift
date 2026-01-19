@@ -36,9 +36,12 @@ struct TouchStoneApp: App {
         }
     }()
 
+    @Bindable private var prefs = UserPreferences.shared
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(prefs.colorScheme)
         }
         .modelContainer(sharedModelContainer)
     }

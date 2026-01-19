@@ -76,6 +76,14 @@ struct SettingsView: View {
                     // MARK: - Appearance Section
                     SettingsSectionHeader(title: "Appearance")
 
+                    NavigationLink(destination: AppearanceModeView()) {
+                        SettingsRow(
+                            icon: prefs.appearanceMode.icon,
+                            title: "Appearance",
+                            value: prefs.appearanceMode.displayName
+                        )
+                    }
+
                     NavigationLink(destination: ThemeColorView()) {
                         SettingsRow(
                             icon: "circle.fill",
@@ -318,6 +326,74 @@ private struct DeadlineBufferView: View {
             }
         }
         .navigationTitle("Deadline Buffer")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Appearance Mode View
+
+private struct AppearanceModeView: View {
+    @Bindable private var prefs = UserPreferences.shared
+
+    var body: some View {
+        ZStack {
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: DesignSystem.Spacing.lg) {
+                    ForEach(AppearanceMode.allCases) { mode in
+                        Button {
+                            prefs.appearanceMode = mode
+                        } label: {
+                            HStack(spacing: DesignSystem.Spacing.lg) {
+                                Image(systemName: mode.icon)
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(DesignSystem.Colors.accent)
+                                    .frame(width: 32)
+
+                                Text(mode.displayName)
+                                    .font(DesignSystem.Typography.body)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                                Spacer()
+
+                                if prefs.appearanceMode == mode {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundStyle(DesignSystem.Colors.accent)
+                                }
+                            }
+                            .padding(DesignSystem.Spacing.lg)
+                            .background(
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                    .fill(DesignSystem.Colors.cardBackground)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                    .strokeBorder(
+                                        prefs.appearanceMode == mode
+                                            ? DesignSystem.Colors.accent.opacity(0.5)
+                                            : DesignSystem.Colors.textTertiary.opacity(0.2),
+                                        lineWidth: prefs.appearanceMode == mode ? 2 : 1
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    // Note about the setting
+                    Text("Choose how TouchStone appears. System follows your device settings.")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, DesignSystem.Spacing.sm)
+                }
+                .padding(DesignSystem.Spacing.xl)
+            }
+        }
+        .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

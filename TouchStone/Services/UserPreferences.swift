@@ -1,6 +1,32 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Appearance Mode Option
+
+enum AppearanceMode: String, CaseIterable, Identifiable {
+    case system = "system"
+    case light = "light"
+    case dark = "dark"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .system: return "circle.lefthalf.filled"
+        case .light: return "sun.max.fill"
+        case .dark: return "moon.fill"
+        }
+    }
+}
+
 // MARK: - Theme Color Option
 
 enum ThemeColorOption: String, CaseIterable, Identifiable {
@@ -122,6 +148,7 @@ class UserPreferences {
         static let appLanguage = "appLanguage"
         static let accentColor = "accentColor"
         static let themeColor = "themeColor"
+        static let appearanceMode = "appearanceMode"
         static let deadlineBufferPercent = "deadlineBufferPercent"
     }
 
@@ -192,6 +219,22 @@ class UserPreferences {
         didSet { defaults.set(appLanguage, forKey: Keys.appLanguage) }
     }
 
+    // MARK: - Appearance Mode
+
+    /// Selected appearance mode (default: system)
+    var appearanceMode: AppearanceMode {
+        didSet { defaults.set(appearanceMode.rawValue, forKey: Keys.appearanceMode) }
+    }
+
+    /// Computed color scheme for SwiftUI
+    var colorScheme: ColorScheme? {
+        switch appearanceMode {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+
     // MARK: - Theme Color
 
     /// Selected theme color option (default: sage)
@@ -230,6 +273,14 @@ class UserPreferences {
         self.restDurationMinutes = defaults.object(forKey: Keys.restDurationMinutes) as? Int ?? 15
         self.deadlineBufferPercent = defaults.object(forKey: Keys.deadlineBufferPercent) as? Int ?? 20
         self.appLanguage = defaults.string(forKey: Keys.appLanguage) ?? "system"
+
+        // Load appearance mode
+        if let modeString = defaults.string(forKey: Keys.appearanceMode),
+           let mode = AppearanceMode(rawValue: modeString) {
+            self.appearanceMode = mode
+        } else {
+            self.appearanceMode = .dark
+        }
 
         // Load theme color
         if let colorString = defaults.string(forKey: Keys.themeColor),
