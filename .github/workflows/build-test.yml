@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    name: Build TouchStone
+    name: Build and Test TouchStone
     runs-on: macos-14
 
     steps:
