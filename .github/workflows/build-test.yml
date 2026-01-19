@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    name: Build and Test TouchStone
+    name: Build TouchStone
     runs-on: macos-14
 
     steps:
@@ -79,19 +79,50 @@ jobs:
         run: |
           mkdir -p screenshots
           if [ -d "TestResults.xcresult" ]; then
-            # Find attachments in xcresult bundle (they're in Data folder with refs)
-            find TestResults.xcresult -type f \( -name "*.png" -o -name "*.jpg" \) -exec cp {} screenshots/ \; 2>/dev/null || true
+            echo "xcresult bundle found, extracting attachments..."
 
-            # Also check the Attachments directory structure
+            # Get all attachment IDs from the xcresult
+            xcrun xcresulttool get --path TestResults.xcresult --format json > result.json 2>/dev/null || true
+
+            # Debug: show xcresult structure
+            ls -la TestResults.xcresult/
+
+            # Method 1: Export using xcresulttool (Xcode 16+)
+            xcrun xcresulttool export --type directory --path TestResults.xcresult --output-path exported 2>/dev/null || true
+            if [ -d "exported" ]; then
+              find exported -name "*.png" -exec cp {} screenshots/ \; 2>/dev/null || true
+            fi
+
+            # Method 2: Check Data directory for binary image files
             if [ -d "TestResults.xcresult/Data" ]; then
+              echo "Checking Data directory..."
               for f in TestResults.xcresult/Data/*; do
-                if file "$f" 2>/dev/null | grep -q "PNG\|JPEG"; then
-                  cp "$f" "screenshots/$(basename $f).png" 2>/dev/null || true
+                if [ -f "$f" ]; then
+                  TYPE=$(file -b "$f" 2>/dev/null || echo "unknown")
+                  if echo "$TYPE" | grep -qi "PNG\|JPEG\|image"; then
+                    BASENAME=$(basename "$f")
+                    cp "$f" "screenshots/${BASENAME}.png" 2>/dev/null || true
+                    echo "Found image: $BASENAME"
+                  fi
                 fi
               done
             fi
 
-            COUNT=$(ls -1 screenshots/*.png 2>/dev/null | wc -l | tr -d ' ')
+            # Method 3: Look for Attachments in nested structure
+            find TestResults.xcresult -type d -name "Attachments" 2>/dev/null | while read dir; do
+              echo "Found Attachments dir: $dir"
+              find "$dir" -type f -exec cp {} screenshots/ \; 2>/dev/null || true
+            done
+
+            # Rename files without extension to .png
+            for f in screenshots/*; do
+              if [ -f "$f" ] && [[ ! "$f" =~ \. ]]; then
+                mv "$f" "$f.png" 2>/dev/null || true
+              fi
+            done
+
+            ls -la screenshots/ || echo "Screenshots dir empty"
+            COUNT=$(ls -1 screenshots/* 2>/dev/null | wc -l | tr -d ' ')
             echo "Found $COUNT screenshots"
             echo "screenshot_count=$COUNT" >> $GITHUB_OUTPUT
           else
