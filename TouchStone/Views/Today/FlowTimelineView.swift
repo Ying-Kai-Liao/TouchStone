@@ -52,15 +52,15 @@ struct FlowTimelineView: View {
         VStack(spacing: 16) {
             Image(systemName: "water.waves")
                 .font(.system(size: 48))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
 
             Text("Your flow is clear")
-                .font(.headline)
-                .foregroundStyle(.secondary)
+                .font(DesignSystem.Typography.headline)
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
 
             Text("No scheduled events or suggested sessions")
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
+                .font(DesignSystem.Typography.body)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
@@ -72,16 +72,15 @@ struct FlowTimelineView: View {
             VStack(spacing: 6) {
                 ForEach(0..<3, id: \.self) { _ in
                     Circle()
-                        .fill(Color(.systemGray3))
+                        .fill(DesignSystem.Colors.textTertiary)
                         .frame(width: 5, height: 5)
                 }
             }
             .padding(.top, 20)
 
             Text("END OF STREAM")
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .foregroundStyle(Color(.systemGray2))
+                .font(DesignSystem.Typography.captionBold)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .tracking(2)
                 .padding(.top, 4)
         }
@@ -101,17 +100,16 @@ struct FlowTimelineView: View {
                     Image(systemName: showMoreToTouch ? "chevron.down" : "chevron.right")
                         .font(.caption2)
                         .fontWeight(.semibold)
-                        .foregroundStyle(Color(.systemGray2))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
 
                     Text("MORE TO TOUCH")
-                        .font(.caption2)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Color(.systemGray2))
+                        .font(DesignSystem.Typography.captionBold)
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                         .tracking(2)
 
                     Text("(\(additionalProjects.count))")
-                        .font(.caption2)
-                        .foregroundStyle(Color(.systemGray3))
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
 
                     Spacer()
                 }
@@ -164,16 +162,7 @@ struct TimelineItemContainer: View {
     }
 
     private var lineColor: Color {
-        switch item.status {
-        case .completed:
-            return Color(.systemGray4)
-        case .inProgress:
-            return Color(.systemGray4)
-        case .upcoming, .suggested:
-            return Color(.systemGray4)
-        case .overdue:
-            return Color(.systemGray4)
-        }
+        DesignSystem.Colors.textTertiary
     }
 
     private var statusIcon: String {
@@ -192,13 +181,13 @@ struct TimelineItemContainer: View {
     private var statusColor: Color {
         switch item.status {
         case .completed:
-            return UserPreferences.shared.accentColor
+            return DesignSystem.Colors.accent
         case .inProgress:
-            return UserPreferences.shared.accentColor
+            return DesignSystem.Colors.accent
         case .upcoming, .suggested:
-            return Color(.systemGray3)
+            return DesignSystem.Colors.textTertiary
         case .overdue:
-            return .orange
+            return DesignSystem.Colors.warning
         }
     }
 
@@ -219,7 +208,7 @@ struct TimelineItemContainer: View {
             HStack(alignment: .top, spacing: 0) {
                 // Timeline with status indicator
                 timelineWithIndicator
-                    .frame(width: 56)
+                    .frame(width: 88)
 
                 // Content
                 FlowItemRow(
@@ -227,10 +216,10 @@ struct TimelineItemContainer: View {
                     onTouch: item.project.map { project in { onTouch(project) } },
                     onFocus: item.project.map { project in { onFocus(project) } }
                 )
-                .padding(.trailing, 16)
-                .padding(.vertical, isTransitionItem ? 4 : 12)
+                .padding(.trailing, 28)
+                .padding(.vertical, isTransitionItem ? 6 : 16)
             }
-            .background(Color(uiColor: UIColor(red: 0.12, green: 0.14, blue: 0.15, alpha: 1.0)))
+            .background(DesignSystem.Colors.background)
             .offset(x: swipeOffset)
             .highPriorityGesture(swipeGesture)
             .simultaneousGesture(longPressGesture)
@@ -323,17 +312,16 @@ struct TimelineItemContainer: View {
         Button {
             showDeleteConfirm = true
         } label: {
-            VStack {
-                Image(systemName: "trash.fill")
-                    .font(.system(size: 18, weight: .semibold))
+            VStack(spacing: 6) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 16, weight: .medium))
                 Text("Remove")
-                    .font(.caption2)
-                    .fontWeight(.medium)
+                    .font(.system(size: 11, weight: .medium))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(DesignSystem.Colors.error)
             .frame(width: abs(deleteThreshold))
             .frame(maxHeight: .infinity)
-            .background(Color.red.opacity(0.9))
+            .background(DesignSystem.Colors.error.opacity(0.15))
         }
         .buttonStyle(.plain)
     }
@@ -343,37 +331,46 @@ struct TimelineItemContainer: View {
             ZStack(alignment: .leading) {
                 // Vertical line - continuous
                 Rectangle()
-                    .fill(lineColor.opacity(0.4))
+                    .fill(lineColor.opacity(0.25))
                     .frame(width: 2)
                     .frame(maxHeight: .infinity)
-                    .offset(x: 24) // Center of the 56pt width
+                    .offset(x: 40) // Center of the 88pt width
 
                 // Status indicator (only for non-transition items)
                 if !isTransitionItem {
                     statusIndicator
-                        .offset(x: 0, y: 14) // Position at top of content
+                        .offset(x: 16, y: 18) // Position at top of content with more left padding
                 }
             }
         }
+    }
+
+    /// Whether this item is currently active (in progress)
+    private var isActive: Bool {
+        item.status == .inProgress
     }
 
     private var statusIndicator: some View {
         ZStack {
             // Outer circle background
             Circle()
-                .fill(Color(uiColor: UIColor(red: 0.12, green: 0.14, blue: 0.15, alpha: 1.0)))
+                .fill(DesignSystem.Colors.background)
                 .frame(width: 50, height: 50)
 
-            // Status circle
+            // Status circle - same color as card, darker when not active
             Circle()
-                .fill(statusColor.opacity(item.status == .completed ? 0.15 : 0.2))
-                .frame(width: 44, height: 44)
+                .fill(DesignSystem.Colors.cardBackground.opacity(isActive ? 1.0 : 0.6))
+                .frame(width: 48, height: 48)
+                .overlay(
+                    Circle()
+                        .strokeBorder(DesignSystem.Colors.textTertiary.opacity(isActive ? 0.3 : 0.2), lineWidth: 1)
+                )
 
             // Inner circle for upcoming/suggested (empty circle style)
             if item.status == .upcoming || item.status == .suggested {
                 Circle()
-                    .strokeBorder(Color(.systemGray3), lineWidth: 2)
-                    .frame(width: 32, height: 32)
+                    .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.4), lineWidth: 1.5)
+                    .frame(width: 28, height: 28)
             } else {
                 // Icon for other states
                 Image(systemName: statusIcon)
@@ -399,5 +396,5 @@ struct TimelineItemContainer: View {
             onEditMode: nil
         )
     }
-    .background(Color(.systemBackground))
+    .background(DesignSystem.Colors.background)
 }

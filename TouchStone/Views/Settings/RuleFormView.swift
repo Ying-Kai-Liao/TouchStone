@@ -21,76 +21,134 @@ struct RuleFormView: View {
     private var isEditing: Bool { rule != nil }
 
     var body: some View {
-        Form {
-            Section {
-                TextField("Title", text: $title)
-            } header: {
-                Text("Name")
-            }
+        ZStack {
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
 
-            Section {
-                HStack {
-                    Text("Start")
-                    Spacer()
-                    Picker("Hour", selection: $startHour) {
-                        ForEach(0..<24, id: \.self) { hour in
-                            Text(formatHour(hour)).tag(hour)
-                        }
+            ScrollView {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                    // Name section
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+                        Text("NAME")
+                            .font(DesignSystem.Typography.captionBold)
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                            .tracking(1)
+
+                        TextField("Title", text: $title)
+                            .font(DesignSystem.Typography.body)
+                            .foregroundStyle(DesignSystem.Colors.textPrimary)
+                            .padding(DesignSystem.Spacing.lg)
+                            .background(
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                    .fill(DesignSystem.Colors.cardBackground)
+                            )
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
 
-                    Text(":")
-                        .foregroundStyle(.secondary)
+                    // Time section
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+                        Text("TIME")
+                            .font(DesignSystem.Typography.captionBold)
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                            .tracking(1)
 
-                    Picker("Minute", selection: $startMinute) {
-                        ForEach([0, 15, 30, 45], id: \.self) { minute in
-                            Text(String(format: "%02d", minute)).tag(minute)
+                        VStack(spacing: 0) {
+                            HStack {
+                                Text("Start")
+                                    .font(DesignSystem.Typography.body)
+                                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                Spacer()
+                                Picker("Hour", selection: $startHour) {
+                                    ForEach(0..<24, id: \.self) { hour in
+                                        Text(formatHour(hour)).tag(hour)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .tint(DesignSystem.Colors.accent)
+
+                                Text(":")
+                                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+
+                                Picker("Minute", selection: $startMinute) {
+                                    ForEach([0, 15, 30, 45], id: \.self) { minute in
+                                        Text(String(format: "%02d", minute)).tag(minute)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .tint(DesignSystem.Colors.accent)
+                            }
+                            .padding(DesignSystem.Spacing.lg)
+
+                            Divider()
+                                .background(DesignSystem.Colors.divider)
+
+                            HStack {
+                                Text("End")
+                                    .font(DesignSystem.Typography.body)
+                                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                Spacer()
+                                Picker("Hour", selection: $endHour) {
+                                    ForEach(0..<24, id: \.self) { hour in
+                                        Text(formatHour(hour)).tag(hour)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .tint(DesignSystem.Colors.accent)
+
+                                Text(":")
+                                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+
+                                Picker("Minute", selection: $endMinute) {
+                                    ForEach([0, 15, 30, 45], id: \.self) { minute in
+                                        Text(String(format: "%02d", minute)).tag(minute)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .tint(DesignSystem.Colors.accent)
+                            }
+                            .padding(DesignSystem.Spacing.lg)
                         }
+                        .background(
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                .fill(DesignSystem.Colors.cardBackground)
+                        )
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                }
 
-                HStack {
-                    Text("End")
-                    Spacer()
-                    Picker("Hour", selection: $endHour) {
-                        ForEach(0..<24, id: \.self) { hour in
-                            Text(formatHour(hour)).tag(hour)
+                    // Recurrence section
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+                        Text("RECURRENCE")
+                            .font(DesignSystem.Typography.captionBold)
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                            .tracking(1)
+
+                        VStack(spacing: 0) {
+                            Picker("Repeats", selection: $recurrenceType) {
+                                Text("Daily").tag(RecurrenceType.daily)
+                                Text("Weekdays").tag(RecurrenceType.weekdays)
+                                Text("Weekends").tag(RecurrenceType.weekends)
+                                Text("Custom").tag(RecurrenceType.custom)
+                            }
+                            .pickerStyle(.segmented)
+                            .padding(DesignSystem.Spacing.lg)
+
+                            if recurrenceType == .custom {
+                                Divider()
+                                    .background(DesignSystem.Colors.divider)
+
+                                DaySelector(selectedDays: $customDays)
+                                    .padding(DesignSystem.Spacing.lg)
+                            }
                         }
+                        .background(
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                .fill(DesignSystem.Colors.cardBackground)
+                        )
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-
-                    Text(":")
-                        .foregroundStyle(.secondary)
-
-                    Picker("Minute", selection: $endMinute) {
-                        ForEach([0, 15, 30, 45], id: \.self) { minute in
-                            Text(String(format: "%02d", minute)).tag(minute)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
                 }
-            } header: {
-                Text("Time")
-            }
-
-            Section {
-                Picker("Repeats", selection: $recurrenceType) {
-                    Text("Daily").tag(RecurrenceType.daily)
-                    Text("Weekdays").tag(RecurrenceType.weekdays)
-                    Text("Weekends").tag(RecurrenceType.weekends)
-                    Text("Custom").tag(RecurrenceType.custom)
-                }
-
-                if recurrenceType == .custom {
-                    DaySelector(selectedDays: $customDays)
-                }
-            } header: {
-                Text("Recurrence")
+                .padding(DesignSystem.Spacing.xl)
             }
         }
         .navigationTitle(isEditing ? "Edit Rule" : "New Rule")
@@ -100,6 +158,7 @@ struct RuleFormView: View {
                 Button("Cancel") {
                     dismiss()
                 }
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
 
             ToolbarItem(placement: .confirmationAction) {
@@ -108,6 +167,7 @@ struct RuleFormView: View {
                     dismiss()
                 }
                 .disabled(title.isEmpty)
+                .foregroundStyle(title.isEmpty ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.accent)
             }
         }
         .onAppear {
@@ -212,11 +272,11 @@ struct DayButton: View {
     var body: some View {
         Button(action: action) {
             Text(name)
-                .font(.caption)
+                .font(DesignSystem.Typography.caption)
                 .fontWeight(.medium)
                 .frame(width: 36, height: 36)
-                .background(isSelected ? UserPreferences.shared.accentColor : Color(.systemGray5))
-                .foregroundStyle(isSelected ? .white : .primary)
+                .background(isSelected ? DesignSystem.Colors.accent : DesignSystem.Colors.backgroundLight)
+                .foregroundStyle(isSelected ? DesignSystem.Colors.background : DesignSystem.Colors.textPrimary)
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)

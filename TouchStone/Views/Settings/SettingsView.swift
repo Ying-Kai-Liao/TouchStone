@@ -14,10 +14,10 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "gearshape.fill")
                         .font(.system(size: 28))
-                        .foregroundStyle(Color.white.opacity(0.85))
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
                     Text("Settings")
                         .font(.system(size: 32, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.85))
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
@@ -76,12 +76,20 @@ struct SettingsView: View {
                     // MARK: - Appearance Section
                     SettingsSectionHeader(title: "Appearance")
 
-                    NavigationLink(destination: AccentColorView()) {
+                    NavigationLink(destination: AppearanceModeView()) {
+                        SettingsRow(
+                            icon: prefs.appearanceMode.icon,
+                            title: "Appearance",
+                            value: prefs.appearanceMode.displayName
+                        )
+                    }
+
+                    NavigationLink(destination: ThemeColorView()) {
                         SettingsRow(
                             icon: "circle.fill",
-                            iconColor: prefs.accentColor,
-                            title: "Accent Color",
-                            value: prefs.accentColorOption.displayName
+                            iconColor: prefs.themeColorOption.accentColor,
+                            title: "Theme Color",
+                            value: prefs.themeColorOption.displayName
                         )
                     }
 
@@ -116,7 +124,7 @@ struct SettingsView: View {
                 Spacer(minLength: 40)
             }
         }
-        .background(Color(.systemBackground))
+        .background(DesignSystem.Colors.background)
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -138,31 +146,29 @@ private struct SettingsRow: View {
     var showChevron: Bool = true
     var isLink: Bool = false
 
-    private let softWhite = Color.white.opacity(0.85)
-
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.system(size: 18))
-                .foregroundStyle(iconColor ?? softWhite)
+                .foregroundStyle(iconColor ?? DesignSystem.Colors.textPrimary)
                 .frame(width: 24)
 
             Text(title)
-                .font(.body)
-                .foregroundStyle(softWhite)
+                .font(DesignSystem.Typography.body)
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
 
             Spacer()
 
             if let value = value {
                 Text(value)
-                    .font(.body)
-                    .foregroundStyle(softWhite.opacity(0.7))
+                    .font(DesignSystem.Typography.body)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
 
             if showChevron {
                 Image(systemName: isLink ? "arrow.up.right" : "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(softWhite.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
             }
         }
         .padding(.horizontal, 20)
@@ -175,12 +181,11 @@ private struct SettingsRow: View {
 
 private struct SettingsSectionHeader: View {
     let title: String
-    private let softWhite = Color.white.opacity(0.85)
 
     var body: some View {
         Text(title)
             .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(softWhite.opacity(0.6))
+            .foregroundStyle(DesignSystem.Colors.textSecondary)
             .padding(.horizontal, 20)
             .padding(.top, 28)
             .padding(.bottom, 8)
@@ -193,21 +198,56 @@ private struct WorkingHoursView: View {
     @Bindable private var prefs = UserPreferences.shared
 
     var body: some View {
-        List {
-            Section {
-                Picker("Start", selection: $prefs.workDayStartHour) {
-                    ForEach(5...12, id: \.self) { hour in
-                        Text(formatHour(hour)).tag(hour)
-                    }
-                }
+        ZStack {
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
 
-                Picker("End", selection: $prefs.workDayEndHour) {
-                    ForEach(17...23, id: \.self) { hour in
-                        Text(formatHour(hour)).tag(hour)
+            ScrollView {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                    // Start time
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+                        Text("Start")
+                            .font(DesignSystem.Typography.body)
+                            .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                        Picker("Start", selection: $prefs.workDayStartHour) {
+                            ForEach(5...12, id: \.self) { hour in
+                                Text(formatHour(hour)).tag(hour)
+                            }
+                        }
+                        .pickerStyle(.segmented)
                     }
+                    .padding(DesignSystem.Spacing.lg)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                            .fill(DesignSystem.Colors.cardBackground)
+                    )
+
+                    // End time
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+                        Text("End")
+                            .font(DesignSystem.Typography.body)
+                            .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                        Picker("End", selection: $prefs.workDayEndHour) {
+                            ForEach(17...23, id: \.self) { hour in
+                                Text(formatHour(hour)).tag(hour)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    .padding(DesignSystem.Spacing.lg)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                            .fill(DesignSystem.Colors.cardBackground)
+                    )
+
+                    Text("Sessions are scheduled within these hours.")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .padding(.horizontal, DesignSystem.Spacing.sm)
                 }
-            } footer: {
-                Text("Sessions are scheduled within these hours.")
+                .padding(DesignSystem.Spacing.xl)
             }
         }
         .navigationTitle("Working Hours")
@@ -228,11 +268,36 @@ private struct DailyGoalView: View {
     @Bindable private var prefs = UserPreferences.shared
 
     var body: some View {
-        List {
-            Section {
-                Stepper("\(prefs.dailyProductiveHours) hours", value: $prefs.dailyProductiveHours, in: 1...12)
-            } footer: {
-                Text("Target productive hours per day.")
+        ZStack {
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                    VStack(spacing: DesignSystem.Spacing.lg) {
+                        Text("\(prefs.dailyProductiveHours)")
+                            .font(DesignSystem.Typography.statLarge)
+                            .foregroundStyle(DesignSystem.Colors.accent)
+                        + Text(" hours")
+                            .font(DesignSystem.Typography.title2)
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
+
+                        Stepper("", value: $prefs.dailyProductiveHours, in: 1...12)
+                            .labelsHidden()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(DesignSystem.Spacing.xl)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                            .fill(DesignSystem.Colors.cardBackground)
+                    )
+
+                    Text("Target productive hours per day.")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .padding(.horizontal, DesignSystem.Spacing.sm)
+                }
+                .padding(DesignSystem.Spacing.xl)
             }
         }
         .navigationTitle("Daily Goal")
@@ -246,12 +311,54 @@ private struct SessionLengthView: View {
     @Bindable private var prefs = UserPreferences.shared
 
     var body: some View {
-        List {
-            Section {
-                Stepper("Min: \(prefs.sessionMinMinutes) min", value: $prefs.sessionMinMinutes, in: 30...60, step: 15)
-                Stepper("Max: \(prefs.sessionMaxMinutes) min", value: $prefs.sessionMaxMinutes, in: 60...120, step: 15)
-            } footer: {
-                Text("Preferred focus session duration range.")
+        ZStack {
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                    VStack(spacing: DesignSystem.Spacing.xl) {
+                        // Min duration
+                        HStack {
+                            Text("Minimum")
+                                .font(DesignSystem.Typography.body)
+                                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                            Spacer()
+                            Text("\(prefs.sessionMinMinutes) min")
+                                .font(DesignSystem.Typography.headline)
+                                .foregroundStyle(DesignSystem.Colors.accent)
+                        }
+                        Stepper("", value: $prefs.sessionMinMinutes, in: 30...60, step: 15)
+                            .labelsHidden()
+
+                        Divider()
+                            .background(DesignSystem.Colors.divider)
+
+                        // Max duration
+                        HStack {
+                            Text("Maximum")
+                                .font(DesignSystem.Typography.body)
+                                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                            Spacer()
+                            Text("\(prefs.sessionMaxMinutes) min")
+                                .font(DesignSystem.Typography.headline)
+                                .foregroundStyle(DesignSystem.Colors.accent)
+                        }
+                        Stepper("", value: $prefs.sessionMaxMinutes, in: 60...120, step: 15)
+                            .labelsHidden()
+                    }
+                    .padding(DesignSystem.Spacing.lg)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                            .fill(DesignSystem.Colors.cardBackground)
+                    )
+
+                    Text("Preferred focus session duration range.")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .padding(.horizontal, DesignSystem.Spacing.sm)
+                }
+                .padding(DesignSystem.Spacing.xl)
             }
         }
         .navigationTitle("Session Length")
@@ -265,18 +372,72 @@ private struct BreaksView: View {
     @Bindable private var prefs = UserPreferences.shared
 
     var body: some View {
-        List {
-            Section {
-                Toggle("Enable Breaks", isOn: $prefs.restBetweenSessionsEnabled)
-            }
+        ZStack {
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
 
-            if prefs.restBetweenSessionsEnabled {
-                Section {
-                    Stepper("Work: \(prefs.workIntervalMinutes) min", value: $prefs.workIntervalMinutes, in: 30...120, step: 15)
-                    Stepper("Break: \(prefs.restDurationMinutes) min", value: $prefs.restDurationMinutes, in: 5...30, step: 5)
-                } footer: {
-                    Text("Take a \(prefs.restDurationMinutes)-minute break every \(prefs.workIntervalMinutes) minutes.")
+            ScrollView {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                    // Toggle card
+                    HStack {
+                        Text("Enable Breaks")
+                            .font(DesignSystem.Typography.body)
+                            .foregroundStyle(DesignSystem.Colors.textPrimary)
+                        Spacer()
+                        Toggle("", isOn: $prefs.restBetweenSessionsEnabled)
+                            .labelsHidden()
+                            .tint(DesignSystem.Colors.accent)
+                    }
+                    .padding(DesignSystem.Spacing.lg)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                            .fill(DesignSystem.Colors.cardBackground)
+                    )
+
+                    if prefs.restBetweenSessionsEnabled {
+                        VStack(spacing: DesignSystem.Spacing.xl) {
+                            // Work interval
+                            HStack {
+                                Text("Work Interval")
+                                    .font(DesignSystem.Typography.body)
+                                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                Spacer()
+                                Text("\(prefs.workIntervalMinutes) min")
+                                    .font(DesignSystem.Typography.headline)
+                                    .foregroundStyle(DesignSystem.Colors.accent)
+                            }
+                            Stepper("", value: $prefs.workIntervalMinutes, in: 30...120, step: 15)
+                                .labelsHidden()
+
+                            Divider()
+                                .background(DesignSystem.Colors.divider)
+
+                            // Break duration
+                            HStack {
+                                Text("Break Duration")
+                                    .font(DesignSystem.Typography.body)
+                                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                Spacer()
+                                Text("\(prefs.restDurationMinutes) min")
+                                    .font(DesignSystem.Typography.headline)
+                                    .foregroundStyle(DesignSystem.Colors.accent)
+                            }
+                            Stepper("", value: $prefs.restDurationMinutes, in: 5...30, step: 5)
+                                .labelsHidden()
+                        }
+                        .padding(DesignSystem.Spacing.lg)
+                        .background(
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                .fill(DesignSystem.Colors.cardBackground)
+                        )
+
+                        Text("Take a \(prefs.restDurationMinutes)-minute break every \(prefs.workIntervalMinutes) minutes.")
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                            .padding(.horizontal, DesignSystem.Spacing.sm)
+                    }
                 }
+                .padding(DesignSystem.Spacing.xl)
             }
         }
         .navigationTitle("Breaks")
@@ -290,31 +451,40 @@ private struct DeadlineBufferView: View {
     @Bindable private var prefs = UserPreferences.shared
 
     var body: some View {
-        List {
-            Section {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        Text("Buffer")
-                        Spacer()
-                        Text("\(prefs.deadlineBufferPercent)%")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(prefs.accentColor)
-                    }
+        ZStack {
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
 
-                    Slider(
-                        value: Binding(
-                            get: { Double(prefs.deadlineBufferPercent) },
-                            set: { prefs.deadlineBufferPercent = Int($0) }
-                        ),
-                        in: 0...50,
-                        step: 5
+            ScrollView {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                    VStack(spacing: DesignSystem.Spacing.xl) {
+                        Text("\(prefs.deadlineBufferPercent)%")
+                            .font(DesignSystem.Typography.statLarge)
+                            .foregroundStyle(DesignSystem.Colors.accent)
+
+                        Slider(
+                            value: Binding(
+                                get: { Double(prefs.deadlineBufferPercent) },
+                                set: { prefs.deadlineBufferPercent = Int($0) }
+                            ),
+                            in: 0...50,
+                            step: 5
+                        )
+                        .tint(DesignSystem.Colors.accent)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(DesignSystem.Spacing.xl)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                            .fill(DesignSystem.Colors.cardBackground)
                     )
-                    .tint(prefs.accentColor)
+
+                    Text("Reserve \(prefs.deadlineBufferPercent)% of days before deadlines for unexpected issues.")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .padding(.horizontal, DesignSystem.Spacing.sm)
                 }
-                .padding(.vertical, 8)
-            } footer: {
-                Text("Reserve \(prefs.deadlineBufferPercent)% of days before deadlines for unexpected issues.")
+                .padding(DesignSystem.Spacing.xl)
             }
         }
         .navigationTitle("Deadline Buffer")
@@ -322,41 +492,134 @@ private struct DeadlineBufferView: View {
     }
 }
 
-// MARK: - Accent Color View
+// MARK: - Appearance Mode View
 
-private struct AccentColorView: View {
+private struct AppearanceModeView: View {
     @Bindable private var prefs = UserPreferences.shared
 
     var body: some View {
-        List {
-            Section {
-                ForEach(AccentColorOption.allCases) { option in
-                    Button {
-                        prefs.accentColorOption = option
-                    } label: {
-                        HStack(spacing: 14) {
-                            Circle()
-                                .fill(option.color)
-                                .frame(width: 24, height: 24)
+        ZStack {
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
 
-                            Text(option.displayName)
-                                .foregroundStyle(.primary)
+            ScrollView {
+                VStack(spacing: DesignSystem.Spacing.lg) {
+                    ForEach(AppearanceMode.allCases) { mode in
+                        Button {
+                            prefs.appearanceMode = mode
+                        } label: {
+                            HStack(spacing: DesignSystem.Spacing.lg) {
+                                Image(systemName: mode.icon)
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(DesignSystem.Colors.accent)
+                                    .frame(width: 32)
 
-                            Spacer()
+                                Text(mode.displayName)
+                                    .font(DesignSystem.Typography.body)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(DesignSystem.Colors.textPrimary)
 
-                            if prefs.accentColorOption == option {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(prefs.accentColor)
+                                Spacer()
+
+                                if prefs.appearanceMode == mode {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundStyle(DesignSystem.Colors.accent)
+                                }
                             }
+                            .padding(DesignSystem.Spacing.lg)
+                            .background(
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                    .fill(DesignSystem.Colors.cardBackground)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                    .strokeBorder(
+                                        prefs.appearanceMode == mode
+                                            ? DesignSystem.Colors.accent.opacity(0.5)
+                                            : DesignSystem.Colors.textTertiary.opacity(0.2),
+                                        lineWidth: prefs.appearanceMode == mode ? 2 : 1
+                                    )
+                            )
                         }
+                        .buttonStyle(.plain)
                     }
+
+                    // Note about the setting
+                    Text("Choose how TouchStone appears. System follows your device settings.")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, DesignSystem.Spacing.sm)
                 }
+                .padding(DesignSystem.Spacing.xl)
             }
         }
-        .navigationTitle("Accent Color")
+        .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
-        .tint(prefs.accentColor)
+    }
+}
+
+// MARK: - Theme Color View
+
+private struct ThemeColorView: View {
+    @Bindable private var prefs = UserPreferences.shared
+
+    var body: some View {
+        ZStack {
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: DesignSystem.Spacing.lg) {
+                    ForEach(ThemeColorOption.allCases) { option in
+                        Button {
+                            prefs.themeColorOption = option
+                        } label: {
+                            HStack(spacing: DesignSystem.Spacing.lg) {
+                                // Color preview circle
+                                Circle()
+                                    .fill(option.accentColor)
+                                    .frame(width: 32, height: 32)
+
+                                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                                    Text(option.displayName)
+                                        .font(DesignSystem.Typography.body)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                }
+
+                                Spacer()
+
+                                if prefs.themeColorOption == option {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundStyle(option.accentColor)
+                                }
+                            }
+                            .padding(DesignSystem.Spacing.lg)
+                            .background(
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                    .fill(DesignSystem.Colors.cardBackground)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                    .strokeBorder(
+                                        prefs.themeColorOption == option
+                                            ? option.accentColor.opacity(0.5)
+                                            : DesignSystem.Colors.textTertiary.opacity(0.2),
+                                        lineWidth: prefs.themeColorOption == option ? 2 : 1
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(DesignSystem.Spacing.xl)
+            }
+        }
+        .navigationTitle("Theme Color")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -374,70 +637,138 @@ private struct AISettingsView: View {
     }
 
     var body: some View {
-        List {
-            if hasExistingKey {
-                Section {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                        Text("Connected")
-                        Spacer()
+        ZStack {
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                    if hasExistingKey {
+                        // Connected status card
+                        VStack(spacing: DesignSystem.Spacing.lg) {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(DesignSystem.Colors.success)
+                                Text("Connected")
+                                    .font(DesignSystem.Typography.body)
+                                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                Spacer()
+                            }
+
+                            Button {
+                                showDeleteConfirmation = true
+                            } label: {
+                                Text("Remove API Key")
+                                    .font(DesignSystem.Typography.body)
+                                    .foregroundStyle(DesignSystem.Colors.error)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(DesignSystem.Spacing.md)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                                            .fill(DesignSystem.Colors.error.opacity(0.1))
+                                    )
+                            }
+                        }
+                        .padding(DesignSystem.Spacing.lg)
+                        .background(
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                .fill(DesignSystem.Colors.cardBackground)
+                        )
+                    } else {
+                        // API Key input card
+                        VStack(spacing: DesignSystem.Spacing.lg) {
+                            HStack {
+                                if showAPIKey {
+                                    TextField("sk-...", text: $apiKey)
+                                        .autocorrectionDisabled()
+                                        .textInputAutocapitalization(.never)
+                                        .font(DesignSystem.Typography.body)
+                                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                } else {
+                                    SecureField("sk-...", text: $apiKey)
+                                        .autocorrectionDisabled()
+                                        .textInputAutocapitalization(.never)
+                                        .font(DesignSystem.Typography.body)
+                                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                }
+
+                                Button {
+                                    showAPIKey.toggle()
+                                } label: {
+                                    Image(systemName: showAPIKey ? "eye.slash" : "eye")
+                                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+                                }
+                            }
+                            .padding(DesignSystem.Spacing.md)
+                            .background(
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                                    .fill(DesignSystem.Colors.backgroundLight)
+                            )
+
+                            Button {
+                                saveAPIKey()
+                            } label: {
+                                Text("Save Key")
+                                    .font(DesignSystem.Typography.headline)
+                                    .foregroundStyle(apiKey.isEmpty ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.background)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(DesignSystem.Spacing.md)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                                            .fill(apiKey.isEmpty ? DesignSystem.Colors.cardBackgroundLight : DesignSystem.Colors.accent)
+                                    )
+                            }
+                            .disabled(apiKey.isEmpty)
+                        }
+                        .padding(DesignSystem.Spacing.lg)
+                        .background(
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                .fill(DesignSystem.Colors.cardBackground)
+                        )
+
+                        Text("Your API key is stored securely in the Keychain.")
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                            .padding(.horizontal, DesignSystem.Spacing.sm)
                     }
 
-                    Button("Remove API Key", role: .destructive) {
-                        showDeleteConfirmation = true
-                    }
-                }
-            } else {
-                Section {
-                    HStack {
-                        if showAPIKey {
-                            TextField("sk-...", text: $apiKey)
-                                .autocorrectionDisabled()
-                                .textInputAutocapitalization(.never)
-                        } else {
-                            SecureField("sk-...", text: $apiKey)
-                                .autocorrectionDisabled()
-                                .textInputAutocapitalization(.never)
+                    // Links section
+                    VStack(spacing: 0) {
+                        Link(destination: URL(string: "https://platform.openai.com/api-keys")!) {
+                            HStack {
+                                Text("Get API Key")
+                                    .font(DesignSystem.Typography.body)
+                                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                Spacer()
+                                Image(systemName: "arrow.up.right")
+                                    .font(.caption)
+                                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                            }
+                            .padding(DesignSystem.Spacing.lg)
                         }
 
-                        Button {
-                            showAPIKey.toggle()
-                        } label: {
-                            Image(systemName: showAPIKey ? "eye.slash" : "eye")
-                                .foregroundStyle(.secondary)
+                        Divider()
+                            .background(DesignSystem.Colors.divider)
+
+                        Link(destination: URL(string: "https://platform.openai.com/usage")!) {
+                            HStack {
+                                Text("View Usage")
+                                    .font(DesignSystem.Typography.body)
+                                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                Spacer()
+                                Image(systemName: "arrow.up.right")
+                                    .font(.caption)
+                                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                            }
+                            .padding(DesignSystem.Spacing.lg)
                         }
                     }
-
-                    Button("Save Key") {
-                        saveAPIKey()
-                    }
-                    .disabled(apiKey.isEmpty)
-                } footer: {
-                    Text("Your API key is stored securely in the Keychain.")
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                            .fill(DesignSystem.Colors.cardBackground)
+                    )
                 }
-            }
-
-            Section {
-                Link(destination: URL(string: "https://platform.openai.com/api-keys")!) {
-                    HStack {
-                        Text("Get API Key")
-                        Spacer()
-                        Image(systemName: "arrow.up.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-
-                Link(destination: URL(string: "https://platform.openai.com/usage")!) {
-                    HStack {
-                        Text("View Usage")
-                        Spacer()
-                        Image(systemName: "arrow.up.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
+                .padding(DesignSystem.Spacing.xl)
             }
         }
         .navigationTitle("AI Assistant")

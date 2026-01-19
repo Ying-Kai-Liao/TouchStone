@@ -1,7 +1,114 @@
 import Foundation
 import SwiftUI
 
-// MARK: - Accent Color Option
+// MARK: - Appearance Mode Option
+
+enum AppearanceMode: String, CaseIterable, Identifiable {
+    case system = "system"
+    case light = "light"
+    case dark = "dark"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .system: return "circle.lefthalf.filled"
+        case .light: return "sun.max.fill"
+        case .dark: return "moon.fill"
+        }
+    }
+}
+
+// MARK: - Theme Color Option
+
+enum ThemeColorOption: String, CaseIterable, Identifiable {
+    case sage = "sage"
+    case ocean = "ocean"
+    case lavender = "lavender"
+    case coral = "coral"
+    case gold = "gold"
+    case slate = "slate"
+
+    var id: String { rawValue }
+
+    /// Helper to check appearance mode
+    private var isDarkMode: Bool {
+        switch UserPreferences.shared.appearanceMode {
+        case .dark: return true
+        case .light: return false
+        case .system: return true
+        }
+    }
+
+    /// The main accent color for this theme (adapts to light/dark mode)
+    var accentColor: Color {
+        if isDarkMode {
+            // Dark mode: lighter, softer colors
+            switch self {
+            case .sage: return Color(red: 0.65, green: 0.78, blue: 0.65)
+            case .ocean: return Color(red: 0.55, green: 0.70, blue: 0.80)
+            case .lavender: return Color(red: 0.70, green: 0.60, blue: 0.80)
+            case .coral: return Color(red: 0.85, green: 0.55, blue: 0.55)
+            case .gold: return Color(red: 0.85, green: 0.75, blue: 0.50)
+            case .slate: return Color(red: 0.60, green: 0.65, blue: 0.70)
+            }
+        } else {
+            // Light mode: deeper, more saturated colors for contrast
+            switch self {
+            case .sage: return Color(red: 0.35, green: 0.55, blue: 0.40)
+            case .ocean: return Color(red: 0.25, green: 0.50, blue: 0.65)
+            case .lavender: return Color(red: 0.50, green: 0.40, blue: 0.65)
+            case .coral: return Color(red: 0.75, green: 0.35, blue: 0.35)
+            case .gold: return Color(red: 0.70, green: 0.55, blue: 0.25)
+            case .slate: return Color(red: 0.40, green: 0.45, blue: 0.52)
+            }
+        }
+    }
+
+    /// A muted version of the accent
+    var accentMuted: Color {
+        if isDarkMode {
+            switch self {
+            case .sage: return Color(red: 0.55, green: 0.68, blue: 0.55)
+            case .ocean: return Color(red: 0.45, green: 0.60, blue: 0.70)
+            case .lavender: return Color(red: 0.60, green: 0.50, blue: 0.70)
+            case .coral: return Color(red: 0.75, green: 0.45, blue: 0.45)
+            case .gold: return Color(red: 0.75, green: 0.65, blue: 0.40)
+            case .slate: return Color(red: 0.50, green: 0.55, blue: 0.60)
+            }
+        } else {
+            switch self {
+            case .sage: return Color(red: 0.45, green: 0.60, blue: 0.50)
+            case .ocean: return Color(red: 0.35, green: 0.55, blue: 0.70)
+            case .lavender: return Color(red: 0.55, green: 0.48, blue: 0.68)
+            case .coral: return Color(red: 0.78, green: 0.45, blue: 0.45)
+            case .gold: return Color(red: 0.75, green: 0.60, blue: 0.35)
+            case .slate: return Color(red: 0.48, green: 0.52, blue: 0.58)
+            }
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .sage: return "Sage"
+        case .ocean: return "Ocean"
+        case .lavender: return "Lavender"
+        case .coral: return "Coral"
+        case .gold: return "Gold"
+        case .slate: return "Slate"
+        }
+    }
+}
+
+// MARK: - Legacy Accent Color Option (deprecated)
 
 enum AccentColorOption: String, CaseIterable, Identifiable {
     case blue = "blue"
@@ -73,6 +180,8 @@ class UserPreferences {
         static let restDurationMinutes = "restDurationMinutes"
         static let appLanguage = "appLanguage"
         static let accentColor = "accentColor"
+        static let themeColor = "themeColor"
+        static let appearanceMode = "appearanceMode"
         static let deadlineBufferPercent = "deadlineBufferPercent"
     }
 
@@ -143,16 +252,44 @@ class UserPreferences {
         didSet { defaults.set(appLanguage, forKey: Keys.appLanguage) }
     }
 
-    // MARK: - Accent Color
+    // MARK: - Appearance Mode
 
-    /// Selected accent color option (default: teal)
-    var accentColorOption: AccentColorOption {
-        didSet { defaults.set(accentColorOption.rawValue, forKey: Keys.accentColor) }
+    /// Selected appearance mode (default: system)
+    var appearanceMode: AppearanceMode {
+        didSet { defaults.set(appearanceMode.rawValue, forKey: Keys.appearanceMode) }
     }
 
-    /// Computed accent color for SwiftUI
+    /// Computed color scheme for SwiftUI
+    var colorScheme: ColorScheme? {
+        switch appearanceMode {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+
+    // MARK: - Theme Color
+
+    /// Selected theme color option (default: sage)
+    var themeColorOption: ThemeColorOption {
+        didSet { defaults.set(themeColorOption.rawValue, forKey: Keys.themeColor) }
+    }
+
+    /// Computed accent color for SwiftUI (from theme)
     var accentColor: Color {
-        accentColorOption.color
+        themeColorOption.accentColor
+    }
+
+    /// Computed muted accent color
+    var accentMuted: Color {
+        themeColorOption.accentMuted
+    }
+
+    // MARK: - Legacy Accent Color (deprecated, kept for compatibility)
+
+    /// Selected accent color option (deprecated - use themeColorOption)
+    var accentColorOption: AccentColorOption {
+        didSet { defaults.set(accentColorOption.rawValue, forKey: Keys.accentColor) }
     }
 
     // MARK: - Initialization
@@ -170,7 +307,23 @@ class UserPreferences {
         self.deadlineBufferPercent = defaults.object(forKey: Keys.deadlineBufferPercent) as? Int ?? 20
         self.appLanguage = defaults.string(forKey: Keys.appLanguage) ?? "system"
 
-        // Load accent color
+        // Load appearance mode
+        if let modeString = defaults.string(forKey: Keys.appearanceMode),
+           let mode = AppearanceMode(rawValue: modeString) {
+            self.appearanceMode = mode
+        } else {
+            self.appearanceMode = .dark
+        }
+
+        // Load theme color
+        if let colorString = defaults.string(forKey: Keys.themeColor),
+           let color = ThemeColorOption(rawValue: colorString) {
+            self.themeColorOption = color
+        } else {
+            self.themeColorOption = .sage
+        }
+
+        // Load legacy accent color (for compatibility)
         if let colorString = defaults.string(forKey: Keys.accentColor),
            let color = AccentColorOption(rawValue: colorString) {
             self.accentColorOption = color

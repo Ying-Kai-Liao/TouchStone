@@ -20,30 +20,25 @@ struct ProjectsListView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if projects.isEmpty {
-                    emptyState
-                } else {
-                    projectList
-                }
-            }
-            .navigationTitle("Projects")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingAddSheet = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 36, height: 36)
-                            .background(
-                                Circle()
-                                    .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)
-                            )
+            ZStack {
+                DesignSystem.Colors.background
+                    .ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    // Custom header
+                    headerView
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+
+                    // Content
+                    if projects.isEmpty {
+                        emptyState
+                    } else {
+                        projectList
                     }
                 }
             }
+            .navigationBarHidden(true)
             .sheet(isPresented: $showingAddSheet) {
                 NewProjectChoiceView()
             }
@@ -68,57 +63,124 @@ struct ProjectsListView: View {
         projectToDelete = nil
     }
 
+    // MARK: - Header View
+
+    private var headerView: some View {
+        HStack(alignment: .center) {
+            Text("Projects")
+                .font(.system(size: 24, weight: .light))
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+            Spacer()
+
+            Button {
+                showingAddSheet = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(DesignSystem.Colors.cardBackground)
+                    )
+                    .overlay(
+                        Circle()
+                            .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.3), lineWidth: 1)
+                    )
+            }
+        }
+    }
+
+    // MARK: - Project List
+
     private var projectList: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if !activeProjects.isEmpty {
-                    projectSection(title: "ACTIVE", projects: activeProjects)
+            VStack(spacing: 16) {
+                ForEach(activeProjects) { project in
+                    SwipeToDeleteRow(
+                        onDelete: {
+                            projectToDelete = project
+                            showDeleteAlert = true
+                        }
+                    ) {
+                        ProjectCard(project: project) {
+                            selectedProject = project
+                        }
+                    }
                 }
 
                 if !archivedProjects.isEmpty {
-                    projectSection(title: "ARCHIVED", projects: archivedProjects)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-        }
-        .background(Color(.systemBackground))
-    }
+                    // Archived section with header
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("ARCHIVED")
+                            .font(DesignSystem.Typography.captionBold)
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                            .tracking(1.5)
+                            .padding(.leading, 4)
+                            .padding(.top, 8)
 
-    private func projectSection(title: String, projects: [Project]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .tracking(1)
-                .padding(.leading, 4)
-
-            ForEach(projects) { project in
-                SwipeToDeleteRow(
-                    onDelete: {
-                        projectToDelete = project
-                        showDeleteAlert = true
-                    }
-                ) {
-                    ProjectCard(project: project) {
-                        selectedProject = project
+                        ForEach(archivedProjects) { project in
+                            SwipeToDeleteRow(
+                                onDelete: {
+                                    projectToDelete = project
+                                    showDeleteAlert = true
+                                }
+                            ) {
+                                ProjectCard(project: project) {
+                                    selectedProject = project
+                                }
+                            }
+                        }
                     }
                 }
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 32)
         }
     }
 
     private var emptyState: some View {
-        ContentUnavailableView {
-            Label("No Projects", systemImage: "folder")
-        } description: {
+        VStack(spacing: 16) {
+            Spacer()
+
+            Image(systemName: "folder")
+                .font(.system(size: 48))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+
+            Text("No Projects")
+                .font(DesignSystem.Typography.headline)
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
+
             Text("Projects are ongoing work you want to touch.\nAdd a project to start tracking your effort.")
-        } actions: {
-            Button("Add Project") {
+                .font(DesignSystem.Typography.body)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .multilineTextAlignment(.center)
+
+            Button {
                 showingAddSheet = true
+            } label: {
+                Text("Add Project")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(DesignSystem.Colors.accent)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(
+                        Capsule()
+                            .fill(DesignSystem.Colors.accent.opacity(0.15))
+                    )
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(DesignSystem.Colors.accent.opacity(0.3), lineWidth: 1)
+                    )
             }
+            .padding(.top, 8)
+
+            Spacer()
         }
+        .frame(maxWidth: .infinity)
+        .background(DesignSystem.Colors.background)
     }
 
     private func deleteProjects(at offsets: IndexSet, from list: [Project]) {
@@ -132,14 +194,6 @@ struct ProjectCard: View {
     @Bindable var project: Project
     let onTap: () -> Void
 
-    private var hoursToday: Int {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let todayLogs = project.touchLogs.filter { calendar.startOfDay(for: $0.timestamp) == today }
-        let totalMinutes = todayLogs.reduce(0) { $0 + $1.durationMinutes }
-        return totalMinutes / 60
-    }
-
     private var phaseName: String? {
         if project.hasStrategicPlan {
             return project.activePhase?.title
@@ -152,100 +206,99 @@ struct ProjectCard: View {
         project.totalPlannedMinutes / 60
     }
 
-    private var completedHoursValue: Int {
+    private var completedHours: Int {
         project.completedHours
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Top row: Title and hours badge
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(project.title)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-
-                    if let phase = phaseName {
-                        Text(phase)
-                            .font(.subheadline)
-                            .foregroundStyle(Color.white.opacity(0.6))
-                    }
+    /// Category label based on project type/phase
+    private var categoryLabel: String {
+        if project.hasStrategicPlan {
+            if let phase = project.activePhase {
+                // Map phase mental rule to category
+                switch phase.mentalRule {
+                case "divergent": return "EXPLORATION"
+                case "convergent": return "DEEP FOCUS"
+                case "iterative": return "BUILDING FLOW"
+                default: return "ACTIVE GROWTH"
                 }
+            }
+            return "ACTIVE GROWTH"
+        }
+        return "BUILDING FLOW"
+    }
 
-                Spacer()
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Top section: Title and phase
+            VStack(alignment: .leading, spacing: 6) {
+                Text(project.title)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
 
-                HStack(spacing: 4) {
-                    if hoursToday > 0 {
-                        Text("\(hoursToday) hr\(hoursToday == 1 ? "" : "s") today")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundStyle(UserPreferences.shared.accentColor)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                Capsule()
-                                    .strokeBorder(UserPreferences.shared.accentColor.opacity(0.4), lineWidth: 1)
-                            )
-                    }
+                if let phase = phaseName {
+                    Text(phase)
+                        .font(.system(size: 15))
+                        .foregroundStyle(DesignSystem.Colors.accent)
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 24)
 
-            // Bottom row: Progress bar and hours
-            HStack(alignment: .center, spacing: 12) {
-                // Progress bar
+            // Bottom section: Category label, hours, and progress bar
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(categoryLabel)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .tracking(1)
+
+                    Spacer()
+
+                    if totalHours > 0 {
+                        Text("\(completedHours) / \(totalHours) hrs")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(DesignSystem.Colors.accent)
+                    } else if completedHours > 0 {
+                        Text("\(completedHours) hrs")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(DesignSystem.Colors.accent)
+                    }
+                }
+
+                // Progress bar - full width
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         // Background track
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.white.opacity(0.15))
-                            .frame(height: 8)
+                            .fill(DesignSystem.Colors.textTertiary.opacity(0.2))
+                            .frame(height: 6)
 
                         // Progress fill
                         if project.totalPlannedMinutes > 0 {
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(UserPreferences.shared.accentColor)
-                                .frame(width: geometry.size.width * project.progress, height: 8)
-                        } else if completedHoursValue > 0 {
+                                .fill(DesignSystem.Colors.accent.opacity(0.8))
+                                .frame(width: max(geometry.size.width * project.progress, 0), height: 6)
+                        } else if completedHours > 0 {
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(UserPreferences.shared.accentColor)
-                                .frame(width: 20, height: 8)
+                                .fill(DesignSystem.Colors.accent.opacity(0.8))
+                                .frame(width: 20, height: 6)
                         }
                     }
                 }
-                .frame(height: 8)
-
-                // Chevron and hours
-                HStack(spacing: 8) {
-                    if project.totalPlannedMinutes > 0 {
-                        Text("\(completedHoursValue) / \(totalHours)h")
-                            .font(.caption)
-                            .foregroundStyle(Color.white.opacity(0.5))
-                    } else if completedHoursValue > 0 {
-                        Text("\(completedHoursValue)h")
-                            .font(.caption)
-                            .foregroundStyle(Color.white.opacity(0.5))
-                    }
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(Color.white.opacity(0.3))
-                }
+                .frame(height: 6)
             }
         }
-        .padding(16)
-        .frame(minHeight: 120)
+        .padding(24)
+        .frame(minHeight: 160)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(red: 0.1, green: 0.18, blue: 0.15))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(Color(red: 0.2, green: 0.35, blue: 0.28), lineWidth: 1)
-                )
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .fill(DesignSystem.Colors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
         )
         .contentShape(Rectangle())
         .onTapGesture {

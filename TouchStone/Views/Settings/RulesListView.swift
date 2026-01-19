@@ -13,29 +13,68 @@ struct RulesListView: View {
     @State private var editingRule: Rule?
 
     var body: some View {
-        List {
-            Section {
-                ForEach(rules) { rule in
-                    RuleRowView(rule: rule)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            editingRule = rule
+        ZStack {
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                    if rules.isEmpty {
+                        // Empty state
+                        VStack(spacing: DesignSystem.Spacing.md) {
+                            Image(systemName: "calendar.badge.clock")
+                                .font(.system(size: 40))
+                                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                            Text("No time blocks")
+                                .font(DesignSystem.Typography.body)
+                                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                            Text("Add blocked time slots to prevent scheduling during certain hours.")
+                                .font(DesignSystem.Typography.caption)
+                                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                                .multilineTextAlignment(.center)
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, DesignSystem.Spacing.xxl)
+                    } else {
+                        // Rules list
+                        VStack(spacing: 0) {
+                            ForEach(rules) { rule in
+                                RuleRowView(rule: rule)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        editingRule = rule
+                                    }
+
+                                if rule.id != rules.last?.id {
+                                    Divider()
+                                        .background(DesignSystem.Colors.divider)
+                                        .padding(.leading, DesignSystem.Spacing.lg)
+                                }
+                            }
+                        }
+                        .background(
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                .fill(DesignSystem.Colors.cardBackground)
+                        )
+                    }
+
+                    Text("Sessions won't be scheduled during these time blocks.")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .padding(.horizontal, DesignSystem.Spacing.sm)
                 }
-                .onDelete(perform: deleteRules)
-            } header: {
-                Text("Daily Rules")
-            } footer: {
-                Text("Sessions won't be scheduled during these time blocks.")
+                .padding(DesignSystem.Spacing.xl)
             }
         }
-        .navigationTitle("Daily Rules")
+        .navigationTitle("Time Blocks")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     showAddRule = true
                 } label: {
                     Image(systemName: "plus")
+                        .foregroundStyle(DesignSystem.Colors.accent)
                 }
             }
         }
@@ -66,24 +105,24 @@ struct RuleRowView: View {
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                 Text(rule.title)
-                    .font(.body)
+                    .font(DesignSystem.Typography.body)
                     .fontWeight(.medium)
-                    .foregroundStyle(rule.isActive ? .primary : .secondary)
+                    .foregroundStyle(rule.isActive ? DesignSystem.Colors.textPrimary : DesignSystem.Colors.textTertiary)
 
-                HStack(spacing: 8) {
+                HStack(spacing: DesignSystem.Spacing.sm) {
                     Text(rule.timeRangeString)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
 
                     Text("·")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
 
                     Text(rule.recurrenceDescription)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
             }
 
@@ -91,8 +130,9 @@ struct RuleRowView: View {
 
             Toggle("", isOn: $rule.isActive)
                 .labelsHidden()
+                .tint(DesignSystem.Colors.accent)
         }
-        .padding(.vertical, 4)
+        .padding(DesignSystem.Spacing.lg)
     }
 }
 

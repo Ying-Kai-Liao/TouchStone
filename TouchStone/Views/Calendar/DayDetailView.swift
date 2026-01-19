@@ -30,36 +30,42 @@ struct DayDetailView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Date header
-                    dateHeader
+            ZStack {
+                DesignSystem.Colors.background
+                    .ignoresSafeArea()
 
-                    // Schedule section first (stones)
-                    if !stones.isEmpty {
-                        stonesSection
-                    } else {
-                        emptyScheduleHint
+                ScrollView {
+                    VStack(spacing: DesignSystem.Spacing.lg) {
+                        // Date header
+                        dateHeader
+
+                        // Schedule section first (stones)
+                        if !stones.isEmpty {
+                            stonesSection
+                        } else {
+                            emptyScheduleHint
+                        }
+
+                        // Pie chart section
+                        dayAllocationChart
+                            .padding(.horizontal, DesignSystem.Spacing.xl)
                     }
-
-                    // Pie chart section
-                    dayAllocationChart
-                        .padding(.horizontal)
+                    .padding(.bottom, 100)
                 }
-                .padding(.bottom, 100)
+                .safeAreaInset(edge: .bottom) {
+                    addStoneButton
+                }
             }
-            .safeAreaInset(edge: .bottom) {
-                addStoneButton
-            }
-            .navigationTitle("Day Overview")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
                         dismiss()
                     }
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
             }
+            .toolbarBackground(DesignSystem.Colors.background, for: .navigationBar)
             .alert("Delete Stone", isPresented: $showDeleteAlert, presenting: stoneToDelete) { stone in
                 Button("Cancel", role: .cancel) {
                     stoneToDelete = nil
@@ -83,28 +89,28 @@ struct DayDetailView: View {
     }
 
     private var dateHeader: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: DesignSystem.Spacing.sm) {
             Text(formattedDate)
-                .font(.title2.bold())
-                .foregroundStyle(.primary)
+                .font(DesignSystem.Typography.title)
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
 
             if calendar.isDateInToday(date) {
                 Text("Today")
-                    .font(.subheadline)
-                    .foregroundStyle(prefs.accentColor)
+                    .font(DesignSystem.Typography.body)
+                    .foregroundStyle(DesignSystem.Colors.accent)
             } else if calendar.isDateInTomorrow(date) {
                 Text("Tomorrow")
-                    .font(.subheadline)
-                    .foregroundStyle(prefs.accentColor)
+                    .font(DesignSystem.Typography.body)
+                    .foregroundStyle(DesignSystem.Colors.accent)
             }
 
             if !stones.isEmpty {
                 Text("\(stones.count) event\(stones.count == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, DesignSystem.Spacing.xl)
     }
 
     // MARK: - Pie Chart Data
@@ -128,13 +134,13 @@ struct DayDetailView: View {
             slices.append(ChartSlice(
                 label: "Stones",
                 hours: stoneHours,
-                color: .gray,
+                color: DesignSystem.Colors.textTertiary,
                 isProject: false
             ))
         }
 
         // Add project allocations (rounded to nearest 0.5 hour)
-        let projectColors: [Color] = [prefs.accentColor, .blue, .purple, .pink, .indigo, .cyan]
+        let projectColors: [Color] = [DesignSystem.Colors.accent, DesignSystem.Colors.focus, .purple, .pink, .indigo, .cyan]
         for (index, allocation) in loadResult.projectAllocations.enumerated() {
             let hours = roundToHalf(allocation.allocatedMinutes / 60.0)
             if hours > 0 {
@@ -154,7 +160,7 @@ struct DayDetailView: View {
             slices.append(ChartSlice(
                 label: "Free",
                 hours: freeHours,
-                color: Color(.systemGray5),
+                color: DesignSystem.Colors.cardBackground,
                 isProject: false
             ))
         }
@@ -172,50 +178,49 @@ struct DayDetailView: View {
         let data = chartData
         let loadPercent = Int(data.loadResult.load * 100)
 
-        return VStack(spacing: 16) {
+        return VStack(spacing: DesignSystem.Spacing.lg) {
             // Header with day type badge
             HStack {
                 Text("TIME ALLOCATION")
-                    .font(.caption2)
+                    .font(DesignSystem.Typography.caption)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                     .tracking(1)
 
                 Spacer()
 
                 if data.loadResult.isBufferDay {
                     Text("BUFFER DAY")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.orange)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(DesignSystem.Colors.background)
+                        .padding(.horizontal, DesignSystem.Spacing.sm)
+                        .padding(.vertical, DesignSystem.Spacing.xs)
+                        .background(DesignSystem.Colors.warning)
                         .clipShape(Capsule())
                 } else {
                     Text("WORK DAY")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(prefs.accentColor)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(DesignSystem.Colors.background)
+                        .padding(.horizontal, DesignSystem.Spacing.sm)
+                        .padding(.vertical, DesignSystem.Spacing.xs)
+                        .background(DesignSystem.Colors.accent)
                         .clipShape(Capsule())
                 }
             }
 
             // Buffer warning if needed
             if data.loadResult.usedBufferDays {
-                HStack(spacing: 6) {
+                HStack(spacing: DesignSystem.Spacing.sm) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(DesignSystem.Colors.warning)
                     Text("Buffer days consumed due to high workload")
-                        .font(.caption)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
-                .padding(8)
+                .padding(DesignSystem.Spacing.sm)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.orange.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(DesignSystem.Colors.warning.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
             }
 
             // Pie chart with center label
@@ -226,39 +231,48 @@ struct DayDetailView: View {
                 // Center label
                 VStack(spacing: 2) {
                     Text("\(loadPercent)%")
-                        .font(.title)
+                        .font(DesignSystem.Typography.title)
                         .fontWeight(.bold)
                         .foregroundStyle(loadColor(for: data.loadResult.load))
                     Text("load")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, DesignSystem.Spacing.sm)
 
             // Legend
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: DesignSystem.Spacing.md) {
                 ForEach(data.slices) { slice in
-                    HStack(spacing: 6) {
+                    HStack(spacing: DesignSystem.Spacing.sm) {
                         Circle()
                             .fill(slice.color)
-                            .frame(width: 10, height: 10)
+                            .frame(width: 8, height: 8)
                         Text(slice.label)
-                            .font(.caption)
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundStyle(DesignSystem.Colors.textPrimary)
                             .lineLimit(1)
                         Spacer()
                         Text("\(formatHours(slice.hours))")
-                            .font(.caption)
+                            .font(DesignSystem.Typography.caption)
                             .fontWeight(.medium)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
                     }
+                    .padding(.vertical, DesignSystem.Spacing.xs)
                 }
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, DesignSystem.Spacing.sm)
+            .padding(.top, DesignSystem.Spacing.sm)
         }
-        .padding()
-        .background(Color(.systemGray6).opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .fill(DesignSystem.Colors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+        )
     }
 
     private func formatHours(_ hours: Double) -> String {
@@ -272,29 +286,30 @@ struct DayDetailView: View {
     // MARK: - Stones Section
 
     private var emptyScheduleHint: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: DesignSystem.Spacing.sm) {
             Text("SCHEDULE")
-                .font(.caption2)
+                .font(DesignSystem.Typography.caption)
                 .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .tracking(1)
 
             Text("No events scheduled")
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
+                .font(DesignSystem.Typography.body)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
         }
         .frame(maxWidth: .infinity)
-        .padding()
+        .padding(DesignSystem.Spacing.lg)
     }
 
     private var stonesSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             Text("SCHEDULE")
-                .font(.caption2)
+                .font(DesignSystem.Typography.caption)
                 .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .tracking(1)
-                .padding(.horizontal)
+                .padding(.horizontal, DesignSystem.Spacing.xl)
+                .padding(.bottom, DesignSystem.Spacing.xs)
 
             ForEach(stones.sorted(by: { $0.startHour * 60 + $0.startMinute < $1.startHour * 60 + $1.startMinute })) { stone in
                 SwipeToDeleteRow(
@@ -305,7 +320,7 @@ struct DayDetailView: View {
                 ) {
                     StoneRowView(stone: stone)
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, DesignSystem.Spacing.xl)
             }
         }
     }
@@ -314,20 +329,22 @@ struct DayDetailView: View {
         Button {
             onAddStone()
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: DesignSystem.Spacing.md) {
                 Image(systemName: "mic.fill")
-                    .font(.title3)
+                    .font(.system(size: 20))
                 Text("Add Stone")
-                    .font(.headline)
+                    .font(DesignSystem.Typography.headline)
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(DesignSystem.Colors.background)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(prefs.accentColor)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .padding(.vertical, DesignSystem.Spacing.lg)
+            .background(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                    .fill(DesignSystem.Colors.accent)
+            )
         }
-        .padding()
-        .background(.regularMaterial)
+        .padding(DesignSystem.Spacing.lg)
+        .background(DesignSystem.Colors.background)
     }
 
     private var formattedDate: String {
@@ -338,11 +355,11 @@ struct DayDetailView: View {
 
     private func loadColor(for load: Double) -> Color {
         if load > 1.0 {
-            return .red
+            return DesignSystem.Colors.error
         } else if load > 0.8 {
-            return .orange
+            return DesignSystem.Colors.warning
         } else {
-            return prefs.accentColor
+            return DesignSystem.Colors.accent
         }
     }
 }
@@ -353,10 +370,13 @@ struct PieChartView: View {
     let slices: [ChartSlice]
     let totalHours: Double
 
+    // Gap between slices in degrees
+    private let gapDegrees: Double = 2.5
+
     var body: some View {
         GeometryReader { geometry in
             let radius = min(geometry.size.width, geometry.size.height) / 2
-            let innerRadius = radius * 0.6
+            let innerRadius = radius * 0.72  // Thinner donut
 
             ZStack {
                 // Draw slices
@@ -378,10 +398,14 @@ struct PieChartView: View {
         var angles: [(start: Angle, end: Angle)] = []
         var currentAngle = Angle(degrees: -90) // Start from top
 
+        let totalGap = gapDegrees * Double(slices.count)
+        let availableDegrees = 360.0 - totalGap
+
         for slice in slices {
-            let sliceAngle = Angle(degrees: (slice.hours / totalHours) * 360)
-            angles.append((start: currentAngle, end: currentAngle + sliceAngle))
-            currentAngle = currentAngle + sliceAngle
+            let sliceAngle = Angle(degrees: (slice.hours / totalHours) * availableDegrees)
+            let halfGap = Angle(degrees: gapDegrees / 2)
+            angles.append((start: currentAngle + halfGap, end: currentAngle + sliceAngle + halfGap))
+            currentAngle = currentAngle + sliceAngle + Angle(degrees: gapDegrees)
         }
 
         return angles
@@ -447,45 +471,47 @@ struct StoneRowView: View {
     let stone: StoneEvent
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignSystem.Spacing.md) {
             // Time indicator
             VStack(alignment: .leading, spacing: 2) {
                 Text(stone.startTimeString)
-                    .font(.subheadline)
+                    .font(DesignSystem.Typography.body)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
                 Text(stone.endTimeString)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
             .frame(width: 70, alignment: .leading)
 
             // Event card
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
                 Text(stone.title)
-                    .font(.body)
+                    .font(DesignSystem.Typography.body)
                     .fontWeight(.medium)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
 
-                HStack(spacing: 8) {
+                HStack(spacing: DesignSystem.Spacing.sm) {
                     Image(systemName: "clock")
                         .font(.caption)
                     Text("\(stone.durationMinutes) min")
-                        .font(.caption)
+                        .font(DesignSystem.Typography.caption)
 
                     if stone.recurrence.type != .none {
                         Image(systemName: "repeat")
                             .font(.caption)
                         Text(recurrenceLabel)
-                            .font(.caption)
+                            .font(DesignSystem.Typography.caption)
                     }
                 }
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(UserPreferences.shared.accentColor.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(DesignSystem.Spacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                    .fill(DesignSystem.Colors.accent.opacity(0.1))
+            )
         }
     }
 

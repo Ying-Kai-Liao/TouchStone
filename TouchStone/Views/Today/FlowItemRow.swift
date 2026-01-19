@@ -38,86 +38,80 @@ struct StoneFlowRow: View {
         item.status == .completed
     }
 
-    private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Stone image header when expanded
+            // Stone image header when expanded - with padding inside card
             if isExpanded {
                 stoneHeader
+                    .padding(.horizontal, 8)
+                    .padding(.top, 8)
             }
 
             // Content - expanded or compact based on tap
             if isExpanded {
                 // Full content for expanded stone
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Title
                     Text(item.title)
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.primary)
-
-                    // Time and duration row
-                    HStack(spacing: 16) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "clock")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(item.timeRangeString)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        HStack(spacing: 6) {
-                            Image(systemName: "hourglass")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("\(item.durationMinutes) min")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                        .multilineTextAlignment(.leading)
 
                     // Recurrence info if applicable
                     if let stoneInstance = item.stoneInstance {
                         let recurrence = stoneInstance.event.recurrence
                         if recurrence.type != .none {
-                            HStack(spacing: 6) {
-                                Image(systemName: "repeat")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                                Text(recurrenceLabel(for: recurrence))
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                            }
+                            Text(recurrenceLabel(for: recurrence))
+                                .font(.system(size: 15))
+                                .foregroundStyle(DesignSystem.Colors.textSecondary.opacity(0.9))
                         }
+                    }
+
+                    // Time row at bottom
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.7))
+                        Text(item.timeRangeString)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.8))
+
+                        Text("·")
+                            .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.5))
+
+                        Text("\(item.durationMinutes) min")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.8))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 24)
             } else {
-                // Compact content
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(item.title)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundStyle(isCompleted ? .secondary : .primary)
+                // Compact content - title on top, time below, no subtitle
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(item.title)
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundStyle(isCompleted ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.textPrimary)
+                        .strikethrough(isCompleted, color: DesignSystem.Colors.textTertiary)
 
-                        Text(item.timeRangeString)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
+                    Text(item.timeRangeString)
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.7))
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 26)
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: isExpanded ? 16 : 12, style: .continuous)
-                .fill(cardBackground)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .fill(DesignSystem.Colors.cardBackground)
                 .opacity(isCompleted ? 0.5 : 1)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
         )
         .contentShape(Rectangle())
         .onTapGesture {
@@ -133,20 +127,15 @@ struct StoneFlowRow: View {
             // Gradient background simulating stone/rock texture
             LinearGradient(
                 colors: [
-                    Color(red: 0.35, green: 0.35, blue: 0.38),
-                    Color(red: 0.45, green: 0.45, blue: 0.48),
-                    Color(red: 0.5, green: 0.5, blue: 0.52)
+                    Color(red: 0.28, green: 0.30, blue: 0.32),
+                    Color(red: 0.38, green: 0.40, blue: 0.42),
+                    Color(red: 0.45, green: 0.47, blue: 0.50)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .frame(height: 100)
-            .clipShape(
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 16,
-                    topTrailingRadius: 16
-                )
-            )
+            .frame(height: 140)
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card - 8, style: .continuous))
             .overlay(
                 // Stone texture pattern
                 ZStack {
@@ -160,24 +149,23 @@ struct StoneFlowRow: View {
                             )
                     }
                 }
-                .clipShape(
-                    UnevenRoundedRectangle(
-                        topLeadingRadius: 16,
-                        topTrailingRadius: 16
-                    )
-                )
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card - 8, style: .continuous))
             )
 
-            // STONE badge
+            // STONE badge - glassy style
             Text("STONE")
-                .font(.caption2)
-                .fontWeight(.bold)
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(.white.opacity(0.95))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
                 .background(
                     Capsule()
-                        .fill(Color(red: 0.4, green: 0.4, blue: 0.45))
+                        .fill(Color(red: 0.5, green: 0.52, blue: 0.55).opacity(0.35))
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(.white.opacity(0.2), lineWidth: 1)
                 )
                 .padding(12)
         }
@@ -207,6 +195,11 @@ struct WaterFlowRow: View {
 
     @State private var isExpanded: Bool = false
 
+    /// Auto-expand if currently in progress
+    private var isInProgress: Bool {
+        item.status == .inProgress
+    }
+
     /// Check if this project was touched today
     private var hasTouchedToday: Bool {
         guard let project = item.project else { return false }
@@ -222,7 +215,10 @@ struct WaterFlowRow: View {
         !hasTouchedToday
     }
 
-    private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
+    /// Check if this item is completed
+    private var isCompleted: Bool {
+        item.status == .completed
+    }
 
     var body: some View {
         // Ghost blocks: tap to touch
@@ -243,176 +239,147 @@ struct WaterFlowRow: View {
 
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Water image header when expanded
+            // Water image header when expanded - with padding inside card
             if isExpanded {
                 waterHeader
+                    .padding(.horizontal, 8)
+                    .padding(.top, 8)
             }
 
             // Content - expanded or compact based on tap
             if isExpanded {
                 // Full content for expanded water block
-                VStack(alignment: .leading, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.title)
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .foregroundStyle(.primary)
-                            .multilineTextAlignment(.leading)
+                VStack(alignment: .leading, spacing: 16) {
+                    // Title
+                    Text(item.title)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                        .multilineTextAlignment(.leading)
 
-                        if let subtitle = item.subtitle {
-                            Text(subtitle)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
+                    // Description - show subtitle or session goal
+                    if let project = item.project,
+                       let session = project.nextPlannedSession,
+                       let goal = session.goal, !goal.isEmpty {
+                        Text(goal)
+                            .font(.system(size: 15))
+                            .foregroundStyle(DesignSystem.Colors.textSecondary.opacity(0.9))
+                            .lineSpacing(4)
+                    } else if let subtitle = item.subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 15))
+                            .foregroundStyle(DesignSystem.Colors.textSecondary.opacity(0.9))
+                            .lineSpacing(4)
                     }
 
-                    // Session goal and phase guardrail
-                    if let project = item.project {
-                        VStack(alignment: .leading, spacing: 8) {
-                            // Next session goal
-                            if let session = project.nextPlannedSession, let goal = session.goal, !goal.isEmpty {
-                                HStack(alignment: .top, spacing: 8) {
-                                    Image(systemName: "target")
-                                        .font(.caption)
-                                        .foregroundStyle(UserPreferences.shared.accentColor)
-                                    Text(goal)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.primary)
-                                }
-                            }
-
-                            // Phase guardrail (mental rule)
-                            if let phase = project.activePhase, let rule = phase.mentalRule, !rule.isEmpty {
-                                HStack(alignment: .top, spacing: 8) {
-                                    Image(systemName: "exclamationmark.triangle")
-                                        .font(.caption)
-                                        .foregroundStyle(.orange)
-                                    Text(rule)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .italic()
-                                }
-                            }
-                        }
-                    }
-
-                    // Time and Focus button row
-                    HStack(alignment: .center, spacing: 12) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "clock")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    // Time and action button row
+                    HStack(alignment: .center) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "clock.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.7))
                             Text(item.timeRangeString)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.8))
                         }
 
                         Spacer()
 
-                        // Play button
+                        // Action button - Pause style pill
                         if let onFocus = onFocus {
                             Button(action: onFocus) {
-                                Image(systemName: "play.fill")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(UserPreferences.shared.accentColor)
-                                    .frame(width: 36, height: 36)
+                                Text("Focus")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                    .padding(.horizontal, 18)
+                                    .padding(.vertical, 8)
                                     .background(
-                                        Circle()
-                                            .fill(UserPreferences.shared.accentColor.opacity(0.15))
+                                        Capsule()
+                                            .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.4), lineWidth: 1)
                                     )
                             }
                             .buttonStyle(.plain)
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 24)
             } else {
-                // Compact content
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(item.title)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundStyle(Color.primary.opacity(isGhost ? 0.6 : 1.0))
-
-                        if let subtitle = item.subtitle {
-                            Text(subtitle)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Spacer()
+                // Compact content - title on top, time below, no subtitle
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(item.title)
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundStyle(isCompleted ? DesignSystem.Colors.textTertiary : (isGhost ? DesignSystem.Colors.textSecondary : DesignSystem.Colors.textPrimary))
+                        .strikethrough(isCompleted, color: DesignSystem.Colors.textTertiary)
 
                     Text(item.timeRangeString)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.7))
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 26)
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: isExpanded ? 16 : 12, style: .continuous)
-                .fill(cardBackground.opacity(isGhost ? 0.5 : 1))
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .fill(DesignSystem.Colors.cardBackground.opacity(isCompleted ? 0.5 : (isGhost ? 0.6 : 1)))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: isExpanded ? 16 : 12, style: .continuous)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
                 .strokeBorder(
-                    isGhost ? UserPreferences.shared.accentColor.opacity(0.3) : Color.clear,
-                    style: StrokeStyle(lineWidth: 1.5, dash: isGhost ? [6, 4] : [])
+                    DesignSystem.Colors.textTertiary.opacity(isGhost && !isCompleted ? 0.3 : 0.2),
+                    lineWidth: 1
                 )
         )
+        .onAppear {
+            // Auto-expand if currently in progress
+            if isInProgress {
+                isExpanded = true
+            }
+        }
     }
 
-    /// Gradient header with "WATER" badge for active sessions
+    /// Gradient header with "ACTIVE FLOW" badge for active sessions
     private var waterHeader: some View {
         ZStack(alignment: .topLeading) {
             // Gradient background simulating water/waves image
             LinearGradient(
                 colors: [
-                    Color(red: 0.4, green: 0.55, blue: 0.6),
-                    Color(red: 0.5, green: 0.65, blue: 0.7),
-                    Color(red: 0.55, green: 0.7, blue: 0.75)
+                    Color(red: 0.35, green: 0.50, blue: 0.55),
+                    Color(red: 0.45, green: 0.58, blue: 0.62),
+                    Color(red: 0.50, green: 0.62, blue: 0.68)
                 ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+                startPoint: .top,
+                endPoint: .bottom
             )
-            .frame(height: 100)
-            .clipShape(
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 16,
-                    topTrailingRadius: 16
-                )
-            )
+            .frame(height: 140)
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card - 8, style: .continuous))
             .overlay(
                 // Subtle wave pattern overlay
                 ZStack {
-                    ForEach(0..<3, id: \.self) { i in
-                        WaveShape(offset: CGFloat(i) * 20, amplitude: 8)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                            .offset(y: CGFloat(i) * 15)
+                    ForEach(0..<5, id: \.self) { i in
+                        WaveShape(offset: CGFloat(i) * 12, amplitude: 5)
+                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            .offset(y: CGFloat(i) * 10 + 50)
                     }
                 }
-                .clipShape(
-                    UnevenRoundedRectangle(
-                        topLeadingRadius: 16,
-                        topTrailingRadius: 16
-                    )
-                )
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card - 8, style: .continuous))
             )
 
-            // WATER badge
-            Text("WATER")
-                .font(.caption2)
-                .fontWeight(.bold)
+            // ACTIVE FLOW badge - white glassy style
+            Text("ACTIVE FLOW")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
                 .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
                 .background(
                     Capsule()
-                        .fill(UserPreferences.shared.accentColor)
+                        .fill(.white.opacity(0.2))
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(.white.opacity(0.3), lineWidth: 1)
                 )
                 .padding(12)
         }
@@ -451,14 +418,14 @@ struct BreathingSpaceRow: View {
     var body: some View {
         HStack {
             Text("Breathing Space \u{00B7} \(minutes)m")
-                .font(.caption)
+                .font(DesignSystem.Typography.caption)
                 .fontWeight(.medium)
-                .foregroundStyle(Color(.systemGray))
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
                 .background(
                     Capsule()
-                        .fill(Color(uiColor: UIColor(red: 0.22, green: 0.24, blue: 0.26, alpha: 1.0)))
+                        .fill(DesignSystem.Colors.cardBackgroundLight)
                 )
         }
         .frame(maxWidth: .infinity)
@@ -477,17 +444,17 @@ struct FlowPrepRow: View {
             HStack(spacing: 8) {
                 Image(systemName: "leaf.fill")
                     .font(.caption)
-                    .foregroundStyle(UserPreferences.shared.accentColor)
+                    .foregroundStyle(DesignSystem.Colors.accent)
                 Text("Flow State Prep \u{00B7} \(minutes)m")
-                    .font(.caption)
+                    .font(DesignSystem.Typography.caption)
                     .fontWeight(.medium)
-                    .foregroundStyle(Color(.systemGray))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
             .background(
                 Capsule()
-                    .fill(UserPreferences.shared.accentColor.opacity(0.12))
+                    .fill(DesignSystem.Colors.accent.opacity(0.12))
             )
         }
         .frame(maxWidth: .infinity)
@@ -507,16 +474,16 @@ struct RestRow: View {
             HStack(spacing: 6) {
                 Image(systemName: "cup.and.saucer.fill")
                     .font(.caption2)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DesignSystem.Colors.warning)
                 Text("Rest \u{00B7} \(minutes)m")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .background(
                 Capsule()
-                    .fill(Color.orange.opacity(0.1))
+                    .fill(DesignSystem.Colors.warning.opacity(0.1))
             )
             Spacer()
         }
@@ -531,22 +498,20 @@ struct OverdueItemRow: View {
     let item: WorkflowItem
     let onReschedule: (() -> Void)?
 
-    private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Title row with reschedule button
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.title)
-                        .font(.body)
+                        .font(DesignSystem.Typography.body)
                         .fontWeight(.semibold)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
 
                     if let subtitle = item.subtitle {
                         Text(subtitle)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(DesignSystem.Typography.callout)
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
                     }
                 }
 
@@ -555,9 +520,9 @@ struct OverdueItemRow: View {
                 if let onReschedule = onReschedule {
                     Button(action: onReschedule) {
                         Text("Reschedule?")
-                            .font(.caption)
+                            .font(DesignSystem.Typography.caption)
                             .fontWeight(.medium)
-                            .foregroundStyle(Color(.systemGray))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -565,14 +530,18 @@ struct OverdueItemRow: View {
 
             // Time info
             Text("Yesterday \u{00B7} 1h estimate")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(DesignSystem.Typography.caption)
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 22)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(cardBackground)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .fill(DesignSystem.Colors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
         )
     }
 }
@@ -585,8 +554,6 @@ struct AdditionalProjectRow: View {
     let project: Project
     let onTouch: () -> Void
     let onFocus: () -> Void
-
-    private let cardBackground = Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 1.0))
 
     /// Count how many times this project was touched today
     private var touchCountToday: Int {
@@ -604,19 +571,19 @@ struct AdditionalProjectRow: View {
                 // Touch count badge
                 Text("x\(touchCountToday)")
                     .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(touchCountToday > 0 ? UserPreferences.shared.accentColor : Color(.systemGray))
+                    .foregroundStyle(touchCountToday > 0 ? DesignSystem.Colors.accent : DesignSystem.Colors.textTertiary)
                     .frame(width: 36)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(project.title)
-                        .font(.subheadline)
+                        .font(DesignSystem.Typography.callout)
                         .fontWeight(.medium)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
 
                     if let phase = project.currentPhase, !phase.isEmpty {
                         Text(phase)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
                     }
                 }
 
@@ -626,20 +593,24 @@ struct AdditionalProjectRow: View {
                 Button(action: onFocus) {
                     Image(systemName: "play.fill")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(UserPreferences.shared.accentColor)
+                        .foregroundStyle(DesignSystem.Colors.accent)
                         .frame(width: 32, height: 32)
                         .background(
                             Circle()
-                                .fill(UserPreferences.shared.accentColor.opacity(0.15))
+                                .fill(DesignSystem.Colors.accent.opacity(0.15))
                         )
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 22)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(cardBackground)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                    .fill(DesignSystem.Colors.cardBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                    .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -652,7 +623,8 @@ struct AdditionalProjectRow: View {
     VStack(spacing: 16) {
         BreathingSpaceRow(minutes: 30)
         FlowPrepRow(minutes: 15)
+        RestRow(minutes: 10)
     }
     .padding()
-    .background(Color(.systemGroupedBackground))
+    .background(DesignSystem.Colors.background)
 }
