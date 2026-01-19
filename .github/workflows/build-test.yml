@@ -79,49 +79,26 @@ jobs:
         run: |
           mkdir -p screenshots
           if [ -d "TestResults.xcresult" ]; then
-            echo "xcresult bundle found, extracting attachments..."
-
-            # Get all attachment IDs from the xcresult
-            xcrun xcresulttool get --path TestResults.xcresult --format json > result.json 2>/dev/null || true
-
-            # Debug: show xcresult structure
+            echo "=== xcresult bundle structure ==="
             ls -la TestResults.xcresult/
 
-            # Method 1: Export using xcresulttool (Xcode 16+)
-            xcrun xcresulttool export --type directory --path TestResults.xcresult --output-path exported 2>/dev/null || true
-            if [ -d "exported" ]; then
-              find exported -name "*.png" -exec cp {} screenshots/ \; 2>/dev/null || true
-            fi
+            echo "=== Data directory contents ==="
+            ls -la TestResults.xcresult/Data/ 2>/dev/null | head -20 || echo "No Data dir"
 
-            # Method 2: Check Data directory for binary image files
-            if [ -d "TestResults.xcresult/Data" ]; then
-              echo "Checking Data directory..."
-              for f in TestResults.xcresult/Data/*; do
-                if [ -f "$f" ]; then
-                  TYPE=$(file -b "$f" 2>/dev/null || echo "unknown")
-                  if echo "$TYPE" | grep -qi "PNG\|JPEG\|image"; then
-                    BASENAME=$(basename "$f")
-                    cp "$f" "screenshots/${BASENAME}.png" 2>/dev/null || true
-                    echo "Found image: $BASENAME"
-                  fi
-                fi
-              done
-            fi
+            echo "=== Finding all files recursively ==="
+            find TestResults.xcresult -type f | head -30
 
-            # Method 3: Look for Attachments in nested structure
-            find TestResults.xcresult -type d -name "Attachments" 2>/dev/null | while read dir; do
-              echo "Found Attachments dir: $dir"
-              find "$dir" -type f -exec cp {} screenshots/ \; 2>/dev/null || true
-            done
-
-            # Rename files without extension to .png
-            for f in screenshots/*; do
-              if [ -f "$f" ] && [[ ! "$f" =~ \. ]]; then
-                mv "$f" "$f.png" 2>/dev/null || true
+            echo "=== Extracting images ==="
+            # Find ALL files in xcresult and check if they're images
+            find TestResults.xcresult -type f | while read f; do
+              if file "$f" 2>/dev/null | grep -qi "PNG\|JPEG\|image data"; then
+                BASENAME=$(basename "$f")
+                cp "$f" "screenshots/${BASENAME}.png" 2>/dev/null
+                echo "Found image: $f"
               fi
             done
 
-            ls -la screenshots/ || echo "Screenshots dir empty"
+            ls -la screenshots/ 2>/dev/null || echo "Screenshots dir empty"
             COUNT=$(ls -1 screenshots/* 2>/dev/null | wc -l | tr -d ' ')
             echo "Found $COUNT screenshots"
             echo "screenshot_count=$COUNT" >> $GITHUB_OUTPUT
