@@ -209,15 +209,15 @@ struct CalendarView: View {
     }
 
     enum WorkloadLevel: CaseIterable {
-        case free, light, busy, full, over
+        case free, light, moderate, busy, full
 
         var label: String {
             switch self {
             case .free: return "FREE"
             case .light: return "LIGHT"
+            case .moderate: return "MODERATE"
             case .busy: return "BUSY"
             case .full: return "FULL"
-            case .over: return "OVER"
             }
         }
 
@@ -226,13 +226,13 @@ struct CalendarView: View {
             case .free:
                 return DesignSystem.Colors.cardBackground
             case .light:
-                return DesignSystem.Colors.accent.opacity(0.25)
+                return DesignSystem.Colors.accent.opacity(0.2)
+            case .moderate:
+                return DesignSystem.Colors.accent.opacity(0.4)
             case .busy:
-                return DesignSystem.Colors.accent.opacity(0.5)
+                return DesignSystem.Colors.accent.opacity(0.6)
             case .full:
-                return DesignSystem.Colors.warning.opacity(0.6)
-            case .over:
-                return DesignSystem.Colors.error.opacity(0.7)
+                return DesignSystem.Colors.accent.opacity(0.8)
             }
         }
 
@@ -240,35 +240,22 @@ struct CalendarView: View {
         static func forLoad(_ load: Double) -> WorkloadLevel {
             switch load {
             case ..<0.01: return .free
-            case ..<0.4: return .light
-            case ..<0.8: return .busy
-            case ..<1.0: return .full
-            default: return .over
+            case ..<0.25: return .light
+            case ..<0.5: return .moderate
+            case ..<0.75: return .busy
+            default: return .full
             }
         }
 
         /// Returns a smooth gradient color based on exact load percentage
         static func gradientColor(for load: Double) -> Color {
-            switch load {
-            case ..<0.01:
-                // Free - card background
+            if load < 0.01 {
                 return DesignSystem.Colors.cardBackground
-            case ..<0.8:
-                // 0-80%: Accent color with opacity gradient from 0.15 to 0.55
-                let normalizedLoad = load / 0.8  // 0 to 1
-                let opacity = 0.15 + (normalizedLoad * 0.4)
-                return DesignSystem.Colors.accent.opacity(opacity)
-            case ..<1.0:
-                // 80-100%: Transition from accent to warning
-                let t = (load - 0.8) / 0.2  // 0 to 1
-                let opacity = 0.5 + (t * 0.15)
-                return DesignSystem.Colors.warning.opacity(opacity)
-            default:
-                // Over 100%: Error color, intensity increases with overload
-                let overload = min(load - 1.0, 0.5)  // Cap at 150%
-                let opacity = 0.5 + (overload * 0.5)
-                return DesignSystem.Colors.error.opacity(opacity)
             }
+            // Smooth accent gradient from 0.15 to 0.8 opacity based on load
+            let clampedLoad = min(load, 1.0)
+            let opacity = 0.15 + (clampedLoad * 0.65)
+            return DesignSystem.Colors.accent.opacity(opacity)
         }
     }
 
@@ -419,7 +406,7 @@ struct DayCell: View {
         .buttonStyle(.plain)
     }
 
-    /// Color based on workload - smooth gradient following the legend levels
+    /// Color based on workload - smooth accent gradient
     private var cellBackgroundColor: Color {
         if !dayData.isCurrentMonth {
             return Color.clear
@@ -429,17 +416,9 @@ struct DayCell: View {
         return CalendarView.WorkloadLevel.gradientColor(for: dayLoad)
     }
 
-    /// Color for deadline badges
+    /// Color for deadline badges - always accent color
     private var loadColor: Color {
-        let level = CalendarView.WorkloadLevel.forLoad(dayLoad)
-        switch level {
-        case .over:
-            return DesignSystem.Colors.error
-        case .full:
-            return DesignSystem.Colors.warning
-        default:
-            return DesignSystem.Colors.accent
-        }
+        return DesignSystem.Colors.accent
     }
 
     private var isToday: Bool {
