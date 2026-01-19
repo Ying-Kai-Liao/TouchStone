@@ -321,7 +321,7 @@ struct DayDetailView: View {
                 .padding(.horizontal, DesignSystem.Spacing.xl)
             }
         }
-        .padding(.bottom, DesignSystem.Spacing.md)
+        .padding(.bottom, DesignSystem.Spacing.xl)
     }
 
     private var addStoneButton: some View {
@@ -370,99 +370,47 @@ struct PieChartView: View {
     let totalHours: Double
 
     // Gap between slices in degrees
-    private let gapDegrees: Double = 2.5
+    private let gapDegrees: Double = 6.0
 
     var body: some View {
         GeometryReader { geometry in
-            let radius = min(geometry.size.width, geometry.size.height) / 2
-            let innerRadius = radius * 0.72  // Thinner donut
+            let size = min(geometry.size.width, geometry.size.height)
+            let lineWidth: CGFloat = size * 0.14  // Donut thickness
+            let radius = (size - lineWidth) / 2
 
             ZStack {
-                // Draw slices
+                // Draw slices as stroked arcs with rounded caps
                 ForEach(Array(sliceAngles.enumerated()), id: \.offset) { index, angles in
-                    PieSlice(
-                        startAngle: angles.start,
-                        endAngle: angles.end,
-                        innerRadius: innerRadius,
-                        outerRadius: radius
-                    )
-                    .fill(slices[index].color)
+                    Circle()
+                        .trim(from: angles.start, to: angles.end)
+                        .stroke(
+                            slices[index].color,
+                            style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: radius * 2, height: radius * 2)
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
     }
 
-    private var sliceAngles: [(start: Angle, end: Angle)] {
-        var angles: [(start: Angle, end: Angle)] = []
-        var currentAngle = Angle(degrees: -90) // Start from top
+    private var sliceAngles: [(start: CGFloat, end: CGFloat)] {
+        var angles: [(start: CGFloat, end: CGFloat)] = []
+        var currentPosition: CGFloat = 0
 
-        let totalGap = gapDegrees * Double(slices.count)
-        let availableDegrees = 360.0 - totalGap
+        let gapFraction = gapDegrees / 360.0
+        let totalGap = gapFraction * CGFloat(slices.count)
+        let availableFraction = 1.0 - totalGap
 
         for slice in slices {
-            let sliceAngle = Angle(degrees: (slice.hours / totalHours) * availableDegrees)
-            let halfGap = Angle(degrees: gapDegrees / 2)
-            angles.append((start: currentAngle + halfGap, end: currentAngle + sliceAngle + halfGap))
-            currentAngle = currentAngle + sliceAngle + Angle(degrees: gapDegrees)
+            let sliceFraction = CGFloat(slice.hours / totalHours) * availableFraction
+            let halfGap = gapFraction / 2
+            angles.append((start: currentPosition + halfGap, end: currentPosition + sliceFraction + halfGap))
+            currentPosition += sliceFraction + gapFraction
         }
 
         return angles
-    }
-}
-
-struct PieSlice: Shape {
-    let startAngle: Angle
-    let endAngle: Angle
-    let innerRadius: CGFloat
-    let outerRadius: CGFloat
-
-    func path(in rect: CGRect) -> Path {
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-
-        var path = Path()
-
-        // Start at inner radius
-        let innerStart = CGPoint(
-            x: center.x + innerRadius * cos(CGFloat(startAngle.radians)),
-            y: center.y + innerRadius * sin(CGFloat(startAngle.radians))
-        )
-        path.move(to: innerStart)
-
-        // Line to outer radius
-        let outerStart = CGPoint(
-            x: center.x + outerRadius * cos(CGFloat(startAngle.radians)),
-            y: center.y + outerRadius * sin(CGFloat(startAngle.radians))
-        )
-        path.addLine(to: outerStart)
-
-        // Arc along outer radius
-        path.addArc(
-            center: center,
-            radius: outerRadius,
-            startAngle: startAngle,
-            endAngle: endAngle,
-            clockwise: false
-        )
-
-        // Line to inner radius
-        let innerEnd = CGPoint(
-            x: center.x + innerRadius * cos(CGFloat(endAngle.radians)),
-            y: center.y + innerRadius * sin(CGFloat(endAngle.radians))
-        )
-        path.addLine(to: innerEnd)
-
-        // Arc along inner radius (clockwise to close)
-        path.addArc(
-            center: center,
-            radius: innerRadius,
-            startAngle: endAngle,
-            endAngle: startAngle,
-            clockwise: true
-        )
-
-        path.closeSubpath()
-        return path
     }
 }
 
