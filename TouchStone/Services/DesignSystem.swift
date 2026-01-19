@@ -14,9 +14,13 @@ enum DesignSystem {
         static let cardBackground = Color(red: 0.10, green: 0.14, blue: 0.12)
         static let cardBackgroundLight = Color(red: 0.12, green: 0.16, blue: 0.14)
 
-        // Accent colors
-        static let accent = Color(red: 0.65, green: 0.78, blue: 0.65)  // Sage green
-        static let accentMuted = Color(red: 0.55, green: 0.68, blue: 0.55)
+        // Accent colors (dynamic based on user theme selection)
+        static var accent: Color {
+            UserPreferences.shared.themeColorOption.accentColor
+        }
+        static var accentMuted: Color {
+            UserPreferences.shared.themeColorOption.accentMuted
+        }
 
         // Text colors
         static let textPrimary = Color.white.opacity(0.95)

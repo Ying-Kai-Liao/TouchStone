@@ -76,12 +76,12 @@ struct SettingsView: View {
                     // MARK: - Appearance Section
                     SettingsSectionHeader(title: "Appearance")
 
-                    NavigationLink(destination: AccentColorView()) {
+                    NavigationLink(destination: ThemeColorView()) {
                         SettingsRow(
                             icon: "circle.fill",
-                            iconColor: prefs.accentColor,
-                            title: "Accent Color",
-                            value: prefs.accentColorOption.displayName
+                            iconColor: prefs.themeColorOption.accentColor,
+                            title: "Theme Color",
+                            value: prefs.themeColorOption.displayName
                         )
                     }
 
@@ -116,7 +116,7 @@ struct SettingsView: View {
                 Spacer(minLength: 40)
             }
         }
-        .background(Color(.systemBackground))
+        .background(DesignSystem.Colors.background)
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -322,41 +322,66 @@ private struct DeadlineBufferView: View {
     }
 }
 
-// MARK: - Accent Color View
+// MARK: - Theme Color View
 
-private struct AccentColorView: View {
+private struct ThemeColorView: View {
     @Bindable private var prefs = UserPreferences.shared
 
     var body: some View {
-        List {
-            Section {
-                ForEach(AccentColorOption.allCases) { option in
-                    Button {
-                        prefs.accentColorOption = option
-                    } label: {
-                        HStack(spacing: 14) {
-                            Circle()
-                                .fill(option.color)
-                                .frame(width: 24, height: 24)
+        ZStack {
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
 
-                            Text(option.displayName)
-                                .foregroundStyle(.primary)
+            ScrollView {
+                VStack(spacing: DesignSystem.Spacing.lg) {
+                    ForEach(ThemeColorOption.allCases) { option in
+                        Button {
+                            prefs.themeColorOption = option
+                        } label: {
+                            HStack(spacing: DesignSystem.Spacing.lg) {
+                                // Color preview circle
+                                Circle()
+                                    .fill(option.accentColor)
+                                    .frame(width: 32, height: 32)
 
-                            Spacer()
+                                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                                    Text(option.displayName)
+                                        .font(DesignSystem.Typography.body)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                }
 
-                            if prefs.accentColorOption == option {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(prefs.accentColor)
+                                Spacer()
+
+                                if prefs.themeColorOption == option {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundStyle(option.accentColor)
+                                }
                             }
+                            .padding(DesignSystem.Spacing.lg)
+                            .background(
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                    .fill(DesignSystem.Colors.cardBackground)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                    .strokeBorder(
+                                        prefs.themeColorOption == option
+                                            ? option.accentColor.opacity(0.5)
+                                            : DesignSystem.Colors.textTertiary.opacity(0.2),
+                                        lineWidth: prefs.themeColorOption == option ? 2 : 1
+                                    )
+                            )
                         }
+                        .buttonStyle(.plain)
                     }
                 }
+                .padding(DesignSystem.Spacing.xl)
             }
         }
-        .navigationTitle("Accent Color")
+        .navigationTitle("Theme Color")
         .navigationBarTitleDisplayMode(.inline)
-        .tint(prefs.accentColor)
     }
 }
 
