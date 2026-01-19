@@ -20,7 +20,9 @@ struct FlowItemRow: View {
         case .flowPrep(let minutes):
             FlowPrepRow(minutes: minutes)
         case .rest(let minutes):
-            RestRow(minutes: minutes)
+            BreakRow(minutes: minutes)
+        case .meal(let rule):
+            MealRow(rule: rule, item: item)
         }
     }
 }
@@ -462,10 +464,10 @@ struct FlowPrepRow: View {
     }
 }
 
-// MARK: - Rest Row
+// MARK: - Break Row
 
-/// Rest break between work sessions
-struct RestRow: View {
+/// Break between work sessions (renamed from Rest)
+struct BreakRow: View {
     let minutes: Int
 
     var body: some View {
@@ -475,7 +477,7 @@ struct RestRow: View {
                 Image(systemName: "cup.and.saucer.fill")
                     .font(.caption2)
                     .foregroundStyle(DesignSystem.Colors.warning)
-                Text("Rest \u{00B7} \(minutes)m")
+                Text("Break \u{00B7} \(minutes)m")
                     .font(DesignSystem.Typography.caption)
                     .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
@@ -488,6 +490,72 @@ struct RestRow: View {
             Spacer()
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Meal Row
+
+/// Meal time badge (lunch, dinner) from rules
+struct MealRow: View {
+    let rule: Rule
+    let item: WorkflowItem
+
+    /// Icon for the meal type
+    private var mealIcon: String {
+        let title = rule.title.lowercased()
+        if title.contains("lunch") {
+            return "sun.max.fill"
+        } else if title.contains("dinner") {
+            return "moon.stars.fill"
+        } else if title.contains("breakfast") {
+            return "sunrise.fill"
+        } else {
+            return "fork.knife"
+        }
+    }
+
+    /// Color for the meal badge
+    private var mealColor: Color {
+        let title = rule.title.lowercased()
+        if title.contains("lunch") {
+            return Color.orange
+        } else if title.contains("dinner") {
+            return Color.purple
+        } else {
+            return DesignSystem.Colors.accent
+        }
+    }
+
+    var body: some View {
+        HStack {
+            Spacer()
+            HStack(spacing: 8) {
+                Image(systemName: mealIcon)
+                    .font(.caption)
+                    .foregroundStyle(mealColor)
+                Text(rule.title)
+                    .font(DesignSystem.Typography.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                Text("\u{00B7}")
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                Text(item.timeRangeString)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(mealColor.opacity(0.1))
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(mealColor.opacity(0.2), lineWidth: 1)
+            )
+            Spacer()
+        }
+        .padding(.vertical, 6)
     }
 }
 
@@ -623,7 +691,7 @@ struct AdditionalProjectRow: View {
     VStack(spacing: 16) {
         BreathingSpaceRow(minutes: 30)
         FlowPrepRow(minutes: 15)
-        RestRow(minutes: 10)
+        BreakRow(minutes: 10)
     }
     .padding()
     .background(DesignSystem.Colors.background)

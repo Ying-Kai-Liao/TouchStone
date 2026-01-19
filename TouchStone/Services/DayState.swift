@@ -19,6 +19,7 @@ class DayState {
     private(set) var workflowItems: [WorkflowItem] = []
     private(set) var dayMessage: String = ""
     private(set) var minutesTouchedToday: Int = 0
+    private(set) var activeRules: [Rule] = []  // Store active rules for meal display
 
     init(date: Date = Date()) {
         self.date = calendar.startOfDay(for: date)
@@ -50,22 +51,25 @@ class DayState {
             .map { StoneEventInstance(event: $0, on: date) }
             .sorted { $0.startTime < $1.startTime }
 
-        // 2. Calculate free time slots (considering rules)
+        // 2. Store active rules that apply to this date for meal display
+        activeRules = rules.filter { $0.appliesTo(date: date) }
+
+        // 3. Calculate free time slots (considering rules)
         freeSlots = calculateFreeSlots(rules: rules)
 
-        // 3. Calculate total minutes touched for the computed date
+        // 4. Calculate total minutes touched for the computed date
         // Use self.date (already start of day) to ensure future days show full schedule
         minutesTouchedToday = projects.flatMap { $0.touchLogs }
             .filter { calendar.startOfDay(for: $0.timestamp) == date }
             .reduce(0) { $0 + $1.durationMinutes }
 
-        // 4. Generate suggested sessions (pour water into slots)
+        // 5. Generate suggested sessions (pour water into slots)
         suggestedSessions = generateSuggestedSessions(projects: projects)
 
-        // 5. Generate unified workflow items (merge stones and waters)
+        // 6. Generate unified workflow items (merge stones, waters, and meals)
         workflowItems = generateWorkflowItems(projects: projects)
 
-        // 6. Generate day message based on load and capacity
+        // 7. Generate day message based on load and capacity
         dayMessage = generateDayMessage()
     }
 
@@ -149,32 +153,35 @@ class DayState {
 
     /// Load workflow items from a persisted DayPlan schedule.
     /// Used when user has already clicked "Let's go" and schedule is locked in.
-    func loadFromPersistedSchedule(dayPlan: DayPlan, stones: [StoneEvent]) {
+    func loadFromPersistedSchedule(dayPlan: DayPlan, stones: [StoneEvent], rules: [Rule] = []) {
         // 1. Load stones as usual
         stoneInstances = stones
             .filter { $0.occursOn(date: date) }
             .map { StoneEventInstance(event: $0, on: date) }
             .sorted { $0.startTime < $1.startTime }
 
-        // 2. Calculate free slots (for reference)
-        freeSlots = calculateFreeSlots()
+        // 2. Store active rules that apply to this date for meal display
+        activeRules = rules.filter { $0.appliesTo(date: date) }
 
-        // 3. Clear ephemeral suggested sessions (we're using persisted ones)
+        // 3. Calculate free slots (for reference)
+        freeSlots = calculateFreeSlots(rules: rules)
+
+        // 4. Clear ephemeral suggested sessions (we're using persisted ones)
         suggestedSessions = []
 
-        // 4. Generate workflow items from persisted sessions + stones
+        // 5. Generate workflow items from persisted sessions + stones + meals
         workflowItems = generateWorkflowFromPersisted(
             stones: stoneInstances,
             sessions: dayPlan.sortedSessions
         )
 
-        // 5. Calculate minutes touched today
+        // 6. Calculate minutes touched today
         let today = calendar.startOfDay(for: Date())
         minutesTouchedToday = dayPlan.scheduledSessions
             .filter { $0.status == .completed }
             .reduce(0) { $0 + $1.durationMinutes }
 
-        // 6. Generate day message
+        // 7. Generate day message
         dayMessage = generateDayMessage()
     }
 
@@ -182,6 +189,7 @@ class DayState {
     private func generateWorkflowFromPersisted(stones: [StoneEventInstance], sessions: [ScheduledSession]) -> [WorkflowItem] {
         var items: [WorkflowItem] = []
         let now = Date()
+        let isToday = calendar.isDateInToday(date)
 
         // 1. Add all stone instances as workflow items
         for instance in stones {
@@ -241,10 +249,36 @@ class DayState {
             }
         }
 
-        // 3. Sort all items chronologically
+        // 3. Add meal rules as workflow items (lunch, dinner badges)
+        for rule in activeRules {
+            if let blocked = rule.blockedRange(for: date) {
+                let status: WorkflowItemStatus
+                if isToday {
+                    if blocked.end <= now {
+                        status = .completed
+                    } else if blocked.start <= now && now < blocked.end {
+                        status = .inProgress
+                    } else {
+                        status = .upcoming
+                    }
+                } else {
+                    status = .upcoming
+                }
+
+                let item = WorkflowItem(
+                    type: .meal(rule),
+                    startTime: blocked.start,
+                    endTime: blocked.end,
+                    status: status
+                )
+                items.append(item)
+            }
+        }
+
+        // 4. Sort all items chronologically
         items.sort { $0.startTime < $1.startTime }
 
-        // 4. Insert breathing spaces and flow prep between items
+        // 5. Insert breathing spaces and flow prep between items
         items = insertTransitionItems(items: items)
 
         return items
@@ -355,6 +389,12 @@ class DayState {
         var slotIndex = 0
         var usableSlots = freeSlots.filter { $0.durationMinutes >= minSession }
 
+        // Track accumulated work time for break insertion
+        var accumulatedWorkMinutes = 0
+        let workInterval = prefs.workIntervalMinutes
+        let breakDuration = prefs.restDurationMinutes
+        let breaksEnabled = prefs.restBetweenSessionsEnabled
+
         // Adjust slots to start from now if we're viewing today
         let now = Date()
         let isToday = calendar.isDateInToday(date)
@@ -378,7 +418,26 @@ class DayState {
             guard slotIndex < usableSlots.count else { break }
 
             let slot = usableSlots[slotIndex]
-            let remainingSlotMinutes = Int(slot.end.timeIntervalSince(currentSlotStart) / 60)
+            var remainingSlotMinutes = Int(slot.end.timeIntervalSince(currentSlotStart) / 60)
+
+            // Check if we need to insert a break gap before this session
+            if breaksEnabled && accumulatedWorkMinutes >= workInterval && accumulatedWorkMinutes > 0 {
+                // Leave a gap for the break
+                currentSlotStart = currentSlotStart.addingTimeInterval(Double(breakDuration) * 60)
+                remainingSlotMinutes = Int(slot.end.timeIntervalSince(currentSlotStart) / 60)
+                accumulatedWorkMinutes = 0  // Reset after break gap
+
+                // Check if we've exceeded the current slot
+                if remainingSlotMinutes < minSession {
+                    slotIndex += 1
+                    if slotIndex < usableSlots.count {
+                        currentSlotStart = usableSlots[slotIndex].start
+                        remainingSlotMinutes = usableSlots[slotIndex].durationMinutes
+                    } else {
+                        break
+                    }
+                }
+            }
 
             // Smart fit: calculate optimal session duration
             let sessionDuration = optimalSessionDuration(
@@ -400,13 +459,17 @@ class DayState {
                 )
                 sessions.append(session)
                 usedMinutes += duration
+                accumulatedWorkMinutes += duration  // Track work time for breaks
 
                 // Move current position forward
                 currentSlotStart = currentSlotStart.addingTimeInterval(Double(duration) * 60)
 
-                // Move to next slot if remaining space is too small
+                // Move to next slot if remaining space is too small (accounting for potential break)
+                let neededForNext = breaksEnabled && accumulatedWorkMinutes >= workInterval
+                    ? minSession + breakDuration
+                    : minSession
                 let remainingInSlot = Int(slot.end.timeIntervalSince(currentSlotStart) / 60)
-                if remainingInSlot < minSession {
+                if remainingInSlot < neededForNext {
                     slotIndex += 1
                     if slotIndex < usableSlots.count {
                         currentSlotStart = usableSlots[slotIndex].start
@@ -484,10 +547,36 @@ class DayState {
             items.append(item)
         }
 
-        // 3. Sort all items chronologically
+        // 3. Add meal rules as workflow items (lunch, dinner badges)
+        for rule in activeRules {
+            if let blocked = rule.blockedRange(for: date) {
+                let status: WorkflowItemStatus
+                if isToday {
+                    if blocked.end <= now {
+                        status = .completed
+                    } else if blocked.start <= now && now < blocked.end {
+                        status = .inProgress
+                    } else {
+                        status = .upcoming
+                    }
+                } else {
+                    status = .upcoming
+                }
+
+                let item = WorkflowItem(
+                    type: .meal(rule),
+                    startTime: blocked.start,
+                    endTime: blocked.end,
+                    status: status
+                )
+                items.append(item)
+            }
+        }
+
+        // 4. Sort all items chronologically
         items.sort { $0.startTime < $1.startTime }
 
-        // 4. Insert breathing spaces and flow prep between items
+        // 5. Insert breathing spaces and flow prep between items
         items = insertTransitionItems(items: items)
 
         return items
@@ -529,8 +618,8 @@ class DayState {
                 }
 
                 accumulatedWorkMinutes += sessionMinutes
-            } else if item.isStone {
-                // Reset work accumulator when hitting a stone (natural break)
+            } else if item.isStone || item.isMeal {
+                // Reset work accumulator when hitting a stone or meal (natural break)
                 accumulatedWorkMinutes = 0
             }
 
