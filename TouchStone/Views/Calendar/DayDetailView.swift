@@ -262,7 +262,6 @@ struct DayDetailView: View {
                 }
             }
             .padding(.horizontal, DesignSystem.Spacing.sm)
-            .padding(.top, DesignSystem.Spacing.sm)
         }
         .padding(DesignSystem.Spacing.lg)
         .background(
@@ -309,7 +308,6 @@ struct DayDetailView: View {
                 .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .tracking(1)
                 .padding(.horizontal, DesignSystem.Spacing.xl)
-                .padding(.bottom, DesignSystem.Spacing.xs)
 
             ForEach(stones.sorted(by: { $0.startHour * 60 + $0.startMinute < $1.startHour * 60 + $1.startMinute })) { stone in
                 SwipeToDeleteRow(
@@ -323,6 +321,7 @@ struct DayDetailView: View {
                 .padding(.horizontal, DesignSystem.Spacing.xl)
             }
         }
+        .padding(.bottom, DesignSystem.Spacing.md)
     }
 
     private var addStoneButton: some View {

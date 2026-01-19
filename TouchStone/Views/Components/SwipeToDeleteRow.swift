@@ -63,19 +63,21 @@ struct SwipeToDeleteRow<Content: View>: View {
 
     private var deleteButton: some View {
         Button(action: performDelete) {
-            VStack {
+            VStack(spacing: 4) {
                 Image(systemName: "trash.fill")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 16, weight: .medium))
                 Text("Delete")
-                    .font(.caption2)
-                    .fontWeight(.medium)
+                    .font(.system(size: 10, weight: .medium))
             }
             .foregroundStyle(.white)
-            .frame(width: deleteButtonWidth)
-            .frame(maxHeight: .infinity)
-            .background(Color.red)
+            .frame(width: 56, height: 56)
+            .background(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                    .fill(DesignSystem.Colors.error)
+            )
         }
         .buttonStyle(.plain)
+        .padding(.trailing, DesignSystem.Spacing.sm)
     }
 
     private var swipeGesture: some Gesture {
