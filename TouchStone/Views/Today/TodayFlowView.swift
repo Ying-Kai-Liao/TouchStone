@@ -122,12 +122,12 @@ struct TodayFlowView: View {
                         } label: {
                             Text("Changed my mind? Tap to start working")
                                 .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(DesignSystem.Colors.textSecondary)
                                 .padding(.vertical, 12)
                                 .padding(.horizontal, 20)
                                 .background(
                                     Capsule()
-                                        .fill(Color.white.opacity(0.1))
+                                        .fill(DesignSystem.Colors.cardBackground)
                                 )
                         }
                         .padding(.bottom, 30)
@@ -180,7 +180,6 @@ struct TodayFlowView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
     }
 
     // MARK: - Header View
