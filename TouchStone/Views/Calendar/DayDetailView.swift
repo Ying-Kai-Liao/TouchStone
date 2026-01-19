@@ -369,18 +369,22 @@ struct PieChartView: View {
     let slices: [ChartSlice]
     let totalHours: Double
 
-    // Gap between slices in degrees
-    private let gapDegrees: Double = 6.0
-
     var body: some View {
         GeometryReader { geometry in
             let size = min(geometry.size.width, geometry.size.height)
-            let lineWidth: CGFloat = size * 0.14  // Donut thickness
+            let lineWidth: CGFloat = size * 0.13  // Donut thickness
             let radius = (size - lineWidth) / 2
 
+            // Calculate cap extension as fraction of circle
+            // Round caps extend by lineWidth/2 at each end
+            let capExtension = (lineWidth / 2) / (2 * .pi * radius)
+
+            // Gap between segments (visual gap after accounting for caps)
+            let visualGapDegrees: CGFloat = 4.0
+            let gapFraction = visualGapDegrees / 360.0
+
             ZStack {
-                // Draw slices as stroked arcs with rounded caps
-                ForEach(Array(sliceAngles.enumerated()), id: \.offset) { index, angles in
+                ForEach(Array(computeSliceAngles(capExtension: capExtension, gapFraction: gapFraction).enumerated()), id: \.offset) { index, angles in
                     Circle()
                         .trim(from: angles.start, to: angles.end)
                         .stroke(
@@ -395,19 +399,28 @@ struct PieChartView: View {
         }
     }
 
-    private var sliceAngles: [(start: CGFloat, end: CGFloat)] {
+    private func computeSliceAngles(capExtension: CGFloat, gapFraction: CGFloat) -> [(start: CGFloat, end: CGFloat)] {
         var angles: [(start: CGFloat, end: CGFloat)] = []
         var currentPosition: CGFloat = 0
 
-        let gapFraction = gapDegrees / 360.0
-        let totalGap = gapFraction * CGFloat(slices.count)
-        let availableFraction = 1.0 - totalGap
+        // Total space needed for gaps and cap extensions
+        let totalCapSpace = capExtension * 2 * CGFloat(slices.count)  // Each segment has 2 caps
+        let totalGapSpace = gapFraction * CGFloat(slices.count)
+        let availableFraction = max(0, 1.0 - totalGapSpace - totalCapSpace)
 
         for slice in slices {
             let sliceFraction = CGFloat(slice.hours / totalHours) * availableFraction
-            let halfGap = gapFraction / 2
-            angles.append((start: currentPosition + halfGap, end: currentPosition + sliceFraction + halfGap))
-            currentPosition += sliceFraction + gapFraction
+
+            // Start after gap and account for the start cap
+            let startPos = currentPosition + gapFraction / 2 + capExtension
+            // End before the next gap, accounting for end cap
+            let endPos = startPos + sliceFraction
+
+            if sliceFraction > 0.001 {  // Only add visible slices
+                angles.append((start: startPos, end: endPos))
+            }
+
+            currentPosition += sliceFraction + gapFraction + capExtension * 2
         }
 
         return angles
