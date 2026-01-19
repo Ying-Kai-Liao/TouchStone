@@ -262,7 +262,6 @@ struct DayDetailView: View {
                 }
             }
             .padding(.horizontal, DesignSystem.Spacing.sm)
-            .padding(.top, DesignSystem.Spacing.sm)
         }
         .padding(DesignSystem.Spacing.lg)
         .background(
@@ -309,7 +308,6 @@ struct DayDetailView: View {
                 .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .tracking(1)
                 .padding(.horizontal, DesignSystem.Spacing.xl)
-                .padding(.bottom, DesignSystem.Spacing.xs)
 
             ForEach(stones.sorted(by: { $0.startHour * 60 + $0.startMinute < $1.startHour * 60 + $1.startMinute })) { stone in
                 SwipeToDeleteRow(
@@ -323,6 +321,7 @@ struct DayDetailView: View {
                 .padding(.horizontal, DesignSystem.Spacing.xl)
             }
         }
+        .padding(.bottom, DesignSystem.Spacing.xl)
     }
 
     private var addStoneButton: some View {
@@ -370,100 +369,61 @@ struct PieChartView: View {
     let slices: [ChartSlice]
     let totalHours: Double
 
-    // Gap between slices in degrees
-    private let gapDegrees: Double = 2.5
-
     var body: some View {
         GeometryReader { geometry in
-            let radius = min(geometry.size.width, geometry.size.height) / 2
-            let innerRadius = radius * 0.72  // Thinner donut
+            let size = min(geometry.size.width, geometry.size.height)
+            let lineWidth: CGFloat = size * 0.13  // Donut thickness
+            let radius = (size - lineWidth) / 2
+
+            // Calculate cap extension as fraction of circle
+            // Round caps extend by lineWidth/2 at each end
+            let capExtension = (lineWidth / 2) / (2 * .pi * radius)
+
+            // Gap between segments (visual gap after accounting for caps)
+            let visualGapDegrees: CGFloat = 4.0
+            let gapFraction = visualGapDegrees / 360.0
 
             ZStack {
-                // Draw slices
-                ForEach(Array(sliceAngles.enumerated()), id: \.offset) { index, angles in
-                    PieSlice(
-                        startAngle: angles.start,
-                        endAngle: angles.end,
-                        innerRadius: innerRadius,
-                        outerRadius: radius
-                    )
-                    .fill(slices[index].color)
+                ForEach(Array(computeSliceAngles(capExtension: capExtension, gapFraction: gapFraction).enumerated()), id: \.offset) { index, angles in
+                    Circle()
+                        .trim(from: angles.start, to: angles.end)
+                        .stroke(
+                            slices[index].color,
+                            style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: radius * 2, height: radius * 2)
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
     }
 
-    private var sliceAngles: [(start: Angle, end: Angle)] {
-        var angles: [(start: Angle, end: Angle)] = []
-        var currentAngle = Angle(degrees: -90) // Start from top
+    private func computeSliceAngles(capExtension: CGFloat, gapFraction: CGFloat) -> [(start: CGFloat, end: CGFloat)] {
+        var angles: [(start: CGFloat, end: CGFloat)] = []
+        var currentPosition: CGFloat = 0
 
-        let totalGap = gapDegrees * Double(slices.count)
-        let availableDegrees = 360.0 - totalGap
+        // Total space needed for gaps and cap extensions
+        let totalCapSpace = capExtension * 2 * CGFloat(slices.count)  // Each segment has 2 caps
+        let totalGapSpace = gapFraction * CGFloat(slices.count)
+        let availableFraction = max(0, 1.0 - totalGapSpace - totalCapSpace)
 
         for slice in slices {
-            let sliceAngle = Angle(degrees: (slice.hours / totalHours) * availableDegrees)
-            let halfGap = Angle(degrees: gapDegrees / 2)
-            angles.append((start: currentAngle + halfGap, end: currentAngle + sliceAngle + halfGap))
-            currentAngle = currentAngle + sliceAngle + Angle(degrees: gapDegrees)
+            let sliceFraction = CGFloat(slice.hours / totalHours) * availableFraction
+
+            // Start after gap and account for the start cap
+            let startPos = currentPosition + gapFraction / 2 + capExtension
+            // End before the next gap, accounting for end cap
+            let endPos = startPos + sliceFraction
+
+            if sliceFraction > 0.001 {  // Only add visible slices
+                angles.append((start: startPos, end: endPos))
+            }
+
+            currentPosition += sliceFraction + gapFraction + capExtension * 2
         }
 
         return angles
-    }
-}
-
-struct PieSlice: Shape {
-    let startAngle: Angle
-    let endAngle: Angle
-    let innerRadius: CGFloat
-    let outerRadius: CGFloat
-
-    func path(in rect: CGRect) -> Path {
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-
-        var path = Path()
-
-        // Start at inner radius
-        let innerStart = CGPoint(
-            x: center.x + innerRadius * cos(CGFloat(startAngle.radians)),
-            y: center.y + innerRadius * sin(CGFloat(startAngle.radians))
-        )
-        path.move(to: innerStart)
-
-        // Line to outer radius
-        let outerStart = CGPoint(
-            x: center.x + outerRadius * cos(CGFloat(startAngle.radians)),
-            y: center.y + outerRadius * sin(CGFloat(startAngle.radians))
-        )
-        path.addLine(to: outerStart)
-
-        // Arc along outer radius
-        path.addArc(
-            center: center,
-            radius: outerRadius,
-            startAngle: startAngle,
-            endAngle: endAngle,
-            clockwise: false
-        )
-
-        // Line to inner radius
-        let innerEnd = CGPoint(
-            x: center.x + innerRadius * cos(CGFloat(endAngle.radians)),
-            y: center.y + innerRadius * sin(CGFloat(endAngle.radians))
-        )
-        path.addLine(to: innerEnd)
-
-        // Arc along inner radius (clockwise to close)
-        path.addArc(
-            center: center,
-            radius: innerRadius,
-            startAngle: endAngle,
-            endAngle: startAngle,
-            clockwise: true
-        )
-
-        path.closeSubpath()
-        return path
     }
 }
 
