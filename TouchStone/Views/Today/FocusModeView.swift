@@ -51,30 +51,16 @@ struct FocusModeView: View {
         }
     }
 
-    // MARK: - Colors
-
-    private let darkGreen = Color(red: 0.08, green: 0.12, blue: 0.10)
-    private let accentGreen = Color(red: 0.20, green: 0.85, blue: 0.55)
-    private let cardBackground = Color(red: 0.12, green: 0.18, blue: 0.15)
-
     var body: some View {
         ZStack {
-            // Dark green gradient background
-            LinearGradient(
-                colors: [
-                    Color(red: 0.05, green: 0.10, blue: 0.08),
-                    Color(red: 0.08, green: 0.14, blue: 0.11),
-                    Color(red: 0.06, green: 0.11, blue: 0.09)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            // Background
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Header
                 headerView
-                    .padding(.top, 8)
+                    .padding(.top, DesignSystem.Spacing.sm)
 
                 Spacer()
 
@@ -90,19 +76,18 @@ struct FocusModeView: View {
 
                 // Intention pill
                 intentionPill
-                    .padding(.bottom, 24)
+                    .padding(.bottom, DesignSystem.Spacing.xl)
 
                 // Action button
                 actionButton
                     .padding(.bottom, 40)
             }
         }
-        .preferredColorScheme(.dark)
         .sheet(isPresented: $showDetails) {
             detailsSheet
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
-                .presentationBackground(cardBackground)
+                .presentationBackground(DesignSystem.Colors.cardBackground)
         }
         .confirmationDialog("Options", isPresented: $showMenu) {
             Button("View Details") {
@@ -127,8 +112,12 @@ struct FocusModeView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
                     .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(DesignSystem.Colors.cardBackground)
+                    )
             }
 
             Spacer()
@@ -136,7 +125,7 @@ struct FocusModeView: View {
             Text("NOW")
                 .font(.system(size: 14, weight: .semibold))
                 .tracking(3)
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
 
             Spacer()
 
@@ -145,11 +134,15 @@ struct FocusModeView: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
                     .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(DesignSystem.Colors.cardBackground)
+                    )
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DesignSystem.Spacing.lg)
     }
 
     // MARK: - Main Card
@@ -161,19 +154,19 @@ struct FocusModeView: View {
                 // Abstract art placeholder
                 AbstractArtView()
                     .frame(height: 260)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .padding(16)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous))
+                    .padding(DesignSystem.Spacing.lg)
 
                 // Category badge
                 Text(categoryLabel)
                     .font(.system(size: 11, weight: .semibold))
                     .tracking(1)
-                    .foregroundStyle(accentGreen)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .foregroundStyle(DesignSystem.Colors.accent)
+                    .padding(.horizontal, DesignSystem.Spacing.md)
+                    .padding(.vertical, DesignSystem.Spacing.sm)
                     .background(
                         Capsule()
-                            .fill(Color.black.opacity(0.4))
+                            .fill(DesignSystem.Colors.background.opacity(0.8))
                     )
                     .padding(.top, 28)
                     .padding(.trailing, 28)
@@ -181,42 +174,53 @@ struct FocusModeView: View {
 
             // Project title
             Text(project.title)
-                .font(.system(size: 32, weight: .bold))
+                .font(DesignSystem.Typography.largeTitle)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.white)
-                .padding(.horizontal, 24)
-                .padding(.top, 8)
-                .padding(.bottom, 32)
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                .padding(.horizontal, DesignSystem.Spacing.xl)
+                .padding(.top, DesignSystem.Spacing.sm)
+                .padding(.bottom, DesignSystem.Spacing.xxl)
         }
         .frame(maxWidth: .infinity)
-        .background(cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .padding(.horizontal, 24)
-        .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+        .background(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.extraLarge, style: .continuous)
+                .fill(DesignSystem.Colors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.extraLarge, style: .continuous)
+                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+        )
+        .padding(.horizontal, DesignSystem.Spacing.xl)
+        .shadow(color: DesignSystem.Colors.background.opacity(0.5), radius: 20, y: 10)
     }
 
     // MARK: - Intention Pill
 
     private var intentionPill: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: DesignSystem.Spacing.sm) {
             Text("INTENTION")
                 .font(.system(size: 11, weight: .semibold))
                 .tracking(1)
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
 
             Text(intentionText)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white.opacity(0.8))
+                .font(DesignSystem.Typography.callout)
+                .fontWeight(.medium)
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 14)
+        .padding(.horizontal, DesignSystem.Spacing.xl)
+        .padding(.vertical, DesignSystem.Spacing.md + 2)
         .frame(maxWidth: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.08))
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                .fill(DesignSystem.Colors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.15), lineWidth: 1)
         )
         .padding(.horizontal, 40)
     }
@@ -233,16 +237,16 @@ struct FocusModeView: View {
                 }
             }
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: DesignSystem.Spacing.md) {
                 Image(systemName: hasStarted ? "checkmark" : "play.fill")
                     .font(.system(size: 18, weight: .semibold))
                 Text(hasStarted ? "Done" : "Begin")
                     .font(.system(size: 19, weight: .semibold))
             }
-            .foregroundStyle(.black)
+            .foregroundStyle(DesignSystem.Colors.background)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 20)
-            .background(accentGreen)
+            .padding(.vertical, DesignSystem.Spacing.xl - 4)
+            .background(DesignSystem.Colors.accent)
             .clipShape(Capsule())
         }
         .padding(.horizontal, 40)
@@ -252,15 +256,15 @@ struct FocusModeView: View {
 
     private var detailsSheet: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xl) {
                 // Header
                 HStack {
                     Text("Details")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(.white)
+                        .font(DesignSystem.Typography.title)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
                     Spacer()
                 }
-                .padding(.top, 8)
+                .padding(.top, DesignSystem.Spacing.sm)
 
                 // Phase section
                 if let phase = activePhase {
@@ -291,88 +295,88 @@ struct FocusModeView: View {
 
                 // Mental rule section
                 if let phase = activePhase, let rule = phase.mentalRule {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+                        HStack(spacing: DesignSystem.Spacing.sm) {
                             Image(systemName: "brain.head.profile")
                                 .font(.system(size: 14))
-                                .foregroundStyle(accentGreen)
+                                .foregroundStyle(DesignSystem.Colors.accent)
                             Text("Mental Rule")
                                 .font(.system(size: 13, weight: .semibold))
                                 .tracking(0.5)
-                                .foregroundStyle(.white.opacity(0.6))
+                                .foregroundStyle(DesignSystem.Colors.textTertiary)
                         }
 
                         Text("\"\(rule)\"")
-                            .font(.system(size: 17))
+                            .font(DesignSystem.Typography.headline)
                             .italic()
-                            .foregroundStyle(.white.opacity(0.9))
-                            .padding(16)
+                            .foregroundStyle(DesignSystem.Colors.textPrimary)
+                            .padding(DesignSystem.Spacing.lg)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(accentGreen.opacity(0.1))
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                                    .fill(DesignSystem.Colors.accent.opacity(0.1))
                             )
                     }
                 }
 
                 // Note section
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+                    HStack(spacing: DesignSystem.Spacing.sm) {
                         Image(systemName: "note.text")
                             .font(.system(size: 14))
-                            .foregroundStyle(accentGreen)
+                            .foregroundStyle(DesignSystem.Colors.accent)
                         Text("Session Note")
                             .font(.system(size: 13, weight: .semibold))
                             .tracking(0.5)
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
                     }
 
                     TextField("Add a note...", text: $note, axis: .vertical)
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white)
-                        .padding(16)
+                        .font(DesignSystem.Typography.body)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                        .padding(DesignSystem.Spacing.lg)
                         .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.white.opacity(0.08))
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                                .fill(DesignSystem.Colors.cardBackgroundLight)
                         )
                         .lineLimit(3...6)
                 }
 
                 Spacer(minLength: 40)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 16)
+            .padding(.horizontal, DesignSystem.Spacing.xl)
+            .padding(.top, DesignSystem.Spacing.lg)
         }
     }
 
     private func detailSection(icon: String, title: String, content: String, subtitle: String?) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            HStack(spacing: DesignSystem.Spacing.sm) {
                 Image(systemName: icon)
                     .font(.system(size: 14))
-                    .foregroundStyle(accentGreen)
+                    .foregroundStyle(DesignSystem.Colors.accent)
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
                     .tracking(0.5)
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
             }
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
                 Text(content)
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.white)
+                    .font(DesignSystem.Typography.headline)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
 
                 if let subtitle = subtitle {
                     Text(subtitle)
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .font(DesignSystem.Typography.callout)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
             }
-            .padding(16)
+            .padding(DesignSystem.Spacing.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(0.08))
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                    .fill(DesignSystem.Colors.cardBackgroundLight)
             )
         }
     }
@@ -401,12 +405,12 @@ struct FocusModeView: View {
 struct AbstractArtView: View {
     var body: some View {
         ZStack {
-            // Base gradient
+            // Base gradient using accent colors
             LinearGradient(
                 colors: [
-                    Color(red: 0.65, green: 0.72, blue: 0.60),
-                    Color(red: 0.45, green: 0.58, blue: 0.55),
-                    Color(red: 0.35, green: 0.50, blue: 0.55)
+                    DesignSystem.Colors.accent.opacity(0.7),
+                    DesignSystem.Colors.accentMuted.opacity(0.8),
+                    DesignSystem.Colors.focus.opacity(0.6)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -417,8 +421,8 @@ struct AbstractArtView: View {
                 .fill(
                     RadialGradient(
                         colors: [
-                            Color(red: 0.80, green: 0.85, blue: 0.75).opacity(0.8),
-                            Color(red: 0.55, green: 0.65, blue: 0.60).opacity(0.4),
+                            DesignSystem.Colors.accent.opacity(0.6),
+                            DesignSystem.Colors.accentMuted.opacity(0.3),
                             Color.clear
                         ],
                         center: .init(x: 0.3, y: 0.3),
@@ -434,8 +438,8 @@ struct AbstractArtView: View {
                 .fill(
                     RadialGradient(
                         colors: [
-                            Color(red: 0.40, green: 0.55, blue: 0.60).opacity(0.6),
-                            Color(red: 0.30, green: 0.45, blue: 0.50).opacity(0.3),
+                            DesignSystem.Colors.focus.opacity(0.5),
+                            DesignSystem.Colors.deep.opacity(0.3),
                             Color.clear
                         ],
                         center: .init(x: 0.7, y: 0.6),
@@ -451,8 +455,8 @@ struct AbstractArtView: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.85, green: 0.88, blue: 0.80).opacity(0.5),
-                            Color(red: 0.70, green: 0.78, blue: 0.72).opacity(0.2)
+                            DesignSystem.Colors.accent.opacity(0.4),
+                            DesignSystem.Colors.accentMuted.opacity(0.2)
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -463,7 +467,7 @@ struct AbstractArtView: View {
                 .offset(x: -30, y: -20)
                 .blur(radius: 20)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
     }
 }
 
