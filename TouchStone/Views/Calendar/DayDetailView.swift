@@ -242,12 +242,12 @@ struct DayDetailView: View {
             .padding(.vertical, DesignSystem.Spacing.sm)
 
             // Legend
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: DesignSystem.Spacing.sm) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: DesignSystem.Spacing.md) {
                 ForEach(data.slices) { slice in
                     HStack(spacing: DesignSystem.Spacing.sm) {
                         Circle()
                             .fill(slice.color)
-                            .frame(width: 10, height: 10)
+                            .frame(width: 8, height: 8)
                         Text(slice.label)
                             .font(DesignSystem.Typography.caption)
                             .foregroundStyle(DesignSystem.Colors.textPrimary)
@@ -258,9 +258,11 @@ struct DayDetailView: View {
                             .fontWeight(.medium)
                             .foregroundStyle(DesignSystem.Colors.textSecondary)
                     }
+                    .padding(.vertical, DesignSystem.Spacing.xs)
                 }
             }
             .padding(.horizontal, DesignSystem.Spacing.sm)
+            .padding(.top, DesignSystem.Spacing.sm)
         }
         .padding(DesignSystem.Spacing.lg)
         .background(
@@ -300,13 +302,14 @@ struct DayDetailView: View {
     }
 
     private var stonesSection: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             Text("SCHEDULE")
                 .font(DesignSystem.Typography.caption)
                 .fontWeight(.semibold)
                 .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .tracking(1)
                 .padding(.horizontal, DesignSystem.Spacing.xl)
+                .padding(.bottom, DesignSystem.Spacing.xs)
 
             ForEach(stones.sorted(by: { $0.startHour * 60 + $0.startMinute < $1.startHour * 60 + $1.startMinute })) { stone in
                 SwipeToDeleteRow(
@@ -367,10 +370,13 @@ struct PieChartView: View {
     let slices: [ChartSlice]
     let totalHours: Double
 
+    // Gap between slices in degrees
+    private let gapDegrees: Double = 2.5
+
     var body: some View {
         GeometryReader { geometry in
             let radius = min(geometry.size.width, geometry.size.height) / 2
-            let innerRadius = radius * 0.6
+            let innerRadius = radius * 0.72  // Thinner donut
 
             ZStack {
                 // Draw slices
@@ -392,10 +398,14 @@ struct PieChartView: View {
         var angles: [(start: Angle, end: Angle)] = []
         var currentAngle = Angle(degrees: -90) // Start from top
 
+        let totalGap = gapDegrees * Double(slices.count)
+        let availableDegrees = 360.0 - totalGap
+
         for slice in slices {
-            let sliceAngle = Angle(degrees: (slice.hours / totalHours) * 360)
-            angles.append((start: currentAngle, end: currentAngle + sliceAngle))
-            currentAngle = currentAngle + sliceAngle
+            let sliceAngle = Angle(degrees: (slice.hours / totalHours) * availableDegrees)
+            let halfGap = Angle(degrees: gapDegrees / 2)
+            angles.append((start: currentAngle + halfGap, end: currentAngle + sliceAngle + halfGap))
+            currentAngle = currentAngle + sliceAngle + Angle(degrees: gapDegrees)
         }
 
         return angles
