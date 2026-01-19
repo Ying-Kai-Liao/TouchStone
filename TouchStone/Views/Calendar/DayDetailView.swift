@@ -21,6 +21,7 @@ struct DayDetailView: View {
 
     @State private var stoneToDelete: StoneEvent?
     @State private var showDeleteAlert = false
+    @State private var stoneToEdit: StoneEvent?
 
     let date: Date
     let stones: [StoneEvent]
@@ -79,6 +80,9 @@ struct DayDetailView: View {
                 } else {
                     Text("Are you sure you want to delete \"\(stone.title)\"?")
                 }
+            }
+            .sheet(item: $stoneToEdit) { stone in
+                StoneEditSheet(stone: stone, onSave: {})
             }
         }
     }
@@ -317,6 +321,10 @@ struct DayDetailView: View {
                     }
                 ) {
                     StoneRowView(stone: stone)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            stoneToEdit = stone
+                        }
                 }
                 .padding(.horizontal, DesignSystem.Spacing.xl)
             }
