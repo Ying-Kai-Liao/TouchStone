@@ -3,46 +3,166 @@ import SwiftUI
 // MARK: - Design System
 
 /// Central design system for the app's visual language
+/// Supports both light and dark appearance modes
 enum DesignSystem {
 
     // MARK: - Colors
 
     enum Colors {
-        // Background colors
-        static let background = Color(red: 0.04, green: 0.07, blue: 0.05)
-        static let backgroundLight = Color(red: 0.06, green: 0.09, blue: 0.07)
-        static let cardBackground = Color(red: 0.10, green: 0.14, blue: 0.12)
-        static let cardBackgroundLight = Color(red: 0.12, green: 0.16, blue: 0.14)
+        // Helper to check if we're in dark mode
+        private static var isDarkMode: Bool {
+            switch UserPreferences.shared.appearanceMode {
+            case .dark:
+                return true
+            case .light:
+                return false
+            case .system:
+                // For system mode, default to dark (will be overridden by preferredColorScheme)
+                return true
+            }
+        }
 
-        // Accent colors (dynamic based on user theme selection)
+        // MARK: - Background Colors
+
+        static var background: Color {
+            isDarkMode
+                ? Color(red: 0.04, green: 0.07, blue: 0.05)  // Dark green-black
+                : Color(red: 0.97, green: 0.96, blue: 0.94)  // Warm off-white
+        }
+
+        static var backgroundLight: Color {
+            isDarkMode
+                ? Color(red: 0.06, green: 0.09, blue: 0.07)
+                : Color(red: 0.94, green: 0.93, blue: 0.91)
+        }
+
+        static var cardBackground: Color {
+            isDarkMode
+                ? Color(red: 0.10, green: 0.14, blue: 0.12)  // Dark card
+                : Color(red: 1.0, green: 0.99, blue: 0.97)   // Warm white card
+        }
+
+        static var cardBackgroundLight: Color {
+            isDarkMode
+                ? Color(red: 0.12, green: 0.16, blue: 0.14)
+                : Color(red: 0.98, green: 0.97, blue: 0.95)
+        }
+
+        // MARK: - Accent Colors (dynamic based on user theme selection)
+
         static var accent: Color {
             UserPreferences.shared.themeColorOption.accentColor
         }
+
         static var accentMuted: Color {
             UserPreferences.shared.themeColorOption.accentMuted
         }
 
-        // Text colors
-        static let textPrimary = Color.white.opacity(0.95)
-        static let textSecondary = Color.white.opacity(0.65)
-        static let textTertiary = Color.white.opacity(0.45)
+        // MARK: - Text Colors
 
-        // Status colors
-        static let success = Color(red: 0.55, green: 0.75, blue: 0.55)
-        static let warning = Color(red: 0.85, green: 0.70, blue: 0.45)
-        static let error = Color(red: 0.85, green: 0.45, blue: 0.45)
+        static var textPrimary: Color {
+            isDarkMode
+                ? Color.white.opacity(0.95)
+                : Color(red: 0.15, green: 0.15, blue: 0.13)  // Dark warm gray
+        }
 
-        // Category colors
-        static let focus = Color(red: 0.55, green: 0.70, blue: 0.75)
-        static let deep = Color(red: 0.60, green: 0.65, blue: 0.55)
-        static let social = Color(red: 0.75, green: 0.65, blue: 0.55)
+        static var textSecondary: Color {
+            isDarkMode
+                ? Color.white.opacity(0.65)
+                : Color(red: 0.35, green: 0.35, blue: 0.32)  // Medium warm gray
+        }
 
-        // Energy gradient colors (for heatmap)
-        static let energyStill = Color(red: 0.25, green: 0.28, blue: 0.26)
-        static let energyEase = Color(red: 0.45, green: 0.55, blue: 0.45)
-        static let energyFlow = Color(red: 0.55, green: 0.65, blue: 0.60)
-        static let energyPower = Color(red: 0.60, green: 0.70, blue: 0.65)
-        static let energyPeak = Color(red: 0.55, green: 0.70, blue: 0.75)
+        static var textTertiary: Color {
+            isDarkMode
+                ? Color.white.opacity(0.45)
+                : Color(red: 0.55, green: 0.55, blue: 0.52)  // Light warm gray
+        }
+
+        // MARK: - Status Colors
+
+        static var success: Color {
+            isDarkMode
+                ? Color(red: 0.55, green: 0.75, blue: 0.55)
+                : Color(red: 0.30, green: 0.60, blue: 0.35)
+        }
+
+        static var warning: Color {
+            isDarkMode
+                ? Color(red: 0.85, green: 0.70, blue: 0.45)
+                : Color(red: 0.80, green: 0.60, blue: 0.20)
+        }
+
+        static var error: Color {
+            isDarkMode
+                ? Color(red: 0.85, green: 0.45, blue: 0.45)
+                : Color(red: 0.75, green: 0.30, blue: 0.30)
+        }
+
+        // MARK: - Category Colors
+
+        static var focus: Color {
+            isDarkMode
+                ? Color(red: 0.55, green: 0.70, blue: 0.75)
+                : Color(red: 0.35, green: 0.55, blue: 0.65)
+        }
+
+        static var deep: Color {
+            isDarkMode
+                ? Color(red: 0.60, green: 0.65, blue: 0.55)
+                : Color(red: 0.45, green: 0.50, blue: 0.40)
+        }
+
+        static var social: Color {
+            isDarkMode
+                ? Color(red: 0.75, green: 0.65, blue: 0.55)
+                : Color(red: 0.65, green: 0.50, blue: 0.40)
+        }
+
+        // MARK: - Energy Gradient Colors (for heatmap)
+
+        static var energyStill: Color {
+            isDarkMode
+                ? Color(red: 0.25, green: 0.28, blue: 0.26)
+                : Color(red: 0.90, green: 0.89, blue: 0.87)
+        }
+
+        static var energyEase: Color {
+            isDarkMode
+                ? Color(red: 0.45, green: 0.55, blue: 0.45)
+                : Color(red: 0.75, green: 0.82, blue: 0.75)
+        }
+
+        static var energyFlow: Color {
+            isDarkMode
+                ? Color(red: 0.55, green: 0.65, blue: 0.60)
+                : Color(red: 0.60, green: 0.72, blue: 0.65)
+        }
+
+        static var energyPower: Color {
+            isDarkMode
+                ? Color(red: 0.60, green: 0.70, blue: 0.65)
+                : Color(red: 0.50, green: 0.65, blue: 0.55)
+        }
+
+        static var energyPeak: Color {
+            isDarkMode
+                ? Color(red: 0.55, green: 0.70, blue: 0.75)
+                : Color(red: 0.40, green: 0.58, blue: 0.50)
+        }
+
+        // MARK: - Divider/Border Colors
+
+        static var divider: Color {
+            isDarkMode
+                ? Color.white.opacity(0.1)
+                : Color.black.opacity(0.08)
+        }
+
+        static var border: Color {
+            isDarkMode
+                ? Color.white.opacity(0.15)
+                : Color.black.opacity(0.1)
+        }
     }
 
     // MARK: - Typography

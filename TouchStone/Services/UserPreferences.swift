@@ -39,27 +39,60 @@ enum ThemeColorOption: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// The main accent color for this theme
+    /// Helper to check appearance mode
+    private var isDarkMode: Bool {
+        switch UserPreferences.shared.appearanceMode {
+        case .dark: return true
+        case .light: return false
+        case .system: return true
+        }
+    }
+
+    /// The main accent color for this theme (adapts to light/dark mode)
     var accentColor: Color {
-        switch self {
-        case .sage: return Color(red: 0.65, green: 0.78, blue: 0.65)
-        case .ocean: return Color(red: 0.55, green: 0.70, blue: 0.80)
-        case .lavender: return Color(red: 0.70, green: 0.60, blue: 0.80)
-        case .coral: return Color(red: 0.85, green: 0.55, blue: 0.55)
-        case .gold: return Color(red: 0.85, green: 0.75, blue: 0.50)
-        case .slate: return Color(red: 0.60, green: 0.65, blue: 0.70)
+        if isDarkMode {
+            // Dark mode: lighter, softer colors
+            switch self {
+            case .sage: return Color(red: 0.65, green: 0.78, blue: 0.65)
+            case .ocean: return Color(red: 0.55, green: 0.70, blue: 0.80)
+            case .lavender: return Color(red: 0.70, green: 0.60, blue: 0.80)
+            case .coral: return Color(red: 0.85, green: 0.55, blue: 0.55)
+            case .gold: return Color(red: 0.85, green: 0.75, blue: 0.50)
+            case .slate: return Color(red: 0.60, green: 0.65, blue: 0.70)
+            }
+        } else {
+            // Light mode: deeper, more saturated colors for contrast
+            switch self {
+            case .sage: return Color(red: 0.35, green: 0.55, blue: 0.40)
+            case .ocean: return Color(red: 0.25, green: 0.50, blue: 0.65)
+            case .lavender: return Color(red: 0.50, green: 0.40, blue: 0.65)
+            case .coral: return Color(red: 0.75, green: 0.35, blue: 0.35)
+            case .gold: return Color(red: 0.70, green: 0.55, blue: 0.25)
+            case .slate: return Color(red: 0.40, green: 0.45, blue: 0.52)
+            }
         }
     }
 
     /// A muted version of the accent
     var accentMuted: Color {
-        switch self {
-        case .sage: return Color(red: 0.55, green: 0.68, blue: 0.55)
-        case .ocean: return Color(red: 0.45, green: 0.60, blue: 0.70)
-        case .lavender: return Color(red: 0.60, green: 0.50, blue: 0.70)
-        case .coral: return Color(red: 0.75, green: 0.45, blue: 0.45)
-        case .gold: return Color(red: 0.75, green: 0.65, blue: 0.40)
-        case .slate: return Color(red: 0.50, green: 0.55, blue: 0.60)
+        if isDarkMode {
+            switch self {
+            case .sage: return Color(red: 0.55, green: 0.68, blue: 0.55)
+            case .ocean: return Color(red: 0.45, green: 0.60, blue: 0.70)
+            case .lavender: return Color(red: 0.60, green: 0.50, blue: 0.70)
+            case .coral: return Color(red: 0.75, green: 0.45, blue: 0.45)
+            case .gold: return Color(red: 0.75, green: 0.65, blue: 0.40)
+            case .slate: return Color(red: 0.50, green: 0.55, blue: 0.60)
+            }
+        } else {
+            switch self {
+            case .sage: return Color(red: 0.45, green: 0.60, blue: 0.50)
+            case .ocean: return Color(red: 0.35, green: 0.55, blue: 0.70)
+            case .lavender: return Color(red: 0.55, green: 0.48, blue: 0.68)
+            case .coral: return Color(red: 0.78, green: 0.45, blue: 0.45)
+            case .gold: return Color(red: 0.75, green: 0.60, blue: 0.35)
+            case .slate: return Color(red: 0.48, green: 0.52, blue: 0.58)
+            }
         }
     }
 
