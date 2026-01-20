@@ -2,90 +2,143 @@
 
 ## Overview
 
-TouchStone is an iOS time management app built on the "Stone & Water" philosophy. Rather than trying to optimize your schedule, TouchStone helps you acknowledge reality and make intentional choices about how to spend your flexible time around fixed commitments.
+TouchStone is a **worry-offloading system** for iOS. Instead of asking you to plan, prioritize, and optimize, TouchStone does the thinking for you — then tells you exactly what "enough" looks like today.
+
+**The core promise**: Follow today's plan, and your future is safe. Stop carrying the mental load. Trust the system.
 
 ---
 
 ## Core Philosophy
 
+### The Problem We Solve
+
+Every morning, most people wake up with a storm of questions:
+- "What should I do first?"
+- "Am I behind? How behind?"
+- "If I rest today, will I miss my deadline?"
+- "What's actually urgent vs. what just feels urgent?"
+
+These questions create **planning anxiety** — the exhausting mental work of figuring out what to do before you can actually do it.
+
+TouchStone eliminates planning anxiety by answering all these questions for you, mathematically, before you even open the app.
+
+### The "Enough" Philosophy
+
+Most productivity systems implicitly say: "More is better. Optimize. Don't waste time."
+
+TouchStone says: **There is a number called "enough." When you hit it, stop.**
+
+- "Enough" is calculated from your deadlines, your projects, and your stated capacity
+- "Enough" includes buffer for bad days and unexpected things
+- When you hit "enough," the app tells you to stop — and means it
+- Time after "enough" is for life: exercise, hobbies, rest, people
+
 ### The Stone & Water Metaphor
 
-- **Stones** represent fixed, immovable events in your day—meetings, appointments, commitments that cannot be changed. They represent reality.
+- **Stones** = Fixed, immovable events (meetings, appointments). Reality that cannot change.
+- **Water** = Flexible work that flows around stones. Projects sized to fit available gaps.
 
-- **Water** represents your flexible work—projects and tasks that can flow around your stones. Water fills the gaps between stones, representing intentional effort.
+The app "pours" your project work into available time slots, automatically, so you never have to decide "what fits here?"
 
-The philosophy is "acknowledging reality, not managing it." TouchStone doesn't try to create an impossible schedule. Instead, it shows you what's actually achievable given your fixed commitments and helps you make the most of your available time.
+### Trust the Plan
+
+Each day, TouchStone presents a complete schedule:
+- Work sessions allocated to fit your free time
+- Breaks built in
+- Deadlines accounted for with buffer
+- "Enough" clearly marked
+
+Your job is simple: **follow the plan.** Not re-plan it. Not second-guess it. Just execute.
+
+If you follow today's plan, your deadlines are safe. The app did the math.
+
+### Bad Days Are Survivable
+
+When you can't work — sickness, emergency, just can't today — the system adapts:
+1. No guilt, no shame messaging
+2. Automatic redistribution across remaining days
+3. Clear answer: "You're still on track" or "Here's the adjusted plan"
+
+Rest days aren't failures. They're built into the model.
 
 ---
 
 ## Main Features
 
-### 1. Flow Tab (Daily Workflow)
+### 1. Flow Tab (Your Daily Plan)
 
-The Flow tab is your primary interface for managing today's work.
+The Flow tab answers the question: **"What does 'enough' look like today?"**
 
-**Key Features:**
-- **Daily Decision**: Each day starts with "Do you want to work today?" This acknowledges that rest days are valid choices.
-- **Integrated Timeline**: See stones (fixed events) and suggested work sessions in chronological order
-- **Liquid Scheduler**: The app automatically "pours" project work into available time slots between your stones
-- **Quick Touch Logging**: Tap any project to log work effort—fast and frictionless
-- **Focus Mode**: Optional 55-minute timer for deep work sessions
-- **Capacity Tracking**: Visual indicator when you've reached your daily productive capacity
-- **Contextual Messages**: Helpful messages based on your schedule load (e.g., "The schedule is light. You have space to think.")
-- **Meal Badges**: Lunch and dinner times shown as inline badges
-- **Undo Support**: Made a mistake? Undo your last touch with one tap
-- **Edit Mode**: Drag to reorder sessions or adjust times
+When you open the app, you see today's complete schedule — no decisions required.
 
-### 2. Plan Tab (Project Management)
+**What You See:**
+- **Today's Timeline**: Stones (fixed events) and work sessions in chronological order
+- **"Enough" Marker**: Clear indication of when your work day is complete
+- **Progress Toward Enough**: Visual sense of how much you've done vs. how much remains
+- **Life Activities**: Habits and personal time shown alongside work
 
-Manage your projects with two approaches:
+**Key Interactions:**
+- **Quick Touch**: Tap a project to log work — fast and frictionless
+- **Focus Mode**: Optional deep work container (~55 min) for concentrated sessions
+- **Undo Support**: Mistakes are reversible with one tap
+- **Rest Day Option**: Some days you can't work. The system adapts.
+
+**The Goal**: Open the app, see exactly what to do, do it, stop when "enough" is reached.
+
+### 2. Plan Tab (Project Setup)
+
+This is where you tell TouchStone what you're working on. Once set up, the app handles the daily planning.
 
 **Simple Projects**
-- Quick creation with just a title
-- Track current phase
-- Log work directly
+- Quick creation: just a title and optional deadline
+- Good for straightforward work that doesn't need decomposition
+- The app tracks hours toward deadline automatically
 
 **Strategic Projects** (AI-Powered)
-- AI-assisted project decomposition using four archetypes:
+- For complex work that benefits from structure
+- AI breaks your goal into phases and sessions
+- Each session is 60-90 minutes with a specific goal
+- You don't have to figure out "what's the next step" — it's pre-planned
 
-  | Archetype | Best For | Phases |
-  |-----------|----------|--------|
-  | **LAB** | Creative/Research work | Exploration → Bricklaying → Refining |
-  | **HUNT** | Administrative tasks | Audit → Gathering → Execution |
-  | **SPIRAL** | Learning projects | Input → Output → Reflection |
-  | **BUILD** | Engineering/Technical | Spec → Dependencies → Assembly → Testing |
+**Project Archetypes:**
 
-**Strategic Planning Flow:**
-1. Enter your goal description
-2. AI classifies it into the most suitable archetype
-3. AI generates phases with mental rules (cognitive constraints)
-4. AI creates 60-90 minute work sessions with specific goals
-5. Adjust phase time allocations (5-80% per phase)
-6. Optionally refine with documents and AI chat
+| Archetype | Best For | Example |
+|-----------|----------|---------|
+| **LAB** | Creative/Research | "Design a new landing page" |
+| **HUNT** | Administrative | "Organize tax documents" |
+| **SPIRAL** | Learning | "Learn basic Spanish" |
+| **BUILD** | Technical/Engineering | "Build user authentication" |
+
+**Why This Matters**: Once a project is set up with sessions, you never have to think "what should I work on next?" The app knows. It schedules. You execute.
 
 ### 3. Calendar Tab
 
-Visual scheduling and stone management.
+See your month at a glance. Understand where the pressure is. Add fixed events.
 
 **Features:**
-- **Month View**: Calendar grid with all your stones
-- **Pressure Visualization**: Color-coded days showing deadline pressure and workload
-- **Add Stones**: Use voice input or form entry
-- **Day Detail**: View and manage stones for any selected day
-- **Energy Gradient**: Visual representation of busy vs. light days
+- **Month View**: All your stones visualized
+- **Pressure Heatmap**: Color-coded days showing workload intensity
+- **Add Stones**: Voice input or form — however is fastest for you
+- **Day Detail**: Tap any day to see/edit what's scheduled
 
-### 4. Me Tab (Personal Statistics)
+**Why This Matters**: The calendar shows you the landscape of your commitments. When you can see the whole picture, you stop worrying about "what am I forgetting?"
 
-Track your progress and build momentum.
+### 4. Me Tab (Your Stats)
 
-**Displays:**
-- Streak count (consecutive days with touches)
-- Total hours (all-time)
-- This week's hours
-- Today's hours
-- Active projects count
-- Completed projects count
-- Weekly progress visualization
+A gentle mirror, not a scoreboard.
+
+**What You See:**
+- Hours this week vs. your goal
+- Today's progress toward "enough"
+- Active and completed projects
+- Weekly rhythm visualization
+
+**What You Don't See:**
+- Judgmental metrics
+- "You missed 3 days" guilt trips
+- Comparison to others or past performance
+
+**Why This Matters**: Stats should inform, not shame. You can see patterns without feeling evaluated.
 
 ### 5. Settings Tab
 
@@ -249,37 +302,38 @@ Rules are recurring time blocks for meals and personal time.
 
 ---
 
-## Tips for Success
+## How to Use TouchStone
 
-### Daily Workflow
+### The Daily Practice
 
-1. **Start each day with the prompt** - Consciously decide if you're working today
-2. **Review your stones first** - Know your fixed commitments
-3. **Trust the liquid scheduler** - Let it fill your gaps with project work
-4. **Touch often** - Quick, approximate logging is better than perfect tracking
-5. **Use Focus Mode for deep work** - The timer helps maintain concentration
+1. **Open the app** — See today's plan already made for you
+2. **Glance at the timeline** — Know what "enough" looks like today
+3. **Do the first thing** — Don't overthink. Just start.
+4. **Tap to log** — Quick touch when you complete a session
+5. **Stop when "enough" is reached** — The app says stop. Trust it.
 
-### Project Planning
+### The Mindset Shift
 
-1. **Be specific in goal descriptions** - Better input = better AI output
-2. **Choose strategic projects for complex work** - The structure helps
-3. **Review and adjust phases** - AI suggestions are starting points
-4. **Attach relevant documents** - Context improves AI recommendations
-5. **Embrace mental rules** - They prevent premature optimization
+**Old way**: "I need to figure out what to do, prioritize, plan my time..."
 
-### Managing Pressure
+**TouchStone way**: "I open the app. It shows me the plan. I follow it."
 
-1. **Add deadlines to important projects** - Enables pressure tracking
-2. **Watch the calendar colors** - Red days need attention
-3. **Trust "Impossible" warnings** - Renegotiate deadlines early
-4. **Use buffer wisely** - The 20% default protects against surprises
+The app does the planning. You do the doing. That's the division of labor.
 
-### Building Habits
+### When You Can't Work
 
-1. **Log daily** - Even small touches build streaks
-2. **Check Me tab weekly** - Track your progress
-3. **Adjust settings as needed** - Your capacity may change
-4. **Rest days are valid** - The app supports them intentionally
+- **Tap "Rest Day"** — No guilt, no judgment
+- **Trust redistribution** — The system recalculates automatically
+- **Check "still safe?"** — The app tells you if deadlines are still okay
+- **Take care of yourself** — That's the point
+
+### Setting Up for Success
+
+1. **Add your fixed events (Stones)** — Meetings, appointments, commitments
+2. **Create projects with deadlines** — So the app can calculate pressure
+3. **Set realistic capacity** — Default is 6 hours; adjust to your reality
+4. **Use Strategic Projects for complex work** — Let AI break it into sessions
+5. **Trust the system** — Stop re-planning what the app already planned
 
 ---
 
@@ -379,4 +433,16 @@ For issues, feedback, or feature requests:
 
 ---
 
-*TouchStone: Acknowledge reality. Flow intentionally.*
+## The TouchStone Promise
+
+When you use TouchStone as designed:
+
+- **You stop asking "what should I do?"** — The app answered that.
+- **You stop worrying about deadlines** — The math is done for you.
+- **You stop feeling guilty about rest** — Rest days are built in.
+- **You stop working past exhaustion** — "Enough" means enough.
+- **You start trusting** — The plan works. Follow it.
+
+---
+
+*TouchStone: Stop planning. Start trusting.*
