@@ -117,6 +117,7 @@ struct StoneFlowRow: View {
         )
         .contentShape(Rectangle())
         .onTapGesture {
+            HapticService.expand()
             withAnimation(.easeInOut(duration: 0.25)) {
                 isExpanded.toggle()
             }
@@ -227,8 +228,10 @@ struct WaterFlowRow: View {
         // Non-ghost blocks: tap to expand/collapse
         Button {
             if isGhost {
+                // Haptic handled in TodayFlowView.performTouch
                 onTouch?()
             } else {
+                HapticService.expand()
                 withAnimation(.easeInOut(duration: 0.25)) {
                     isExpanded.toggle()
                 }
@@ -288,7 +291,10 @@ struct WaterFlowRow: View {
 
                         // Action button - Pause style pill
                         if let onFocus = onFocus {
-                            Button(action: onFocus) {
+                            Button {
+                                HapticService.buttonPress()
+                                onFocus()
+                            } label: {
                                 Text("Focus")
                                     .font(.system(size: 13, weight: .medium))
                                     .foregroundStyle(DesignSystem.Colors.textPrimary)
@@ -658,7 +664,10 @@ struct AdditionalProjectRow: View {
                 Spacer()
 
                 // Play button
-                Button(action: onFocus) {
+                Button {
+                    HapticService.buttonPress()
+                    onFocus()
+                } label: {
                     Image(systemName: "play.fill")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(DesignSystem.Colors.accent)

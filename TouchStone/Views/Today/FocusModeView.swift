@@ -67,6 +67,7 @@ struct FocusModeView: View {
                 // Main content card
                 mainCard
                     .onTapGesture {
+                        HapticService.expand()
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             showDetails.toggle()
                         }
@@ -108,6 +109,7 @@ struct FocusModeView: View {
     private var headerView: some View {
         HStack {
             Button {
+                HapticService.buttonPress()
                 finishFocus()
             } label: {
                 Image(systemName: "xmark")
@@ -130,6 +132,7 @@ struct FocusModeView: View {
             Spacer()
 
             Button {
+                HapticService.buttonPress()
                 showMenu = true
             } label: {
                 Image(systemName: "ellipsis")
@@ -230,8 +233,10 @@ struct FocusModeView: View {
     private var actionButton: some View {
         Button {
             if hasStarted {
+                HapticService.complete()
                 finishFocus()
             } else {
+                HapticService.startFocus()
                 withAnimation(.easeInOut(duration: 0.2)) {
                     hasStarted = true
                 }
