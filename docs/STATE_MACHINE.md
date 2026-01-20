@@ -4,27 +4,70 @@ The daily flow is designed around one principle: **"See the plan. Execute. Stop 
 
 ---
 
-## State 0: Plan Ready
+## State 0a: Day Preview
 
 **What User Sees:**
 ```
 Today: Monday, Jan 20
 ━━━━━━━━━━━━━━━━━━━━━━━
-Today's Work: 5 hrs (4 sessions)
-Deadlines: All safe ✓
 
-[Timeline of today's sessions and stones]
+YOUR REALITY
+• 10am Standup
+• 3pm Client call
+• 6 hrs free time available
+
+PREVIEW
+~5 hrs work · ~4 sessions
+All deadlines safe ✓
 
 [ Let's Go ]    [ Not Today ]
 ```
 
 **Key Elements:**
-- Pre-computed plan already visible
-- "Enough" is quantified (X hours, Y sessions)
-- Deadline safety confirmed upfront
-- User's only decision: start or rest
+- Stones (fixed events) shown immediately
+- Preview shows estimated work shape (hours, session count)
+- Deadline safety calculated upfront
+- User knows roughly what they're committing to
 
-**Philosophy**: No planning required. The thinking is done. Just confirm.
+**Philosophy**: See enough to decide, without full computation yet.
+
+---
+
+## State 0b: Plan Generated
+
+**Trigger:** User taps "Let's Go"
+
+**System:**
+- Liquid Scheduler algorithm runs
+- Sessions allocated around stones
+- Full day plan generated and persisted
+- DayPlan committed to database
+
+**What User Sees:**
+```
+Today: Monday, Jan 20
+━━━━━━━━━━━━━━━━━━━━━━━
+
+YOUR DAY
+9:00   Project Alpha (90 min)
+10:30  ▧ Standup [Stone]
+11:00  Project Beta (90 min)
+12:30  ░ Lunch
+13:30  Project Alpha (60 min)
+15:00  ▧ Client call [Stone]
+16:00  Project Beta (60 min)
+17:00  ✓ ENOUGH
+
+Deadlines: All safe ✓
+```
+
+**Key Elements:**
+- Full timeline now visible with specific times
+- Sessions assigned to specific projects
+- "Enough" marker shows when work day ends
+- Plan is now committed — this is today's contract
+
+**Philosophy**: Commitment triggers generation. Once generated, this is the plan to trust.
 
 ---
 
@@ -167,39 +210,48 @@ Options:
 ## Transitions Summary
 
 ```
-┌─────────────┐
-│ State 0:    │
-│ Plan Ready  │
-└──────┬──────┘
-       │
-   ┌───┴───┐
-   ▼       ▼
-┌──────┐ ┌──────────┐
-│Rest  │ │Working   │
-│Day   │ │Day       │
-│(S5)  │ │(S1)      │
-└──────┘ └────┬─────┘
-              │
-         ┌────┴────┐
-         ▼         ▼
-    ┌────────┐ ┌────────┐
-    │Touch   │ │Focus   │
-    │Logged  │ │Mode    │
-    │(S2)    │ │(S3)    │
-    └───┬────┘ └───┬────┘
-        │          │
-        └────┬─────┘
-             ▼
-       ┌───────────┐
-       │ Enough?   │
-       └─────┬─────┘
-         Yes │ No
-         ▼   └──→ Back to S1
-    ┌────────────┐
-    │ Enough     │
-    │ Reached 🎉 │
-    │ (S4)       │
-    └────────────┘
+┌──────────────────┐
+│ State 0a:        │
+│ Day Preview      │
+│ (stones + est.)  │
+└────────┬─────────┘
+         │
+    ┌────┴────┐
+    ▼         ▼
+┌──────┐  ┌──────────────────┐
+│Rest  │  │ [Let's Go]       │
+│Day   │  │ ↓                │
+│(S5)  │  │ State 0b:        │
+└──────┘  │ Plan Generated   │
+          │ (algorithm runs) │
+          └────────┬─────────┘
+                   │
+                   ▼
+          ┌──────────────┐
+          │ State 1:     │
+          │ Working Day  │
+          └──────┬───────┘
+                 │
+            ┌────┴────┐
+            ▼         ▼
+       ┌────────┐ ┌────────┐
+       │Touch   │ │Focus   │
+       │Logged  │ │Mode    │
+       │(S2)    │ │(S3)    │
+       └───┬────┘ └───┬────┘
+           │          │
+           └────┬─────┘
+                ▼
+          ┌───────────┐
+          │ Enough?   │
+          └─────┬─────┘
+            Yes │ No
+            ▼   └──→ Back to S1
+       ┌────────────┐
+       │ Enough     │
+       │ Reached 🎉 │
+       │ (S4)       │
+       └────────────┘
 ```
 
 ---

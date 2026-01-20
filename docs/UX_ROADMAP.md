@@ -15,11 +15,12 @@ This checklist captures UX decisions and improvements needed to fully deliver on
 
 ## 1. Daily Flow Simplification
 
-### P0: Remove Decision Gate at Day Start
+### ~~P0: Remove Decision Gate at Day Start~~ ✓ ADDRESSED
 
-- [ ] **Current**: "Do you want to work today?" requires commitment before seeing plan
-- [ ] **Target**: Show today's plan immediately; "Not Today" is an option, not a gate
-- [ ] **Why**: Asking for commitment before showing value creates friction
+- [x] **Current design**: Preview shows stones + estimated work before commitment
+- [x] **Flow**: Preview → [Let's Go] triggers full plan generation
+- [x] User sees enough context (reality + estimate) before deciding
+- [x] "Not Today" available without committing first
 
 ### P1: Show "Enough" Explicitly
 

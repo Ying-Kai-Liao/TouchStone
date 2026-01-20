@@ -115,26 +115,45 @@ When you hit it, you're done. Really done.
 
 ### What You See When You Open the App
 
+**Step 1: Day Preview**
 ```
 ┌─────────────────────────────────────────┐
 │  MONDAY, JAN 20                         │
 │                                         │
-│  Today's Work: 5 hrs across 4 sessions  │
-│  Deadlines: All safe ✓                  │
+│  YOUR REALITY                           │
+│  • 10am Team Standup                    │
+│  • 3pm Client call                      │
+│  • ~6 hrs free time available           │
 │                                         │
-│  9:00   Project Alpha (90 min)          │
-│  11:00  ▧ Team Standup [Stone]          │
-│  11:30  Project Beta (2 hrs)            │
-│  13:00  ░ Lunch                         │
-│  14:00  Project Alpha (90 min)          │
-│  17:00  ✓ ENOUGH — Day complete         │
-│  18:00  🏋️ Gym                          │
+│  PREVIEW                                │
+│  ~5 hrs work · ~4 sessions              │
+│  All deadlines safe ✓                   │
 │                                         │
-│  [ Let's Go ]                           │
+│  [ Let's Go ]         [ Not Today ]     │
 └─────────────────────────────────────────┘
 ```
 
-No decisions. No prioritization. Just: "This is what safe looks like. Go."
+You see your fixed reality (stones) and a preview of what the work day looks like. Enough information to decide without full computation.
+
+**Step 2: Plan Generated (after "Let's Go")**
+```
+┌─────────────────────────────────────────┐
+│  MONDAY, JAN 20                         │
+│                                         │
+│  9:00   Project Alpha (90 min)          │
+│  10:30  ▧ Team Standup [Stone]          │
+│  11:00  Project Beta (90 min)           │
+│  12:30  ░ Lunch                         │
+│  13:30  Project Alpha (60 min)          │
+│  15:00  ▧ Client call [Stone]           │
+│  16:00  Project Beta (60 min)           │
+│  17:00  ✓ ENOUGH — Day complete         │
+│  18:00  🏋️ Gym                          │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+Tapping "Let's Go" triggers the Liquid Scheduler algorithm. Now you see the full plan with specific times and projects. This is today's contract — follow it and you're safe.
 
 ### When You Hit "Enough"
 
