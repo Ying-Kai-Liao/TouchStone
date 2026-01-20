@@ -355,38 +355,211 @@ class DayState {
 
     private func generateSuggestedSessions(projects: [Project]) -> [SuggestedSession] {
         // Filter to active, non-completed projects only
-        // A project is completed when it has planned hours and remaining hours is 0
         let activeProjects = projects.filter { project in
             guard project.isActive else { return false }
-            // If project has planned hours, check if there's remaining work
             if project.totalPlannedMinutes > 0 {
                 return project.remainingHours > 0
             }
-            // Projects without planned hours are always included
             return true
         }
         guard !activeProjects.isEmpty else { return [] }
-
-        // Sort projects by priority (staleness + remaining work)
-        let prioritized = activeProjects
-            .map { project -> (Project, Int) in
-                let staleness = project.daysSinceLastTouch ?? 100 // Never touched = high priority
-                let hasRemainingWork = project.remainingHours > 0
-                // Priority score: staleness * 10 + (has remaining work ? 50 : 0)
-                let priority = staleness * 10 + (hasRemainingWork ? 50 : 0)
-                return (project, priority)
-            }
-            .sorted { $0.1 > $1.1 } // Higher priority first
-            .map { $0.0 }
 
         // Calculate remaining capacity
         let remainingCapacity = max(0, availableMinutes - minutesTouchedToday)
         let minSession = prefs.sessionMinMinutes
         guard remainingCapacity >= minSession else { return [] }
 
-        var sessions: [SuggestedSession] = []
-        var usedMinutes = 0
-        var slotIndex = 0
+        // Count available session slots
+        let sessionSlots = remainingCapacity / prefs.sessionMaxMinutes
+
+        // Check for crunch mode - projects within threshold days of deadline
+        let crunchProjects = detectCrunchProjects(activeProjects, date: date)
+
+        // If in crunch mode, skip diversity and fill all slots with crunch projects
+        if !crunchProjects.isEmpty {
+            return scheduleCrunchMode(
+                crunchProjects: crunchProjects,
+                remainingCapacity: remainingCapacity
+            )
+        }
+
+        // Normal mode: Apply priority scoring and diversity constraints
+        let weeklyProgress = WeeklyProgress(for: date)
+        let prioritized = calculatePriorityScores(
+            projects: activeProjects,
+            weeklyProgress: weeklyProgress
+        )
+
+        // Apply diversity constraints (2-3 distinct projects)
+        let diverseProjects = applyDiversityConstraints(
+            prioritizedProjects: prioritized,
+            sessionSlots: sessionSlots,
+            minProjects: prefs.minProjectsPerDay,
+            maxProjects: prefs.maxProjectsPerDay
+        )
+
+        // Pour projects into time slots
+        return pourSessionsIntoSlots(
+            projects: diverseProjects,
+            remainingCapacity: remainingCapacity
+        )
+    }
+
+    // MARK: - Crunch Mode Detection
+
+    /// Detect projects that are within crunch threshold of their deadline
+    private func detectCrunchProjects(_ projects: [Project], date: Date) -> [Project] {
+        let threshold = prefs.crunchThresholdDays
+
+        // Find projects in crunch mode (within threshold AND have remaining work)
+        let crunchProjects = projects.filter { project in
+            project.isInCrunchMode(from: date, threshold: threshold) || project.isOverdue
+        }
+
+        // Sort by deadline (earliest first), then by remaining hours (most first for ties)
+        return crunchProjects.sorted { p1, p2 in
+            let d1 = p1.daysUntilDeadline ?? Int.max
+            let d2 = p2.daysUntilDeadline ?? Int.max
+            if d1 != d2 { return d1 < d2 }
+            return p1.remainingHours > p2.remainingHours
+        }
+    }
+
+    /// Schedule in crunch mode - all time goes to crunch project(s)
+    private func scheduleCrunchMode(crunchProjects: [Project], remainingCapacity: Int) -> [SuggestedSession] {
+        // Create a project list that repeats crunch projects to fill all slots
+        var projectsToSchedule: [Project] = []
+        let maxSessions = 6 // Cap to prevent infinite loops
+
+        // Interleave crunch projects if there are multiple
+        var projectIndex = 0
+        while projectsToSchedule.count < maxSessions {
+            projectsToSchedule.append(crunchProjects[projectIndex % crunchProjects.count])
+            projectIndex += 1
+        }
+
+        return pourSessionsIntoSlots(
+            projects: projectsToSchedule,
+            remainingCapacity: remainingCapacity
+        )
+    }
+
+    // MARK: - Priority Scoring
+
+    /// Calculate priority scores for projects using multi-factor formula
+    private func calculatePriorityScores(
+        projects: [Project],
+        weeklyProgress: WeeklyProgress
+    ) -> [(Project, Double)] {
+        return projects.map { project in
+            let score = calculateProjectPriority(project: project, weeklyProgress: weeklyProgress)
+            return (project, score)
+        }.sorted { $0.1 > $1.1 } // Higher priority first
+    }
+
+    /// Calculate individual project priority score
+    /// Factors: remaining work (0-50), urgency (0-200), due this week (0-75), staleness (0-50), weekly adjustment (-25 to +25)
+    private func calculateProjectPriority(project: Project, weeklyProgress: WeeklyProgress) -> Double {
+        var total: Double = 0
+
+        // 1. Remaining work score (0-50)
+        let remainingWorkScore: Double = project.remainingHours > 0 ? 50 : 0
+        total += remainingWorkScore
+
+        // 2. Deadline urgency score (0-200)
+        let urgencyScore = project.urgencyScore(from: date)
+        total += urgencyScore
+
+        // 3. Due this week bonus (0-75)
+        if prefs.dueThisWeekPriorityBoost && project.isDueThisWeek(from: date) {
+            total += 75
+        }
+
+        // 4. Staleness score (0-50, capped)
+        let daysSinceTouch = project.daysSinceLastTouch ?? 100
+        let stalenessScore = min(50, Double(daysSinceTouch) * 5)
+        total += stalenessScore
+
+        // 5. Weekly catch-up adjustment (-25 to +25)
+        let progress = weeklyProgress.calculateProgress(
+            for: project,
+            dailyCapacity: prefs.dailyProductiveHours,
+            date: date
+        )
+        // If behind on weekly target, boost priority; if ahead, reduce
+        let weeklyAdjustment: Double
+        if progress.targetHoursThisWeek > 0 {
+            let progressRatio = progress.completedHoursThisWeek / progress.targetHoursThisWeek
+            if progressRatio < 0.8 {
+                // Behind: boost by up to +25
+                weeklyAdjustment = 25 * (1 - progressRatio)
+            } else if progressRatio > 1.2 {
+                // Ahead: reduce by up to -25
+                weeklyAdjustment = -25 * min(1, (progressRatio - 1))
+            } else {
+                weeklyAdjustment = 0
+            }
+        } else {
+            weeklyAdjustment = 0
+        }
+        total += weeklyAdjustment
+
+        return total
+    }
+
+    // MARK: - Diversity Constraints
+
+    /// Apply diversity constraints to select 2-3 projects for the day
+    private func applyDiversityConstraints(
+        prioritizedProjects: [(Project, Double)],
+        sessionSlots: Int,
+        minProjects: Int,
+        maxProjects: Int
+    ) -> [Project] {
+        // Get unique projects (sorted by priority)
+        let uniqueProjects = prioritizedProjects.map { $0.0 }
+
+        // Determine how many distinct projects to schedule
+        let availableProjects = uniqueProjects.count
+        let targetProjects = min(maxProjects, max(1, min(minProjects, availableProjects)))
+
+        // Select top N distinct projects
+        let selectedProjects = Array(uniqueProjects.prefix(targetProjects))
+
+        // Distribute sessions across selected projects (interleaved for cognitive variety)
+        var result: [Project] = []
+        let maxSessionsPerProject = 3 // Prevent hyperfocus on one project
+
+        // Round-robin distribution
+        var sessionCounts: [UUID: Int] = [:]
+        var projectIndex = 0
+        let maxTotalSessions = max(sessionSlots, 1)
+
+        while result.count < maxTotalSessions {
+            let project = selectedProjects[projectIndex % selectedProjects.count]
+            let currentCount = sessionCounts[project.id, default: 0]
+
+            if currentCount < maxSessionsPerProject {
+                result.append(project)
+                sessionCounts[project.id] = currentCount + 1
+            }
+
+            projectIndex += 1
+
+            // Safety: break if we've cycled through all projects and can't add more
+            if projectIndex >= selectedProjects.count * maxSessionsPerProject {
+                break
+            }
+        }
+
+        return result
+    }
+
+    // MARK: - Session Pouring
+
+    /// Pour projects into available time slots
+    private func pourSessionsIntoSlots(projects: [Project], remainingCapacity: Int) -> [SuggestedSession] {
+        let minSession = prefs.sessionMinMinutes
         var usableSlots = freeSlots.filter { $0.durationMinutes >= minSession }
 
         // Track accumulated work time for break insertion
@@ -400,20 +573,19 @@ class DayState {
         let isToday = calendar.isDateInToday(date)
 
         if isToday {
-            // For today, filter out past slots and truncate current slot
             usableSlots = usableSlots.compactMap { slot -> TimeSlot? in
-                if slot.end <= now { return nil } // Slot already passed
-                if slot.start >= now { return slot } // Slot is in future
-                // Truncate slot to start from now
+                if slot.end <= now { return nil }
+                if slot.start >= now { return slot }
                 return TimeSlot(start: now, end: slot.end)
             }.filter { $0.durationMinutes >= minSession }
         }
-        // For future dates, keep all slots as-is
 
-        // Pour projects into slots - track current position within slot
+        var sessions: [SuggestedSession] = []
+        var usedMinutes = 0
+        var slotIndex = 0
         var currentSlotStart = usableSlots.first?.start ?? now
 
-        for project in prioritized {
+        for project in projects {
             guard usedMinutes < remainingCapacity else { break }
             guard slotIndex < usableSlots.count else { break }
 
@@ -422,12 +594,10 @@ class DayState {
 
             // Check if we need to insert a break gap before this session
             if breaksEnabled && accumulatedWorkMinutes >= workInterval && accumulatedWorkMinutes > 0 {
-                // Leave a gap for the break
                 currentSlotStart = currentSlotStart.addingTimeInterval(Double(breakDuration) * 60)
                 remainingSlotMinutes = Int(slot.end.timeIntervalSince(currentSlotStart) / 60)
-                accumulatedWorkMinutes = 0  // Reset after break gap
+                accumulatedWorkMinutes = 0
 
-                // Check if we've exceeded the current slot
                 if remainingSlotMinutes < minSession {
                     slotIndex += 1
                     if slotIndex < usableSlots.count {
@@ -439,7 +609,6 @@ class DayState {
                 }
             }
 
-            // Smart fit: calculate optimal session duration
             let sessionDuration = optimalSessionDuration(
                 availableMinutes: min(remainingSlotMinutes, remainingCapacity - usedMinutes),
                 minDuration: prefs.sessionMinMinutes,
@@ -447,7 +616,6 @@ class DayState {
             )
 
             if let duration = sessionDuration {
-                // Create a time slot for this specific session
                 let sessionSlot = TimeSlot(
                     start: currentSlotStart,
                     end: currentSlotStart.addingTimeInterval(Double(duration) * 60)
@@ -459,12 +627,10 @@ class DayState {
                 )
                 sessions.append(session)
                 usedMinutes += duration
-                accumulatedWorkMinutes += duration  // Track work time for breaks
+                accumulatedWorkMinutes += duration
 
-                // Move current position forward
                 currentSlotStart = currentSlotStart.addingTimeInterval(Double(duration) * 60)
 
-                // Move to next slot if remaining space is too small (accounting for potential break)
                 let neededForNext = breaksEnabled && accumulatedWorkMinutes >= workInterval
                     ? minSession + breakDuration
                     : minSession
@@ -476,7 +642,6 @@ class DayState {
                     }
                 }
             } else {
-                // Can't fit a session, move to next slot
                 slotIndex += 1
                 if slotIndex < usableSlots.count {
                     currentSlotStart = usableSlots[slotIndex].start
