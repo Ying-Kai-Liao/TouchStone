@@ -6,6 +6,7 @@ struct StonesListView: View {
     @Query(sort: \StoneEvent.createdAt, order: .reverse) private var stones: [StoneEvent]
 
     @State private var showingAddSheet = false
+    @State private var showingImportSheet = false
 
     var body: some View {
         NavigationStack {
@@ -19,8 +20,18 @@ struct StonesListView: View {
             .navigationTitle("Stones")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingAddSheet = true
+                    Menu {
+                        Button {
+                            showingAddSheet = true
+                        } label: {
+                            Label("Add Manually", systemImage: "plus")
+                        }
+
+                        Button {
+                            showingImportSheet = true
+                        } label: {
+                            Label("Import from Calendar", systemImage: "calendar.badge.plus")
+                        }
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -30,6 +41,13 @@ struct StonesListView: View {
                 StoneEventFormView(onSave: { stone in
                     modelContext.insert(stone)
                 })
+            }
+            .sheet(isPresented: $showingImportSheet) {
+                ImportEventsView { importedStones in
+                    for stone in importedStones {
+                        modelContext.insert(stone)
+                    }
+                }
             }
         }
     }
@@ -51,8 +69,18 @@ struct StonesListView: View {
         } description: {
             Text("Stones are fixed events that cannot move.\nAdd your meetings, appointments, and commitments.")
         } actions: {
-            Button("Add Stone") {
-                showingAddSheet = true
+            HStack(spacing: 16) {
+                Button("Add Stone") {
+                    showingAddSheet = true
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button {
+                    showingImportSheet = true
+                } label: {
+                    Label("Import", systemImage: "calendar.badge.plus")
+                }
+                .buttonStyle(.bordered)
             }
         }
     }
