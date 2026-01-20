@@ -452,7 +452,7 @@ struct FlowPrepRow: View {
             HStack(spacing: 8) {
                 Image(systemName: "leaf.fill")
                     .font(.caption)
-                    .foregroundStyle(DesignSystem.Colors.accent)
+                    .foregroundStyle(DesignSystem.Colors.badge)
                 Text("Flow State Prep \u{00B7} \(minutes)m")
                     .font(DesignSystem.Typography.caption)
                     .fontWeight(.medium)
@@ -462,7 +462,7 @@ struct FlowPrepRow: View {
             .padding(.vertical, 10)
             .background(
                 Capsule()
-                    .fill(DesignSystem.Colors.accent.opacity(0.12))
+                    .fill(DesignSystem.Colors.badgeBackground)
             )
         }
         .frame(maxWidth: .infinity)
@@ -482,7 +482,7 @@ struct BreakRow: View {
             HStack(spacing: 6) {
                 Image(systemName: "cup.and.saucer.fill")
                     .font(.caption2)
-                    .foregroundStyle(DesignSystem.Colors.warning)
+                    .foregroundStyle(DesignSystem.Colors.badge)
                 Text("Break \u{00B7} \(minutes)m")
                     .font(DesignSystem.Typography.caption)
                     .foregroundStyle(DesignSystem.Colors.textSecondary)
@@ -491,7 +491,7 @@ struct BreakRow: View {
             .padding(.vertical, 8)
             .background(
                 Capsule()
-                    .fill(DesignSystem.Colors.warning.opacity(0.1))
+                    .fill(DesignSystem.Colors.badgeBackground)
             )
             Spacer()
         }
@@ -520,25 +520,13 @@ struct MealRow: View {
         }
     }
 
-    /// Color for the meal badge
-    private var mealColor: Color {
-        let title = rule.title.lowercased()
-        if title.contains("lunch") {
-            return Color.orange
-        } else if title.contains("dinner") {
-            return Color.purple
-        } else {
-            return DesignSystem.Colors.accent
-        }
-    }
-
     var body: some View {
         HStack {
             Spacer()
             HStack(spacing: 8) {
                 Image(systemName: mealIcon)
                     .font(.caption)
-                    .foregroundStyle(mealColor)
+                    .foregroundStyle(DesignSystem.Colors.badge)
                 Text(rule.title)
                     .font(DesignSystem.Typography.caption)
                     .fontWeight(.medium)
@@ -553,11 +541,11 @@ struct MealRow: View {
             .padding(.vertical, 10)
             .background(
                 Capsule()
-                    .fill(mealColor.opacity(0.1))
+                    .fill(DesignSystem.Colors.badgeBackground)
             )
             .overlay(
                 Capsule()
-                    .strokeBorder(mealColor.opacity(0.2), lineWidth: 1)
+                    .strokeBorder(DesignSystem.Colors.badgeBorder, lineWidth: 1)
             )
             Spacer()
         }

@@ -431,3 +431,68 @@ enum Archetype: String, Codable, CaseIterable {
         phaseStructure.map { ($0.name, $0.type, $0.rule) }
     }
 }
+
+// MARK: - Deadline-Aware Scheduling Extensions
+
+extension Project {
+
+    /// Check if project is due within this week (7 days from date)
+    func isDueThisWeek(from date: Date = Date()) -> Bool {
+        guard let deadline = deadline else { return false }
+        let calendar = Calendar.current
+        let endOfWeek = calendar.date(byAdding: .day, value: 7, to: calendar.startOfDay(for: date)) ?? date
+        return deadline >= date && deadline < endOfWeek
+    }
+
+    /// Check if project is in "crunch mode" - within threshold days of deadline with remaining work
+    func isInCrunchMode(from date: Date = Date(), threshold: Int = 2) -> Bool {
+        guard let daysUntil = daysUntilDeadline,
+              daysUntil >= 0,           // Not yet overdue (overdue is handled separately)
+              daysUntil <= threshold,   // Within crunch threshold
+              remainingHours > 0        // Has work remaining
+        else { return false }
+        return true
+    }
+
+    /// Days until end of current week from a given date
+    func daysUntilEndOfWeek(from date: Date = Date()) -> Int {
+        let calendar = Calendar.current
+        let weekday = calendar.component(.weekday, from: date)
+        // Days until Sunday (end of week)
+        let daysToSunday = (8 - weekday) % 7
+        return daysToSunday == 0 ? 7 : daysToSunday
+    }
+
+    /// Whether the project is overdue (past deadline with remaining work)
+    var isOverdue: Bool {
+        guard let daysUntil = daysUntilDeadline else { return false }
+        return daysUntil < 0 && remainingHours > 0
+    }
+
+    /// Calculate urgency score (0-200) based on deadline proximity
+    func urgencyScore(from date: Date = Date()) -> Double {
+        guard let daysUntil = daysUntilDeadline else { return 0 }
+
+        // Overdue: maximum urgency
+        if daysUntil < 0 {
+            return 200
+        }
+
+        // Due in 1-3 days: 150-195 points (linear interpolation)
+        if daysUntil <= 3 {
+            // daysUntil 0 -> 195, daysUntil 3 -> 150
+            return 195 - (Double(daysUntil) * 15)
+        }
+
+        // Due in 4-7 days: 100-150 points
+        if daysUntil <= 7 {
+            // daysUntil 4 -> ~146, daysUntil 7 -> 100
+            return 150 - (Double(daysUntil - 3) * 12.5)
+        }
+
+        // Due in 8+ days: decays from 100
+        // Using exponential decay: 100 * 0.9^(days-7)
+        let daysOver7 = daysUntil - 7
+        return 100 * pow(0.9, Double(daysOver7))
+    }
+}
