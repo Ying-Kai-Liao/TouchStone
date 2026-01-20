@@ -15,6 +15,8 @@ struct FocusModeView: View {
     @State private var showDetails = false
     @State private var showMenu = false
     @State private var hasStarted = false
+    @State private var isGeneratingDetails = false
+    @State private var generationError: String?
 
     var activePhase: ProjectPhase? {
         project.activePhase
@@ -324,6 +326,11 @@ struct FocusModeView: View {
                     }
                 }
 
+                // Generated details section (magic button)
+                if let session = currentSession {
+                    generatedDetailsSection(for: session)
+                }
+
                 // Note section
                 VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
                     HStack(spacing: DesignSystem.Spacing.sm) {
@@ -351,6 +358,130 @@ struct FocusModeView: View {
             }
             .padding(.horizontal, DesignSystem.Spacing.xl)
             .padding(.top, DesignSystem.Spacing.lg)
+        }
+    }
+
+    // MARK: - Generated Details Section
+
+    @ViewBuilder
+    private func generatedDetailsSection(for session: PlannedSession) -> some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            HStack(spacing: DesignSystem.Spacing.sm) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14))
+                    .foregroundStyle(DesignSystem.Colors.accent)
+                Text("Practical Steps")
+                    .font(.system(size: 13, weight: .semibold))
+                    .tracking(0.5)
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                Spacer()
+
+                // Regenerate button (shown when details exist)
+                if session.generatedDetails != nil && !isGeneratingDetails {
+                    Button {
+                        HapticService.buttonPress()
+                        generateDetails(for: session, regenerate: true)
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    }
+                }
+            }
+
+            if let details = session.generatedDetails {
+                // Show generated details
+                Text(details)
+                    .font(DesignSystem.Typography.callout)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    .padding(DesignSystem.Spacing.lg)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                            .fill(DesignSystem.Colors.cardBackgroundLight)
+                    )
+            } else if isGeneratingDetails {
+                // Loading state
+                HStack(spacing: DesignSystem.Spacing.md) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Breaking it down...")
+                        .font(DesignSystem.Typography.callout)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+                }
+                .padding(DesignSystem.Spacing.lg)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                        .fill(DesignSystem.Colors.cardBackgroundLight)
+                )
+            } else {
+                // Magic button to generate
+                Button {
+                    HapticService.buttonPress()
+                    generateDetails(for: session, regenerate: false)
+                } label: {
+                    HStack(spacing: DesignSystem.Spacing.md) {
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 16, weight: .medium))
+                        Text("Break it down for me")
+                            .font(.system(size: 15, weight: .medium))
+                    }
+                    .foregroundStyle(DesignSystem.Colors.accent)
+                    .padding(.vertical, DesignSystem.Spacing.md + 2)
+                    .padding(.horizontal, DesignSystem.Spacing.lg)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                            .strokeBorder(DesignSystem.Colors.accent.opacity(0.5), lineWidth: 1.5)
+                            .background(
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                                    .fill(DesignSystem.Colors.accent.opacity(0.08))
+                            )
+                    )
+                }
+            }
+
+            // Error message
+            if let error = generationError {
+                Text(error)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.red.opacity(0.8))
+            }
+        }
+    }
+
+    // MARK: - Generate Details Action
+
+    private func generateDetails(for session: PlannedSession, regenerate: Bool) {
+        guard !isGeneratingDetails else { return }
+
+        isGeneratingDetails = true
+        generationError = nil
+
+        Task {
+            do {
+                let service = DetailGenerationService()
+                let details = try await service.generateDetails(
+                    sessionTitle: session.title,
+                    sessionGoal: session.goal,
+                    phaseName: session.phaseName,
+                    mentalRule: session.mentalRule,
+                    projectTitle: project.title
+                )
+
+                await MainActor.run {
+                    session.generatedDetails = details
+                    isGeneratingDetails = false
+                    HapticService.complete()
+                }
+            } catch {
+                await MainActor.run {
+                    generationError = "Couldn't generate steps. Check your API key in Settings."
+                    isGeneratingDetails = false
+                    HapticService.error()
+                }
+            }
         }
     }
 

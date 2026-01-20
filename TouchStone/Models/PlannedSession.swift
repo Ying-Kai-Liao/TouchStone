@@ -43,6 +43,7 @@ final class PlannedSession {
 
     var phase: ProjectPhase?
     var completedTouchLog: TouchLog?     // Link when completed
+    var generatedDetails: String?        // AI-generated practical steps (on-demand)
 
     init(
         id: UUID = UUID(),
