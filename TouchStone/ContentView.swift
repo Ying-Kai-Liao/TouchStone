@@ -11,6 +11,11 @@ struct ContentView: View {
                     Label("Flow", systemImage: "drop.fill")
                 }
 
+            UnifiedInputView()
+                .tabItem {
+                    Label("Ask", systemImage: "bubble.left.and.bubble.right")
+                }
+
             CalendarView()
                 .tabItem {
                     Label("Calendar", systemImage: "calendar")
