@@ -1,14 +1,40 @@
 import SwiftUI
 import SwiftData
 
-/// Chat-based strategic planning flow with generative UI
+/// Chat message types for the planning conversation
+enum PlanningChatMessage: Identifiable {
+    case assistantText(id: UUID = UUID(), text: String)
+    case userText(id: UUID = UUID(), text: String)
+    case assistantLoading(id: UUID = UUID(), text: String)
+    case phaseAllocation(id: UUID = UUID())
+    case sessionReview(id: UUID = UUID())
+
+    var id: UUID {
+        switch self {
+        case .assistantText(let id, _): return id
+        case .userText(let id, _): return id
+        case .assistantLoading(let id, _): return id
+        case .phaseAllocation(let id): return id
+        case .sessionReview(let id): return id
+        }
+    }
+}
+
+/// Chat-based strategic planning flow
 struct StrategicPlanningChatView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
     private var prefs: UserPreferences { UserPreferences.shared }
 
-    @State private var step: StrategyChatEngine.ChatStep = .idle
+    // Chat state
+    @State private var messages: [PlanningChatMessage] = []
+    @State private var inputText = ""
+    @State private var isProcessing = false
+    @State private var currentPhase: ChatPhase = .goalInput
+    @SwiftUI.FocusState private var isInputFocused: Bool
+
+    // Planning state
     @State private var goal = ""
     @State private var projectTitle = ""
     @State private var archetype: Archetype?
@@ -17,26 +43,46 @@ struct StrategicPlanningChatView: View {
     @State private var totalHours: Int = 40
     @State private var generatedSessions: StrategyChatEngine.SessionsResult?
     @State private var errorMessage: String?
-    @State private var isProcessing = false
 
     private let engine = StrategyChatEngine()
 
+    init() {}
+
+    enum ChatPhase {
+        case goalInput
+        case classifying
+        case phaseReview
+        case generatingSessions
+        case sessionReview
+        case done
+    }
+
     var body: some View {
         NavigationStack {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.xl) {
-                        // Step content
-                        stepContent
-                            .id("content")
+            VStack(spacing: 0) {
+                // Chat messages
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                            ForEach(messages) { message in
+                                chatMessageView(message)
+                                    .id(message.id)
+                            }
+                        }
+                        .padding(DesignSystem.Spacing.lg)
+                        .padding(.bottom, DesignSystem.Spacing.xl)
                     }
-                    .padding(DesignSystem.Spacing.lg)
-                }
-                .onChange(of: step) { _, _ in
-                    withAnimation {
-                        proxy.scrollTo("content", anchor: .top)
+                    .onChange(of: messages.count) { _, _ in
+                        if let lastMessage = messages.last {
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
+                        }
                     }
                 }
+
+                // Input bar
+                inputBar
             }
             .background(DesignSystem.Colors.background)
             .navigationTitle("Plan Project")
@@ -45,6 +91,15 @@ struct StrategicPlanningChatView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .foregroundStyle(DesignSystem.Colors.textSecondary)
+                }
+            }
+            .onAppear {
+                // Start with welcome message
+                messages.append(.assistantText(
+                    text: "What do you want to accomplish? Tell me about your project and I'll help you break it down into phases and sessions."
+                ))
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    isInputFocused = true
                 }
             }
             .alert("Error", isPresented: .constant(errorMessage != nil)) {
@@ -57,103 +112,114 @@ struct StrategicPlanningChatView: View {
         }
     }
 
-    // MARK: - Step Content
+    // MARK: - Chat Message View
 
     @ViewBuilder
-    private var stepContent: some View {
-        switch step {
-        case .idle:
-            goalInputSection
+    private func chatMessageView(_ message: PlanningChatMessage) -> some View {
+        switch message {
+        case .assistantText(_, let text):
+            assistantBubble(text)
 
-        case .classifying:
-            loadingSection("Analyzing your goal...")
+        case .userText(_, let text):
+            userBubble(text)
 
-        case .phaseReview:
-            phaseAllocationSection
+        case .assistantLoading(_, let text):
+            loadingBubble(text)
 
-        case .generatingSessions:
-            loadingSection("Generating session goals...")
+        case .phaseAllocation:
+            phaseAllocationCard
 
         case .sessionReview:
-            sessionReviewSection
-
-        case .done:
-            EmptyView()
+            sessionReviewCard
         }
     }
 
-    // MARK: - Goal Input Section
+    private func assistantBubble(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: DesignSystem.Spacing.sm) {
+            // AI avatar
+            Image(systemName: "sparkles")
+                .font(.system(size: 14))
+                .foregroundStyle(DesignSystem.Colors.accent)
+                .frame(width: 28, height: 28)
+                .background(DesignSystem.Colors.accent.opacity(0.15))
+                .clipShape(Circle())
 
-    private var goalInputSection: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
-            // Intro message
-            chatBubble(
-                "What do you want to accomplish? Describe your project goal and I'll help you plan it strategically.",
-                isAssistant: true
+            Text(try! AttributedString(markdown: text))
+                .font(DesignSystem.Typography.body)
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                .padding(DesignSystem.Spacing.md)
+                .background(DesignSystem.Colors.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                        .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+                )
+
+            Spacer(minLength: 44)
+        }
+    }
+
+    private func userBubble(_ text: String) -> some View {
+        HStack {
+            Spacer(minLength: 60)
+
+            Text(text)
+                .font(DesignSystem.Typography.body)
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                .padding(DesignSystem.Spacing.md)
+                .background(DesignSystem.Colors.accent.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+        }
+    }
+
+    private func loadingBubble(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: DesignSystem.Spacing.sm) {
+            // AI avatar
+            Image(systemName: "sparkles")
+                .font(.system(size: 14))
+                .foregroundStyle(DesignSystem.Colors.accent)
+                .frame(width: 28, height: 28)
+                .background(DesignSystem.Colors.accent.opacity(0.15))
+                .clipShape(Circle())
+
+            HStack(spacing: DesignSystem.Spacing.sm) {
+                ProgressView()
+                    .scaleEffect(0.8)
+                    .tint(DesignSystem.Colors.accent)
+                Text(text)
+                    .font(DesignSystem.Typography.body)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+            }
+            .padding(DesignSystem.Spacing.md)
+            .background(DesignSystem.Colors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                    .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
             )
 
-            // Goal input
-            VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
-                TextField("e.g., Write a research paper on ML optimization", text: $goal, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(DesignSystem.Typography.body)
-                    .foregroundStyle(DesignSystem.Colors.textPrimary)
-                    .padding(DesignSystem.Spacing.lg)
-                    .background(DesignSystem.Colors.cardBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                            .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
-                    )
-                    .lineLimit(3...6)
-
-                Button {
-                    classifyGoal()
-                } label: {
-                    HStack {
-                        Text("Generate Plan")
-                        Image(systemName: "sparkles")
-                    }
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: .infinity)
-                    .padding(DesignSystem.Spacing.lg)
-                    .background(goal.isEmpty ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.accent)
-                    .foregroundStyle(DesignSystem.Colors.background)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
-                }
-                .disabled(goal.isEmpty || isProcessing)
-            }
+            Spacer(minLength: 44)
         }
     }
 
-    // MARK: - Phase Allocation Section
+    // MARK: - Phase Allocation Card
 
-    private var phaseAllocationSection: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
-            // Classification result bubble
-            if let arch = archetype {
-                chatBubble(
-                    "I identified this as a **\(arch.displayName)** project.\n\n\(reasoning)",
-                    isAssistant: true
-                )
-            }
-
+    private var phaseAllocationCard: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             // Archetype badge
             if let arch = archetype {
                 HStack(spacing: DesignSystem.Spacing.sm) {
                     Image(systemName: arch.icon)
                         .foregroundStyle(DesignSystem.Colors.accent)
                     Text(arch.displayName)
-                        .fontWeight(.bold)
+                        .fontWeight(.semibold)
                         .foregroundStyle(DesignSystem.Colors.textPrimary)
-                    Text("Project Structure")
-                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
-                .font(DesignSystem.Typography.headline)
+                .font(DesignSystem.Typography.callout)
             }
 
             // Title field
-            VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                 Text("Project Title")
                     .font(DesignSystem.Typography.caption)
                     .foregroundStyle(DesignSystem.Colors.textSecondary)
@@ -161,102 +227,81 @@ struct StrategicPlanningChatView: View {
                     .textFieldStyle(.plain)
                     .font(DesignSystem.Typography.body)
                     .foregroundStyle(DesignSystem.Colors.textPrimary)
-                    .padding(DesignSystem.Spacing.lg)
-                    .background(DesignSystem.Colors.cardBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                            .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
-                    )
+                    .padding(DesignSystem.Spacing.md)
+                    .background(DesignSystem.Colors.background)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
             }
 
-            // Total time control
+            // Total time
             TotalTimeControl(totalHours: $totalHours)
 
             // Phase cards
             if let arch = archetype {
-                ForEach(Array(arch.phaseStructure.enumerated()), id: \.offset) { index, template in
-                    PhaseAllocationCard(
-                        phaseName: template.name,
-                        phaseType: template.type,
-                        mentalRule: template.rule,
-                        index: index,
-                        percent: binding(for: index),
-                        totalMinutes: totalHours * 60,
-                        onAdjust: { delta in adjustPhasePercent(index: index, delta: delta) }
-                    )
+                VStack(spacing: DesignSystem.Spacing.sm) {
+                    ForEach(Array(arch.phaseStructure.enumerated()), id: \.offset) { index, template in
+                        PhaseAllocationCard(
+                            phaseName: template.name,
+                            phaseType: template.type,
+                            mentalRule: template.rule,
+                            index: index,
+                            percent: binding(for: index),
+                            totalMinutes: totalHours * 60,
+                            onAdjust: { delta in adjustPhasePercent(index: index, delta: delta) }
+                        )
+                    }
                 }
             }
 
-            // Action buttons
-            HStack(spacing: DesignSystem.Spacing.md) {
-                Button {
-                    step = .idle
-                } label: {
-                    HStack {
-                        Image(systemName: "arrow.counterclockwise")
-                        Text("Start Over")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(DesignSystem.Spacing.lg)
-                    .background(DesignSystem.Colors.cardBackground)
-                    .foregroundStyle(DesignSystem.Colors.textPrimary)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                            .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
-                    )
+            // Continue button
+            Button {
+                generateSessions()
+            } label: {
+                HStack {
+                    Text("Generate Sessions")
+                    Image(systemName: "sparkles")
                 }
-
-                Button {
-                    generateSessions()
-                } label: {
-                    HStack {
-                        Text("Looks Good")
-                        Image(systemName: "arrow.right")
-                    }
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: .infinity)
-                    .padding(DesignSystem.Spacing.lg)
-                    .background(projectTitle.isEmpty ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.accent)
-                    .foregroundStyle(DesignSystem.Colors.background)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
-                }
-                .disabled(projectTitle.isEmpty || isProcessing)
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity)
+                .padding(DesignSystem.Spacing.md)
+                .background(projectTitle.isEmpty ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.accent)
+                .foregroundStyle(DesignSystem.Colors.background)
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
             }
+            .disabled(projectTitle.isEmpty || isProcessing)
         }
+        .padding(DesignSystem.Spacing.lg)
+        .background(DesignSystem.Colors.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+        )
     }
 
-    // MARK: - Session Review Section
+    // MARK: - Session Review Card
 
-    private var sessionReviewSection: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
-            // Sessions intro
-            chatBubble(
-                "Here are the session goals I suggest based on your time allocation. Review them and create your project when ready.",
-                isAssistant: true
-            )
-
+    private var sessionReviewCard: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             // Project summary
-            VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
-                HStack(spacing: DesignSystem.Spacing.sm) {
-                    Text(projectTitle)
-                        .font(DesignSystem.Typography.title2)
-                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+            HStack(spacing: DesignSystem.Spacing.sm) {
+                Text(projectTitle)
+                    .font(DesignSystem.Typography.headline)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
 
-                    if let arch = archetype {
-                        Text(arch.displayName)
-                            .font(DesignSystem.Typography.caption)
-                            .padding(.horizontal, DesignSystem.Spacing.sm)
-                            .padding(.vertical, DesignSystem.Spacing.xs)
-                            .background(DesignSystem.Colors.accent.opacity(0.15))
-                            .foregroundStyle(DesignSystem.Colors.accent)
-                            .clipShape(Capsule())
-                    }
+                if let arch = archetype {
+                    Text(arch.displayName)
+                        .font(DesignSystem.Typography.caption)
+                        .padding(.horizontal, DesignSystem.Spacing.sm)
+                        .padding(.vertical, DesignSystem.Spacing.xs)
+                        .background(DesignSystem.Colors.accent.opacity(0.15))
+                        .foregroundStyle(DesignSystem.Colors.accent)
+                        .clipShape(Capsule())
                 }
 
-                Text("\(totalHours) hours total")
-                    .font(DesignSystem.Typography.callout)
+                Spacer()
+
+                Text("\(totalHours)h")
+                    .font(DesignSystem.Typography.caption)
                     .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
 
@@ -271,21 +316,34 @@ struct StrategicPlanningChatView: View {
             // Action buttons
             HStack(spacing: DesignSystem.Spacing.md) {
                 Button {
-                    step = .phaseReview
-                } label: {
-                    HStack {
-                        Image(systemName: "arrow.left")
-                        Text("Adjust Time")
+                    // Go back to phase allocation
+                    currentPhase = .phaseReview
+                    // Remove session review from messages
+                    messages.removeAll { msg in
+                        if case .sessionReview = msg { return true }
+                        return false
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(DesignSystem.Spacing.lg)
-                    .background(DesignSystem.Colors.cardBackground)
-                    .foregroundStyle(DesignSystem.Colors.textPrimary)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                            .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
-                    )
+                    // Remove last assistant message about sessions
+                    if let lastIndex = messages.lastIndex(where: { msg in
+                        if case .assistantText(_, let text) = msg {
+                            return text.contains("session")
+                        }
+                        return false
+                    }) {
+                        messages.remove(at: lastIndex)
+                    }
+                } label: {
+                    Text("Adjust")
+                        .font(DesignSystem.Typography.callout)
+                        .frame(maxWidth: .infinity)
+                        .padding(DesignSystem.Spacing.md)
+                        .background(DesignSystem.Colors.background)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.3), lineWidth: 1)
+                        )
                 }
 
                 Button {
@@ -297,77 +355,139 @@ struct StrategicPlanningChatView: View {
                     }
                     .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
-                    .padding(DesignSystem.Spacing.lg)
+                    .padding(DesignSystem.Spacing.md)
                     .background(DesignSystem.Colors.accent)
                     .foregroundStyle(DesignSystem.Colors.background)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                 }
             }
         }
+        .padding(DesignSystem.Spacing.lg)
+        .background(DesignSystem.Colors.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+        )
     }
 
-    // MARK: - Loading Section
+    // MARK: - Input Bar
 
-    private func loadingSection(_ message: String) -> some View {
-        VStack(spacing: DesignSystem.Spacing.lg) {
-            ProgressView()
-                .scaleEffect(1.2)
-                .tint(DesignSystem.Colors.accent)
-            Text(message)
-                .font(DesignSystem.Typography.body)
-                .foregroundStyle(DesignSystem.Colors.textSecondary)
+    private var inputBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+                .background(DesignSystem.Colors.divider)
+
+            HStack(spacing: DesignSystem.Spacing.md) {
+                TextField(inputPlaceholder, text: $inputText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(DesignSystem.Typography.body)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    .lineLimit(1...4)
+                    .focused($isInputFocused)
+                    .onSubmit {
+                        sendMessage()
+                    }
+
+                Button {
+                    sendMessage()
+                } label: {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(canSend ? DesignSystem.Colors.accent : DesignSystem.Colors.textTertiary)
+                }
+                .disabled(!canSend)
+            }
+            .padding(.horizontal, DesignSystem.Spacing.lg)
+            .padding(.vertical, DesignSystem.Spacing.md)
+            .background(DesignSystem.Colors.cardBackground)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, DesignSystem.Spacing.xxl + DesignSystem.Spacing.sm)
     }
 
-    // MARK: - Chat Bubble
-
-    private func chatBubble(_ message: String, isAssistant: Bool) -> some View {
-        HStack {
-            if !isAssistant { Spacer() }
-
-            Text(try! AttributedString(markdown: message))
-                .font(DesignSystem.Typography.body)
-                .foregroundStyle(DesignSystem.Colors.textPrimary)
-                .padding(DesignSystem.Spacing.lg)
-                .background(isAssistant ? DesignSystem.Colors.cardBackground : DesignSystem.Colors.accent.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
-                .overlay(
-                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                        .strokeBorder(DesignSystem.Colors.textTertiary.opacity(isAssistant ? 0.2 : 0), lineWidth: 1)
-                )
-
-            if isAssistant { Spacer() }
+    private var inputPlaceholder: String {
+        switch currentPhase {
+        case .goalInput:
+            return "Describe your project goal..."
+        case .phaseReview, .sessionReview:
+            return "Type to adjust or ask questions..."
+        default:
+            return "Type a message..."
         }
+    }
+
+    private var canSend: Bool {
+        !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isProcessing
     }
 
     // MARK: - Actions
 
+    private func sendMessage() {
+        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+
+        inputText = ""
+
+        switch currentPhase {
+        case .goalInput:
+            // User entered their goal
+            goal = text
+            messages.append(.userText(text: text))
+            classifyGoal()
+
+        case .phaseReview, .sessionReview:
+            // User feedback - for now just acknowledge
+            messages.append(.userText(text: text))
+            messages.append(.assistantText(
+                text: "I understand. You can adjust the settings above, or tap \"Generate Sessions\" when you're ready."
+            ))
+
+        default:
+            break
+        }
+    }
+
     private func classifyGoal() {
         isProcessing = true
-        step = .classifying
+        currentPhase = .classifying
+
+        // Add loading message
+        let loadingId = UUID()
+        messages.append(.assistantLoading(id: loadingId, text: "Analyzing your goal..."))
 
         Task {
             do {
                 let result = try await engine.classifyGoal(goal)
                 await MainActor.run {
+                    // Remove loading message
+                    messages.removeAll { $0.id == loadingId }
+
                     if let arch = Archetype(rawValue: result.archetype.lowercased()) {
                         archetype = arch
                         reasoning = result.reasoning
                         projectTitle = result.suggestedTitle
                         phasePercents = arch.phaseStructure.map { $0.defaultPercent }
-                        step = .phaseReview
+                        currentPhase = .phaseReview
+
+                        // Add explanation message
+                        messages.append(.assistantText(
+                            text: "I identified this as a **\(arch.displayName)** project. \(reasoning)\n\nHere's a suggested plan structure. You can adjust the title, total time, and phase allocations:"
+                        ))
+
+                        // Add phase allocation card
+                        messages.append(.phaseAllocation())
                     } else {
                         errorMessage = "Could not determine project type. Please try again."
-                        step = .idle
+                        currentPhase = .goalInput
                     }
                     isProcessing = false
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    step = .idle
+                    messages.removeAll { $0.id == loadingId }
+                    messages.append(.assistantText(
+                        text: "Sorry, I encountered an error: \(error.localizedDescription). Please try again."
+                    ))
+                    currentPhase = .goalInput
                     isProcessing = false
                 }
             }
@@ -378,7 +498,11 @@ struct StrategicPlanningChatView: View {
         guard let arch = archetype else { return }
 
         isProcessing = true
-        step = .generatingSessions
+        currentPhase = .generatingSessions
+
+        // Add loading message
+        let loadingId = UUID()
+        messages.append(.assistantLoading(id: loadingId, text: "Generating session goals..."))
 
         var allocation = StrategyChatEngine.PhaseAllocation(
             archetype: arch,
@@ -394,14 +518,29 @@ struct StrategicPlanningChatView: View {
                     allocation: allocation
                 )
                 await MainActor.run {
+                    // Remove loading message
+                    messages.removeAll { $0.id == loadingId }
+
                     generatedSessions = result
-                    step = .sessionReview
+                    currentPhase = .sessionReview
+
+                    // Add explanation
+                    messages.append(.assistantText(
+                        text: "Here are the sessions I've planned for your project. Review them and create your project when ready:"
+                    ))
+
+                    // Add session review card
+                    messages.append(.sessionReview())
+
                     isProcessing = false
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    step = .phaseReview
+                    messages.removeAll { $0.id == loadingId }
+                    messages.append(.assistantText(
+                        text: "Sorry, I encountered an error generating sessions: \(error.localizedDescription)"
+                    ))
+                    currentPhase = .phaseReview
                     isProcessing = false
                 }
             }
@@ -456,8 +595,6 @@ struct StrategicPlanningChatView: View {
 
         if newPercent != oldPercent {
             phasePercents[index] = newPercent
-
-            // Redistribute to other phases
             let actualDelta = newPercent - oldPercent
             redistributePercents(excludingIndex: index, delta: -actualDelta)
         }
@@ -482,7 +619,6 @@ struct StrategicPlanningChatView: View {
             remaining -= share
         }
 
-        // Normalize to 100%
         let total = phasePercents.reduce(0, +)
         if total != 100 {
             let diff = 100 - total
