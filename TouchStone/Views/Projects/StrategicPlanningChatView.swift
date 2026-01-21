@@ -34,6 +34,9 @@ struct StrategicPlanningChatView: View {
     @State private var currentPhase: ChatPhase = .goalInput
     @SwiftUI.FocusState private var isInputFocused: Bool
 
+    // Speech recognition
+    @State private var speechRecognizer = SpeechRecognizer()
+
     // Planning state
     @State private var goal = ""
     @State private var projectTitle = ""
@@ -379,16 +382,42 @@ struct StrategicPlanningChatView: View {
                 .background(DesignSystem.Colors.divider)
 
             HStack(spacing: DesignSystem.Spacing.md) {
-                TextField(inputPlaceholder, text: $inputText, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(DesignSystem.Typography.body)
-                    .foregroundStyle(DesignSystem.Colors.textPrimary)
-                    .lineLimit(1...4)
-                    .focused($isInputFocused)
-                    .onSubmit {
-                        sendMessage()
-                    }
+                // Microphone button
+                Button {
+                    toggleRecording()
+                } label: {
+                    Image(systemName: isRecording ? "stop.circle.fill" : "mic.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(isRecording ? DesignSystem.Colors.error : DesignSystem.Colors.textSecondary)
+                        .symbolEffect(.pulse, isActive: isRecording)
+                }
+                .disabled(isProcessing)
 
+                // Text field or recording indicator
+                if isRecording {
+                    HStack(spacing: DesignSystem.Spacing.sm) {
+                        Circle()
+                            .fill(DesignSystem.Colors.error)
+                            .frame(width: 8, height: 8)
+                        Text(speechRecognizer.transcript.isEmpty ? "Listening..." : speechRecognizer.transcript)
+                            .font(DesignSystem.Typography.body)
+                            .foregroundStyle(DesignSystem.Colors.textPrimary)
+                            .lineLimit(2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    TextField(inputPlaceholder, text: $inputText, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .font(DesignSystem.Typography.body)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                        .lineLimit(1...4)
+                        .focused($isInputFocused)
+                        .onSubmit {
+                            sendMessage()
+                        }
+                }
+
+                // Send button
                 Button {
                     sendMessage()
                 } label: {
@@ -402,6 +431,20 @@ struct StrategicPlanningChatView: View {
             .padding(.vertical, DesignSystem.Spacing.md)
             .background(DesignSystem.Colors.cardBackground)
         }
+        .onChange(of: speechRecognizer.state) { _, newState in
+            if newState == .finished {
+                // Transfer transcript to input text
+                let transcript = speechRecognizer.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !transcript.isEmpty {
+                    inputText = transcript
+                }
+                speechRecognizer.reset()
+            }
+        }
+    }
+
+    private var isRecording: Bool {
+        speechRecognizer.state == .recording || speechRecognizer.state == .processing
     }
 
     private var inputPlaceholder: String {
@@ -420,6 +463,23 @@ struct StrategicPlanningChatView: View {
     }
 
     // MARK: - Actions
+
+    private func toggleRecording() {
+        if isRecording {
+            speechRecognizer.stopRecording()
+        } else {
+            Task {
+                let authorized = await speechRecognizer.requestAuthorization()
+                if authorized {
+                    do {
+                        try speechRecognizer.startRecording()
+                    } catch {
+                        errorMessage = "Could not start recording: \(error.localizedDescription)"
+                    }
+                }
+            }
+        }
+    }
 
     private func sendMessage() {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
