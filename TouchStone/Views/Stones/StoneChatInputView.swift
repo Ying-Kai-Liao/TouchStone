@@ -95,8 +95,9 @@ struct StoneChatInputView: View {
                 messages.append(.assistantText(
                     text: "Tell me about your event. For example:\n• \"Team meeting at 10 AM\"\n• \"Lunch from 12 to 1 daily\"\n• \"Gym at 6 PM on weekdays\""
                 ))
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    isInputFocused = true
+                // Auto-start microphone recording
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    startRecordingAutomatically()
                 }
             }
             .alert("Error", isPresented: .constant(errorMessage != nil)) {
@@ -490,6 +491,27 @@ struct StoneChatInputView: View {
     }
 
     // MARK: - Actions
+
+    private func startRecordingAutomatically() {
+        Task {
+            let authorized = await speechRecognizer.requestAuthorization()
+            if authorized {
+                do {
+                    try speechRecognizer.startRecording()
+                } catch {
+                    // Silently fall back to text input if mic fails
+                    await MainActor.run {
+                        isInputFocused = true
+                    }
+                }
+            } else {
+                // If not authorized, fall back to text input
+                await MainActor.run {
+                    isInputFocused = true
+                }
+            }
+        }
+    }
 
     private func toggleRecording() {
         if isRecording {
