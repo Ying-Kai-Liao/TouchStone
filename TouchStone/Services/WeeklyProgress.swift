@@ -69,11 +69,8 @@ struct WeeklyProgress {
 
     /// Calculate completed hours for a project this week
     private func calculateCompletedHoursThisWeek(for project: Project) -> Double {
-        let weekLogs = project.touchLogs.filter { log in
-            log.timestamp >= weekStart && log.timestamp < weekEnd
-        }
-        let totalMinutes = weekLogs.reduce(0) { $0 + $1.durationMinutes }
-        return Double(totalMinutes) / 60.0
+        // Use Project's hoursInRange to avoid direct touchLogs relationship access
+        return project.hoursInRange(from: weekStart, to: weekEnd)
     }
 
     /// Calculate target hours for this week based on deadline or balanced share

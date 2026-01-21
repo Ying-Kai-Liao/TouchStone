@@ -103,6 +103,21 @@ final class Project {
         return todayMinutes / 60
     }
 
+    /// Hours touched within a date range (inclusive of start, exclusive of end)
+    /// Uses defensive access pattern to avoid SwiftData faulting issues
+    func hoursInRange(from startDate: Date, to endDate: Date) -> Double {
+        // Copy to local array and safely access properties
+        var totalMinutes = 0
+        for log in touchLogs {
+            // Access timestamp - if this fails on faulted object, skip it
+            let ts = log.timestamp
+            if ts >= startDate && ts < endDate {
+                totalMinutes += log.durationMinutes
+            }
+        }
+        return Double(totalMinutes) / 60.0
+    }
+
     /// Last touched date
     var lastTouchedAt: Date? {
         touchLogs.max(by: { $0.timestamp < $1.timestamp })?.timestamp
