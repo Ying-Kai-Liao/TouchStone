@@ -209,76 +209,78 @@ struct StrategicPlanningChatView: View {
 
     private var phaseAllocationCard: some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-            // Archetype badge
-            if let arch = archetype {
-                HStack(spacing: DesignSystem.Spacing.sm) {
-                    Image(systemName: arch.icon)
-                        .foregroundStyle(DesignSystem.Colors.accent)
-                    Text(arch.displayName)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(DesignSystem.Colors.textPrimary)
-                }
-                .font(DesignSystem.Typography.callout)
-            }
-
-            // Title field
-            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
-                Text("Project Title")
-                    .font(DesignSystem.Typography.caption)
-                    .foregroundStyle(DesignSystem.Colors.textSecondary)
-                TextField("Project title", text: $projectTitle)
-                    .textFieldStyle(.plain)
-                    .font(DesignSystem.Typography.body)
-                    .foregroundStyle(DesignSystem.Colors.textPrimary)
-                    .padding(DesignSystem.Spacing.md)
-                    .background(DesignSystem.Colors.background)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
-            }
-
-            // Total time
-            TotalTimeControl(totalHours: $totalHours)
-
-            // Phase cards
-            if let arch = archetype {
-                VStack(spacing: DesignSystem.Spacing.sm) {
-                    ForEach(Array(arch.phaseStructure.enumerated()), id: \.offset) { index, template in
-                        PhaseAllocationCard(
-                            phaseName: template.name,
-                            phaseType: template.type,
-                            mentalRule: template.rule,
-                            index: index,
-                            percent: binding(for: index),
-                            totalMinutes: totalHours * 60,
-                            onAdjust: { delta in adjustPhasePercent(index: index, delta: delta) }
-                        )
+            // Main project info card
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                // Archetype header with icon
+                if let arch = archetype {
+                    HStack(spacing: DesignSystem.Spacing.sm) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(DesignSystem.Colors.accent)
+                        Text(arch.displayName.uppercased())
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
+                            .tracking(1.5)
                     }
                 }
+
+                // Title field
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                    Text("PROJECT TITLE")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .tracking(1)
+                    TextField("Enter project title", text: $projectTitle)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                }
+
+                // Total time control
+                TotalTimeControl(totalHours: $totalHours)
+            }
+            .padding(DesignSystem.Spacing.lg)
+            .background(DesignSystem.Colors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large))
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
+                    .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.15), lineWidth: 1)
+            )
+
+            // Phase cards - separate cards for each phase
+            if let arch = archetype {
+                ForEach(Array(arch.phaseStructure.enumerated()), id: \.offset) { index, template in
+                    PhaseAllocationCard(
+                        phaseName: template.name,
+                        phaseType: template.type,
+                        mentalRule: template.rule,
+                        index: index,
+                        percent: binding(for: index),
+                        totalMinutes: totalHours * 60,
+                        onAdjust: { delta in adjustPhasePercent(index: index, delta: delta) }
+                    )
+                }
             }
 
-            // Continue button
+            // Generate Sessions button - dark style
             Button {
                 generateSessions()
             } label: {
-                HStack {
+                HStack(spacing: DesignSystem.Spacing.sm) {
                     Text("Generate Sessions")
+                        .font(.system(size: 16, weight: .semibold))
                     Image(systemName: "sparkles")
+                        .font(.system(size: 14, weight: .medium))
                 }
-                .fontWeight(.semibold)
                 .frame(maxWidth: .infinity)
-                .padding(DesignSystem.Spacing.md)
-                .background(projectTitle.isEmpty ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.accent)
+                .padding(.vertical, DesignSystem.Spacing.md)
+                .background(projectTitle.isEmpty ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.textPrimary)
                 .foregroundStyle(DesignSystem.Colors.background)
-                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large))
             }
             .disabled(projectTitle.isEmpty || isProcessing)
+            .padding(.top, DesignSystem.Spacing.sm)
         }
-        .padding(DesignSystem.Spacing.lg)
-        .background(DesignSystem.Colors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
-        )
     }
 
     // MARK: - Session Review Card
