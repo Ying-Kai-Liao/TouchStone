@@ -61,7 +61,7 @@ struct CalendarView: View {
                 )
             }
             .sheet(isPresented: $showingAddStone) {
-                SpeechStoneInputView(initialDate: addStoneDate)
+                StoneChatInputView(initialDate: addStoneDate)
             }
         }
     }
