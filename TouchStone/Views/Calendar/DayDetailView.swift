@@ -144,14 +144,17 @@ struct DayDetailView: View {
         }
 
         // Add project allocations (rounded to nearest 0.5 hour)
-        let projectColors: [Color] = [DesignSystem.Colors.accent, DesignSystem.Colors.focus, .purple, .pink, .indigo, .cyan]
+        // Use accent color with varying opacities for monochromatic design
+        let projectCount = loadResult.projectAllocations.count
         for (index, allocation) in loadResult.projectAllocations.enumerated() {
             let hours = roundToHalf(allocation.allocatedMinutes / 60.0)
             if hours > 0 {
+                // Opacity ranges from 1.0 (first project) down to 0.4 (last project)
+                let opacity = projectCount > 1 ? 1.0 - (Double(index) * 0.6 / Double(projectCount - 1)) : 1.0
                 slices.append(ChartSlice(
                     label: allocation.project.title,
                     hours: hours,
-                    color: projectColors[index % projectColors.count],
+                    color: DesignSystem.Colors.accent.opacity(opacity),
                     isProject: true
                 ))
             }
