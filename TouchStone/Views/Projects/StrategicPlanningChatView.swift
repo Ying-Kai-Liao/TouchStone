@@ -25,12 +25,12 @@ struct StrategicPlanningChatView: View {
         NavigationStack {
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.xl) {
                         // Step content
                         stepContent
                             .id("content")
                     }
-                    .padding()
+                    .padding(DesignSystem.Spacing.lg)
                 }
                 .onChange(of: step) { _, _ in
                     withAnimation {
@@ -38,12 +38,13 @@ struct StrategicPlanningChatView: View {
                     }
                 }
             }
-            .background(Color(.systemGroupedBackground))
+            .background(DesignSystem.Colors.background)
             .navigationTitle("Plan Project")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
             }
             .alert("Error", isPresented: .constant(errorMessage != nil)) {
@@ -84,7 +85,7 @@ struct StrategicPlanningChatView: View {
     // MARK: - Goal Input Section
 
     private var goalInputSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
             // Intro message
             chatBubble(
                 "What do you want to accomplish? Describe your project goal and I'll help you plan it strategically.",
@@ -92,12 +93,18 @@ struct StrategicPlanningChatView: View {
             )
 
             // Goal input
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
                 TextField("e.g., Write a research paper on ML optimization", text: $goal, axis: .vertical)
                     .textFieldStyle(.plain)
-                    .padding()
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .font(DesignSystem.Typography.body)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    .padding(DesignSystem.Spacing.lg)
+                    .background(DesignSystem.Colors.cardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                            .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+                    )
                     .lineLimit(3...6)
 
                 Button {
@@ -109,10 +116,10 @@ struct StrategicPlanningChatView: View {
                     }
                     .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(goal.isEmpty ? Color.gray : prefs.accentColor)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(DesignSystem.Spacing.lg)
+                    .background(goal.isEmpty ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.accent)
+                    .foregroundStyle(DesignSystem.Colors.background)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                 }
                 .disabled(goal.isEmpty || isProcessing)
             }
@@ -122,7 +129,7 @@ struct StrategicPlanningChatView: View {
     // MARK: - Phase Allocation Section
 
     private var phaseAllocationSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
             // Classification result bubble
             if let arch = archetype {
                 chatBubble(
@@ -133,27 +140,34 @@ struct StrategicPlanningChatView: View {
 
             // Archetype badge
             if let arch = archetype {
-                HStack {
+                HStack(spacing: DesignSystem.Spacing.sm) {
                     Image(systemName: arch.icon)
-                        .foregroundStyle(prefs.accentColor)
+                        .foregroundStyle(DesignSystem.Colors.accent)
                     Text(arch.displayName)
                         .fontWeight(.bold)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
                     Text("Project Structure")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
-                .font(.headline)
+                .font(DesignSystem.Typography.headline)
             }
 
             // Title field
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
                 Text("Project Title")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
                 TextField("Project title", text: $projectTitle)
                     .textFieldStyle(.plain)
-                    .padding()
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .font(DesignSystem.Typography.body)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    .padding(DesignSystem.Spacing.lg)
+                    .background(DesignSystem.Colors.cardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                            .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+                    )
             }
 
             // Total time control
@@ -175,7 +189,7 @@ struct StrategicPlanningChatView: View {
             }
 
             // Action buttons
-            HStack(spacing: 12) {
+            HStack(spacing: DesignSystem.Spacing.md) {
                 Button {
                     step = .idle
                 } label: {
@@ -184,9 +198,14 @@ struct StrategicPlanningChatView: View {
                         Text("Start Over")
                     }
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(DesignSystem.Spacing.lg)
+                    .background(DesignSystem.Colors.cardBackground)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                            .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+                    )
                 }
 
                 Button {
@@ -198,10 +217,10 @@ struct StrategicPlanningChatView: View {
                     }
                     .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(prefs.accentColor)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(DesignSystem.Spacing.lg)
+                    .background(projectTitle.isEmpty ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.accent)
+                    .foregroundStyle(DesignSystem.Colors.background)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                 }
                 .disabled(projectTitle.isEmpty || isProcessing)
             }
@@ -211,7 +230,7 @@ struct StrategicPlanningChatView: View {
     // MARK: - Session Review Section
 
     private var sessionReviewSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
             // Sessions intro
             chatBubble(
                 "Here are the session goals I suggest based on your time allocation. Review them and create your project when ready.",
@@ -219,25 +238,26 @@ struct StrategicPlanningChatView: View {
             )
 
             // Project summary
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+                HStack(spacing: DesignSystem.Spacing.sm) {
                     Text(projectTitle)
-                        .font(.title2)
-                        .fontWeight(.bold)
+                        .font(DesignSystem.Typography.title2)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
 
                     if let arch = archetype {
                         Text(arch.displayName)
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(prefs.accentColor.opacity(0.15))
+                            .font(DesignSystem.Typography.caption)
+                            .padding(.horizontal, DesignSystem.Spacing.sm)
+                            .padding(.vertical, DesignSystem.Spacing.xs)
+                            .background(DesignSystem.Colors.accent.opacity(0.15))
+                            .foregroundStyle(DesignSystem.Colors.accent)
                             .clipShape(Capsule())
                     }
                 }
 
                 Text("\(totalHours) hours total")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(DesignSystem.Typography.callout)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
 
             // Sessions list
@@ -249,7 +269,7 @@ struct StrategicPlanningChatView: View {
             }
 
             // Action buttons
-            HStack(spacing: 12) {
+            HStack(spacing: DesignSystem.Spacing.md) {
                 Button {
                     step = .phaseReview
                 } label: {
@@ -258,9 +278,14 @@ struct StrategicPlanningChatView: View {
                         Text("Adjust Time")
                     }
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(DesignSystem.Spacing.lg)
+                    .background(DesignSystem.Colors.cardBackground)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                            .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+                    )
                 }
 
                 Button {
@@ -272,10 +297,10 @@ struct StrategicPlanningChatView: View {
                     }
                     .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(prefs.accentColor)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(DesignSystem.Spacing.lg)
+                    .background(DesignSystem.Colors.accent)
+                    .foregroundStyle(DesignSystem.Colors.background)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                 }
             }
         }
@@ -284,14 +309,16 @@ struct StrategicPlanningChatView: View {
     // MARK: - Loading Section
 
     private func loadingSection(_ message: String) -> some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DesignSystem.Spacing.lg) {
             ProgressView()
                 .scaleEffect(1.2)
+                .tint(DesignSystem.Colors.accent)
             Text(message)
-                .foregroundStyle(.secondary)
+                .font(DesignSystem.Typography.body)
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
+        .padding(.vertical, DesignSystem.Spacing.xxl + DesignSystem.Spacing.sm)
     }
 
     // MARK: - Chat Bubble
@@ -301,9 +328,15 @@ struct StrategicPlanningChatView: View {
             if !isAssistant { Spacer() }
 
             Text(try! AttributedString(markdown: message))
-                .padding()
-                .background(isAssistant ? Color(.secondarySystemGroupedBackground) : prefs.accentColor.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .font(DesignSystem.Typography.body)
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                .padding(DesignSystem.Spacing.lg)
+                .background(isAssistant ? DesignSystem.Colors.cardBackground : DesignSystem.Colors.accent.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                        .strokeBorder(DesignSystem.Colors.textTertiary.opacity(isAssistant ? 0.2 : 0), lineWidth: 1)
+                )
 
             if isAssistant { Spacer() }
         }
