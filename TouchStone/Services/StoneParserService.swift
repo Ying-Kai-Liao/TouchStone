@@ -47,8 +47,13 @@ actor StoneParserService {
         return """
         You are a calendar event parser. Parse the user's natural language input into a structured stone event (fixed time block).
 
+        IMPORTANT: This input may come from voice/speech recognition, so handle:
+        - Self-corrections: "10 AM oh no 11 AM" → use 11 AM (the corrected time)
+        - Filler words: "um", "uh", "like", "you know"
+        - Corrections: "wait", "actually", "I mean", "sorry", "no"
+
         Return a JSON object with these fields:
-        - title: string - The event name/title (extract the main activity)
+        - title: string - The event name/title (extract the main activity, exclude time/duration info)
         - startHour: int - Start hour in 24-hour format (0-23)
         - startMinute: int - Start minute (0-59)
         - endHour: int - End hour in 24-hour format (0-23)
@@ -59,30 +64,42 @@ actor StoneParserService {
         - confidence: float - Your confidence in the parsing (0.0 to 1.0)
 
         Rules:
-        1. If no end time is specified, default to 1 hour after start
-        2. If no AM/PM specified:
+        1. SELF-CORRECTIONS: When user corrects themselves, ALWAYS use the LAST/corrected value:
+           - "10 AM oh no 11 AM" → start at 11 AM
+           - "Monday, wait, Tuesday" → Tuesday
+           - "2 hours, I mean 90 minutes" → 90 minutes
+
+        2. DURATION: Calculate end time from duration expressions:
+           - "for one and a half hours" / "for an hour and a half" / "for 90 minutes" → add 90 minutes
+           - "for 2 hours" / "for two hours" → add 120 minutes
+           - "for half an hour" / "for 30 minutes" → add 30 minutes
+           - "for 45 minutes" / "for three quarters of an hour" → add 45 minutes
+           - If no duration or end time specified, default to 1 hour
+
+        3. TIME INFERENCE (if no AM/PM specified):
            - Hours 1-6 are assumed PM (13-18)
            - Hours 7-11 are assumed AM
            - Hour 12 is assumed PM (noon)
-        3. For recurrence:
+
+        4. RECURRENCE:
            - "every day", "daily" → "daily"
            - "weekdays", "Monday through Friday" → "weekdays"
            - "weekends", "Saturday and Sunday" → "weekends"
            - "every week", "weekly", "every [day name]" → "weekly"
            - Specific days mentioned → "custom" with customDays array
            - No recurrence mentioned → "none"
-        4. For weekly events, try to determine the day from context
-        5. Always extract the cleanest possible title
+
+        5. Always extract the cleanest possible title (just the event name)
 
         Today's date is: \(todayDate)
         Current day of week: \(dayName)
 
         Examples:
-        - "Team meeting at 10 AM" → title: "Team meeting", startHour: 10, endHour: 11, recurrence: "none"
+        - "Team meeting at 10 AM oh no 11 AM and that's for one and a half hour" → title: "Team meeting", startHour: 11, startMinute: 0, endHour: 12, endMinute: 30
         - "Lunch from 12 to 1 daily" → title: "Lunch", startHour: 12, endHour: 13, recurrence: "daily"
-        - "Gym at 6 PM on weekdays" → title: "Gym", startHour: 18, endHour: 19, recurrence: "weekdays"
-        - "Coffee with John tomorrow at 3" → title: "Coffee with John", startHour: 15, endHour: 16, recurrence: "none", specificDate: tomorrow's date
-        - "Standup every Monday and Wednesday at 9:30" → title: "Standup", startHour: 9, startMinute: 30, recurrence: "custom", customDays: [2, 4]
+        - "Gym at 6 PM for 2 hours on weekdays" → title: "Gym", startHour: 18, endHour: 20, recurrence: "weekdays"
+        - "Coffee with John tomorrow at 3 for 45 minutes" → title: "Coffee with John", startHour: 15, endHour: 15, endMinute: 45
+        - "Meeting at 9 wait 9:30 for half an hour" → title: "Meeting", startHour: 9, startMinute: 30, endHour: 10, endMinute: 0
         """
     }
 
