@@ -91,8 +91,8 @@ struct UnifiedInputView: View {
                             .id(message.id)
                     }
 
-                    // Pending actions preview (Phase 2)
-                    if !pendingActions.isEmpty {
+                    // Pending actions preview (Phase 2) - show when waiting for confirmation
+                    if !pendingActions.isEmpty && (conversationState == .initial || conversationState == .refining) {
                         PendingActionsPreview(
                             pendingActions: pendingActions,
                             suggestions: suggestions,
@@ -107,6 +107,7 @@ struct UnifiedInputView: View {
                             }
                         )
                         .padding(.horizontal)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                         .id("pending-actions")
                     }
 
@@ -282,6 +283,17 @@ struct UnifiedInputView: View {
                 // Send to backend
                 let response = try await agentService.chat(message: text, context: context)
 
+                // DEBUG: Log response details
+                print("DEBUG: Response received")
+                print("DEBUG: conversationState = \(response.conversationState)")
+                print("DEBUG: pendingActions count = \(response.pendingActions.count)")
+                for action in response.pendingActions {
+                    print("DEBUG: action type = \(action.actionType)")
+                    if let stone = action.stone {
+                        print("DEBUG: stone = \(stone.title) on \(stone.date ?? "no date")")
+                    }
+                }
+
                 // Add assistant response
                 let assistantMessage = AgentChatMessage(role: .assistant, content: response.message)
                 messages.append(assistantMessage)
@@ -293,7 +305,10 @@ struct UnifiedInputView: View {
 
                 // Handle confirmed state - create data locally
                 if response.conversationState == .confirmed {
+                    print("DEBUG: State is CONFIRMED, calling commitPendingActions()")
                     await commitPendingActions()
+                } else {
+                    print("DEBUG: State is NOT confirmed: \(response.conversationState)")
                 }
 
                 // Process any legacy actions
@@ -358,11 +373,17 @@ struct UnifiedInputView: View {
 
     /// Create SwiftData objects from pending actions (iOS-as-authority pattern)
     private func commitPendingActions() async {
+        print("DEBUG: commitPendingActions called with \(pendingActions.count) actions")
+
         for action in pendingActions {
+            print("DEBUG: Processing action: \(action.actionType)")
             switch action.actionType {
             case "add_stone":
                 if let stone = action.stone {
+                    print("DEBUG: Creating stone: \(stone.title)")
                     await createStoneEvent(from: stone)
+                } else {
+                    print("DEBUG: action.stone is nil!")
                 }
             case "add_project":
                 if let project = action.project {
@@ -373,6 +394,7 @@ struct UnifiedInputView: View {
                     await createTouchLog(from: log)
                 }
             default:
+                print("DEBUG: Unknown action type: \(action.actionType)")
                 break
             }
         }
@@ -385,10 +407,13 @@ struct UnifiedInputView: View {
         // Add confirmation message
         let confirmMessage = AgentChatMessage(role: .assistant, content: "Done! I've added everything to your schedule.")
         messages.append(confirmMessage)
+        print("DEBUG: commitPendingActions completed")
     }
 
     /// Create a StoneEvent from pending data
     private func createStoneEvent(from pending: AgentService.PendingStone) async {
+        print("DEBUG: createStoneEvent - title: \(pending.title), date: \(pending.date ?? "nil")")
+
         let stone = StoneEvent(
             title: pending.title,
             startHour: pending.startHour,
@@ -403,6 +428,9 @@ struct UnifiedInputView: View {
             formatter.dateFormat = "yyyy-MM-dd"
             if let date = formatter.date(from: dateStr) {
                 stone.specificDate = date
+                print("DEBUG: Set specificDate to \(date)")
+            } else {
+                print("DEBUG: Failed to parse date string: \(dateStr)")
             }
         }
 
@@ -427,7 +455,14 @@ struct UnifiedInputView: View {
         }
 
         modelContext.insert(stone)
-        try? modelContext.save()
+        print("DEBUG: Inserted stone into modelContext")
+
+        do {
+            try modelContext.save()
+            print("DEBUG: Successfully saved stone to SwiftData")
+        } catch {
+            print("DEBUG: Failed to save stone: \(error)")
+        }
     }
 
     /// Create a Project from pending data
@@ -552,7 +587,7 @@ struct AgentMessageBubble: View {
             }
 
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
-                Text(message.content)
+                Text(displayContent)
                     .font(DesignSystem.Typography.body)
                     .foregroundStyle(message.role == .user ? .white : DesignSystem.Colors.textPrimary)
                     .padding(.horizontal, DesignSystem.Spacing.md)
@@ -571,6 +606,26 @@ struct AgentMessageBubble: View {
                 Spacer()
             }
         }
+    }
+
+    /// Strips JSON code blocks from assistant messages for cleaner display
+    private var displayContent: String {
+        guard message.role == .assistant else {
+            return message.content
+        }
+
+        // Remove ```json ... ``` blocks from the content
+        let pattern = "```json\\s*\\{[^`]*\\}\\s*```"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) else {
+            return message.content
+        }
+
+        let range = NSRange(message.content.startIndex..., in: message.content)
+        let cleaned = regex.stringByReplacingMatches(in: message.content, options: [], range: range, withTemplate: "")
+
+        // Clean up extra whitespace/newlines left behind
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\n\n\n", with: "\n\n")
     }
 
     private var timeString: String {
