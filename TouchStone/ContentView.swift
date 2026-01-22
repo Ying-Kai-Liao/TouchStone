@@ -19,6 +19,11 @@ struct ContentView: View {
                 }
                 .tag(1)
 
+            UnifiedInputView()
+                .tabItem {
+                    Label("Ask", systemImage: "sparkles")
+                }
+
             ProjectsListView()
                 .tabItem {
                     Label("Plan", systemImage: "square.grid.2x2")
@@ -40,5 +45,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [Project.self, ProjectPhase.self, PlannedSession.self, StoneEvent.self, TouchLog.self, FocusSession.self], inMemory: true)
+        .modelContainer(for: [Project.self, ProjectPhase.self, Milestone.self, StoneEvent.self, TouchLog.self, FocusSession.self], inMemory: true)
 }

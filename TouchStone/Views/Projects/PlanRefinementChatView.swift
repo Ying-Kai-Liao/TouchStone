@@ -171,13 +171,13 @@ struct PlanRefinementChatView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            // Locked sessions warning
-            let lockedCount = project.lockedSessions.count
-            if lockedCount > 0 {
+            // Logged work info
+            let loggedHours = project.completedHours
+            if loggedHours > 0 {
                 HStack(spacing: 6) {
-                    Image(systemName: "lock.fill")
-                        .foregroundStyle(.orange)
-                    Text("\(lockedCount) completed session\(lockedCount == 1 ? "" : "s") will be preserved")
+                    Image(systemName: "clock.fill")
+                        .foregroundStyle(.green)
+                    Text("\(loggedHours)h already logged")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -304,33 +304,23 @@ struct PlanRefinementChatView: View {
 
     private func proposedPhaseCard(_ phasePlan: PlanRefinementEngine.PhasePlan) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(phasePlan.name)
-                .font(.subheadline)
-                .fontWeight(.semibold)
+            HStack {
+                Text(phasePlan.name)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
 
-            ForEach(Array(phasePlan.sessions.enumerated()), id: \.offset) { _, session in
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "circle")
-                        .font(.caption2)
-                        .foregroundStyle(prefs.accentColor)
-                        .padding(.top, 4)
+                Spacer()
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(session.title)
-                            .font(.caption)
-                            .fontWeight(.medium)
+                Text("\(phasePlan.estimatedMinutes / 60)h budget")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
-                        Text(session.goal)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    Text("~\(session.estimatedMinutes)m")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+            if let mentalRule = phasePlan.mentalRule, !mentalRule.isEmpty {
+                Text("\"\(mentalRule)\"")
+                    .font(.caption)
+                    .italic()
+                    .foregroundStyle(prefs.accentColor)
             }
         }
         .padding()
@@ -451,37 +441,12 @@ struct PlanRefinementChatView: View {
                 continue
             }
 
-            // Get locked sessions (completed/skipped) - these are preserved
-            let lockedSessions = existingPhase.sessions.filter { $0.status != .planned }
+            // Update phase time budget from the refinement result
+            existingPhase.estimatedMinutes = phasePlan.estimatedMinutes
 
-            // Get old planned sessions to delete
-            let oldPlannedSessions = existingPhase.sessions.filter { $0.status == .planned }
-
-            // Delete old planned sessions from the model context
-            for oldSession in oldPlannedSessions {
-                modelContext.delete(oldSession)
-            }
-
-            // Create and insert new sessions
-            var newSessions: [PlannedSession] = []
-            for (sessionIndex, plan) in phasePlan.sessions.enumerated() {
-                let session = PlannedSession(
-                    title: plan.title,
-                    goal: plan.goal,
-                    estimatedMinutes: plan.estimatedMinutes,
-                    sequenceOrder: lockedSessions.count + sessionIndex
-                )
-                session.phase = existingPhase
-                modelContext.insert(session)
-                newSessions.append(session)
-            }
-
-            // Update the phase's sessions array
-            existingPhase.sessions = lockedSessions + newSessions
-
-            // Re-sequence the locked sessions
-            for (i, session) in lockedSessions.enumerated() {
-                session.sequenceOrder = i
+            // Update mental rule if changed
+            if let newRule = phasePlan.mentalRule, !newRule.isEmpty {
+                existingPhase.mentalRule = newRule
             }
         }
 
@@ -496,5 +461,5 @@ struct PlanRefinementChatView: View {
     PlanRefinementChatView(
         project: Project(title: "ML Research Paper", archetype: .lab, totalPlannedMinutes: 2400)
     )
-    .modelContainer(for: [Project.self, ProjectPhase.self, PlannedSession.self, ProjectDocument.self], inMemory: true)
+    .modelContainer(for: [Project.self, ProjectPhase.self, Milestone.self, ProjectDocument.self], inMemory: true)
 }

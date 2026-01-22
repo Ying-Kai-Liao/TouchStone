@@ -16,7 +16,6 @@ struct StrategicProjectDetailView: View {
     @State private var showingDocumentPicker = false
     @State private var showingDeleteConfirmation = false
     @State private var editMode: EditMode = .inactive
-    @State private var selectedSession: PlannedSession?
     @State private var expandedPhases: Set<String> = []
 
     var body: some View {
@@ -69,8 +68,12 @@ struct StrategicProjectDetailView: View {
                         // Progress section
                         progressCard
 
-                        // Phase list with indicator
-                        phasesCard
+                        // Phase list (for phase mode) or milestone list (for milestone mode)
+                        if project.isPhaseMode {
+                            phasesCard
+                        } else {
+                            milestonesCard
+                        }
 
                         // Attached documents
                         if !project.documents.isEmpty {
@@ -92,9 +95,6 @@ struct StrategicProjectDetailView: View {
         }
         .sheet(isPresented: $showingRefinementChat) {
             PlanRefinementChatView(project: project)
-        }
-        .sheet(item: $selectedSession) { session in
-            SessionEditorSheet(session: session)
         }
         .confirmationDialog(
             "Delete Project",
@@ -375,12 +375,12 @@ struct StrategicProjectDetailView: View {
         )
     }
 
-    // MARK: - Phases Card
+    // MARK: - Phases Card (Phase Mode)
 
     private var phasesCard: some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             HStack(spacing: DesignSystem.Spacing.sm) {
-                Image(systemName: "list.bullet")
+                Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 16))
                     .foregroundStyle(DesignSystem.Colors.textSecondary)
                 Text("Phases")
@@ -392,12 +392,11 @@ struct StrategicProjectDetailView: View {
 
             VStack(spacing: 0) {
                 ForEach(Array(project.sortedPhases.enumerated()), id: \.element.id) { index, phase in
-                    CollapsiblePhaseRow(
+                    PhaseProgressRow(
                         phase: phase,
                         isActive: phase.id == project.activePhase?.id,
                         isExpanded: expandedPhases.contains(phase.id.uuidString),
                         isLast: index == project.sortedPhases.count - 1,
-                        isEditing: editMode.isEditing,
                         onToggleExpand: {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 if expandedPhases.contains(phase.id.uuidString) {
@@ -406,11 +405,44 @@ struct StrategicProjectDetailView: View {
                                     expandedPhases.insert(phase.id.uuidString)
                                 }
                             }
-                        },
-                        onSessionTap: { session in
-                            selectedSession = session
                         }
                     )
+                }
+            }
+        }
+        .padding(DesignSystem.Spacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .fill(DesignSystem.Colors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Milestones Card (Milestone Mode)
+
+    private var milestonesCard: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            HStack(spacing: DesignSystem.Spacing.sm) {
+                Image(systemName: "checklist")
+                    .font(.system(size: 16))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                Text("Milestones")
+                    .font(DesignSystem.Typography.body)
+                    .fontWeight(.medium)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                Spacer()
+
+                Text("\(project.completedMilestoneCount)/\(project.totalMilestoneCount)")
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+            }
+
+            VStack(spacing: DesignSystem.Spacing.sm) {
+                ForEach(project.sortedMilestones) { milestone in
+                    MilestoneRow(milestone: milestone)
                 }
             }
         }
@@ -496,24 +528,15 @@ struct StrategicProjectDetailView: View {
     }
 }
 
-// MARK: - Collapsible Phase Row
+// MARK: - Phase Progress Row
 
-struct CollapsiblePhaseRow: View {
+/// A row showing phase with time budget progress (no individual sessions)
+struct PhaseProgressRow: View {
     @Bindable var phase: ProjectPhase
     let isActive: Bool
     let isExpanded: Bool
     let isLast: Bool
-    let isEditing: Bool
     let onToggleExpand: () -> Void
-    let onSessionTap: (PlannedSession) -> Void
-
-    private var completedCount: Int {
-        phase.sortedSessions.filter { $0.status == .completed }.count
-    }
-
-    private var totalCount: Int {
-        phase.sortedSessions.count
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -533,10 +556,10 @@ struct CollapsiblePhaseRow: View {
 
                     Spacer()
 
-                    // Session count
-                    Text("\(completedCount)/\(totalCount)")
+                    // Time progress
+                    Text(phase.progressString)
                         .font(DesignSystem.Typography.caption)
-                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .foregroundStyle(phase.isComplete ? DesignSystem.Colors.success : DesignSystem.Colors.textTertiary)
 
                     // Phase type badge
                     Text(phase.phaseType.displayName)
@@ -556,9 +579,9 @@ struct CollapsiblePhaseRow: View {
             }
             .buttonStyle(.plain)
 
-            // Expanded sessions
+            // Expanded details
             if isExpanded {
-                VStack(spacing: DesignSystem.Spacing.sm) {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
                     // Mental rule if available
                     if let rule = phase.mentalRule {
                         Text("\"\(rule)\"")
@@ -566,16 +589,30 @@ struct CollapsiblePhaseRow: View {
                             .italic()
                             .foregroundStyle(DesignSystem.Colors.accent)
                             .padding(.leading, DesignSystem.Spacing.xl)
-                            .padding(.bottom, DesignSystem.Spacing.xs)
                     }
 
-                    ForEach(phase.sortedSessions) { session in
-                        MinimalSessionRow(
-                            session: session,
-                            isEditing: isEditing,
-                            onTap: { onSessionTap(session) }
-                        )
+                    // Progress bar
+                    HStack(spacing: DesignSystem.Spacing.md) {
+                        ProgressView(value: phase.progress)
+                            .tint(phase.isComplete ? DesignSystem.Colors.success : DesignSystem.Colors.accent)
+
+                        if phase.isComplete {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(DesignSystem.Colors.success)
+                                .font(.caption)
+                        }
                     }
+                    .padding(.leading, DesignSystem.Spacing.xl)
+                    .padding(.trailing, DesignSystem.Spacing.md)
+
+                    // Time budget info
+                    HStack(spacing: DesignSystem.Spacing.lg) {
+                        Label("\(phase.minutesInvested / 60)h invested", systemImage: "clock")
+                        Label("\(phase.remainingMinutes / 60)h remaining", systemImage: "hourglass")
+                    }
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    .padding(.leading, DesignSystem.Spacing.xl)
                 }
                 .padding(.bottom, DesignSystem.Spacing.sm)
             }
@@ -591,47 +628,6 @@ struct CollapsiblePhaseRow: View {
     }
 }
 
-// MARK: - Minimal Session Row
-
-struct MinimalSessionRow: View {
-    @Bindable var session: PlannedSession
-    let isEditing: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: DesignSystem.Spacing.sm) {
-                // Status indicator
-                Image(systemName: session.status.icon)
-                    .font(.caption2)
-                    .foregroundStyle(colorForStatus)
-                    .frame(width: 16)
-
-                // Session title
-                Text(session.title)
-                    .font(DesignSystem.Typography.caption)
-                    .foregroundStyle(session.status == .skipped ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.textPrimary)
-                    .strikethrough(session.status == .skipped)
-                    .lineLimit(1)
-
-                Spacer()
-            }
-            .padding(.leading, DesignSystem.Spacing.xl)
-            .padding(.vertical, DesignSystem.Spacing.xs)
-        }
-        .buttonStyle(.plain)
-        .opacity(session.status == .skipped ? 0.6 : 1.0)
-    }
-
-    private var colorForStatus: Color {
-        switch session.status {
-        case .planned: return DesignSystem.Colors.textSecondary
-        case .completed: return DesignSystem.Colors.success
-        case .skipped: return DesignSystem.Colors.warning
-        }
-    }
-}
-
 // MARK: - Preview
 
 #Preview {
@@ -640,5 +636,5 @@ struct MinimalSessionRow: View {
             project: Project(title: "ML Research Paper", archetype: .lab, totalPlannedMinutes: 2400)
         )
     }
-    .modelContainer(for: [Project.self, ProjectPhase.self, PlannedSession.self, TouchLog.self, ProjectDocument.self], inMemory: true)
+    .modelContainer(for: [Project.self, ProjectPhase.self, Milestone.self, TouchLog.self, ProjectDocument.self], inMemory: true)
 }

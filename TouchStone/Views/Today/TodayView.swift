@@ -266,6 +266,7 @@ struct TodayView: View {
 
     private func computeDayState() {
         dayState.compute(stones: allStones, projects: activeProjects)
+        syncWidgetData()
     }
 
     private func touchProject(_ project: Project) {
@@ -277,6 +278,9 @@ struct TodayView: View {
             showUndoToast = true
         }
 
+        // Sync widget data after touch
+        syncWidgetData()
+
         // Hide toast after 5 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
             withAnimation {
@@ -285,6 +289,13 @@ struct TodayView: View {
                 }
             }
         }
+    }
+
+    private func syncWidgetData() {
+        WidgetDataSync.shared.sync(
+            stones: allStones,
+            projects: activeProjects
+        )
     }
 
     private func undoTouch() {
@@ -332,6 +343,7 @@ struct StoneRow: View {
 // MARK: - Project Touch Row
 
 /// Touch row with tap to touch and long press or button for focus mode.
+/// Handles both phase mode and milestone mode projects.
 struct ProjectTouchRow: View {
     let project: Project
     let onTouch: () -> Void
@@ -342,6 +354,12 @@ struct ProjectTouchRow: View {
             // Main tappable area
             Button(action: onTouch) {
                 HStack(spacing: 12) {
+                    // Mode icon
+                    Image(systemName: project.isMilestoneMode ? "checklist" : "layers.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20)
+
                     // Project info
                     VStack(alignment: .leading, spacing: 4) {
                         Text(project.title)
@@ -349,13 +367,20 @@ struct ProjectTouchRow: View {
                             .fontWeight(.medium)
                             .foregroundStyle(.primary)
 
-                        // Phase name
-                        if project.hasStrategicPlan {
-                            if let phase = project.activePhase {
-                                Text(phase.title)
-                                    .font(.caption)
-                                    .foregroundStyle(UserPreferences.shared.accentColor)
-                            }
+                        // Show current intention based on mode
+                        if let intention = project.currentIntention {
+                            Text(intention)
+                                .font(.caption)
+                                .foregroundStyle(UserPreferences.shared.accentColor)
+                                .lineLimit(1)
+                        } else if project.isPhaseMode, let phase = project.activePhase {
+                            Text(phase.title)
+                                .font(.caption)
+                                .foregroundStyle(UserPreferences.shared.accentColor)
+                        } else if project.isMilestoneMode, let milestone = project.nextMilestone {
+                            Text(milestone.title)
+                                .font(.caption)
+                                .foregroundStyle(UserPreferences.shared.accentColor)
                         } else if let phase = project.currentPhase {
                             Text(phase)
                                 .font(.caption)
@@ -364,6 +389,17 @@ struct ProjectTouchRow: View {
                     }
 
                     Spacer()
+
+                    // Progress indicator for milestone mode
+                    if project.isMilestoneMode {
+                        let completed = project.completedMilestoneCount
+                        let total = project.milestones.count
+                        if total > 0 {
+                            Text("\(completed)/\(total)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
 
                     // Touched times today
                     let touchCount = project.touchCountToday
@@ -399,5 +435,5 @@ struct ProjectTouchRow: View {
 
 #Preview {
     TodayView()
-        .modelContainer(for: [Project.self, StoneEvent.self, TouchLog.self], inMemory: true)
+        .modelContainer(for: [Project.self, ProjectPhase.self, Milestone.self, StoneEvent.self, TouchLog.self], inMemory: true)
 }

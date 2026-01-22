@@ -2,6 +2,35 @@ import Foundation
 import SwiftData
 import SwiftUI
 
+// MARK: - Project Mode
+
+/// Project mode determines how work is tracked
+enum ProjectMode: String, Codable, CaseIterable {
+    case phase      // Time-based cognitive phases (for creative/research work)
+    case milestone  // Checkable deliverables (for task-oriented work)
+
+    var displayName: String {
+        switch self {
+        case .phase: return "Phase Mode"
+        case .milestone: return "Milestone Mode"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .phase: return "Time-based cognitive phases for creative/research work"
+        case .milestone: return "Checkable deliverables for task-oriented work"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .phase: return "clock.arrow.circlepath"
+        case .milestone: return "checklist"
+        }
+    }
+}
+
 // MARK: - Project Model
 
 /// A Project represents ongoing work that you want to "touch" regularly.
@@ -11,12 +40,13 @@ import SwiftUI
 final class Project {
     var id: UUID
     var title: String
-    var currentPhase: String?       // e.g., "Discovery", "Building", "Refinement" (for simple projects)
+    var modeRaw: String = "phase"    // ProjectMode raw value (phase or milestone)
+    var currentPhase: String?        // e.g., "Discovery", "Building", "Refinement" (for simple projects)
     var deadline: Date?              // Optional deadline set during strategic plan creation
     var isActive: Bool
     var createdAt: Date
-    var archetypeRaw: String?       // Archetype for strategic projects
-    var totalPlannedMinutes: Int = 0  // Total time budget set during planning (in minutes)
+    var archetypeRaw: String?        // Archetype for phase-mode projects
+    var totalPlannedMinutes: Int = 0 // Total time budget set during planning (in minutes)
     var planningContext: String?     // Original goal/description used for planning
     var planningNotes: String?       // Additional context notes for AI refinement
     var lastPlanModifiedAt: Date?    // Track when plan was last edited
@@ -27,12 +57,16 @@ final class Project {
     @Relationship(deleteRule: .cascade, inverse: \ProjectPhase.project)
     var phases: [ProjectPhase] = []
 
+    @Relationship(deleteRule: .cascade, inverse: \Milestone.project)
+    var milestones: [Milestone] = []
+
     @Relationship(deleteRule: .cascade, inverse: \ProjectDocument.project)
     var documents: [ProjectDocument] = []
 
     init(
         id: UUID = UUID(),
         title: String,
+        mode: ProjectMode = .phase,
         currentPhase: String? = nil,
         deadline: Date? = nil,
         isActive: Bool = true,
@@ -42,6 +76,7 @@ final class Project {
     ) {
         self.id = id
         self.title = title
+        self.modeRaw = mode.rawValue
         self.currentPhase = currentPhase
         self.deadline = deadline
         self.isActive = isActive
@@ -101,6 +136,21 @@ final class Project {
             .filter { calendar.startOfDay(for: $0.timestamp) == today }
             .reduce(0) { $0 + $1.durationMinutes }
         return todayMinutes / 60
+    }
+
+    /// Hours touched within a date range (inclusive of start, exclusive of end)
+    /// Uses defensive access pattern to avoid SwiftData faulting issues
+    func hoursInRange(from startDate: Date, to endDate: Date) -> Double {
+        // Copy to local array and safely access properties
+        var totalMinutes = 0
+        for log in touchLogs {
+            // Access timestamp - if this fails on faulted object, skip it
+            let ts = log.timestamp
+            if ts >= startDate && ts < endDate {
+                totalMinutes += log.durationMinutes
+            }
+        }
+        return Double(totalMinutes) / 60.0
     }
 
     /// Last touched date
@@ -172,14 +222,35 @@ final class Project {
         }
     }
 
-    // MARK: - Strategic Planning Properties
+    // MARK: - Mode Properties
 
-    /// Whether this project has a strategic plan with phases
-    var hasStrategicPlan: Bool {
-        !phases.isEmpty
+    /// The project's mode (phase or milestone)
+    var mode: ProjectMode {
+        get { ProjectMode(rawValue: modeRaw) ?? .phase }
+        set { modeRaw = newValue.rawValue }
     }
 
-    /// The project's archetype (for strategic projects)
+    /// Whether this is a phase-mode project
+    var isPhaseMode: Bool {
+        mode == .phase
+    }
+
+    /// Whether this is a milestone-mode project
+    var isMilestoneMode: Bool {
+        mode == .milestone
+    }
+
+    // MARK: - Strategic Planning Properties
+
+    /// Whether this project has a strategic plan (phases for phase-mode, milestones for milestone-mode)
+    var hasStrategicPlan: Bool {
+        switch mode {
+        case .phase: return !phases.isEmpty
+        case .milestone: return !milestones.isEmpty
+        }
+    }
+
+    /// The project's archetype (for phase-mode projects only)
     var archetype: Archetype? {
         get { archetypeRaw.flatMap { Archetype(rawValue: $0) } }
         set { archetypeRaw = newValue?.rawValue }
@@ -190,70 +261,86 @@ final class Project {
         phases.sorted { $0.sequenceOrder < $1.sequenceOrder }
     }
 
-    /// The current active phase (first phase with incomplete sessions)
+    /// Sorted milestones by sequence order
+    var sortedMilestones: [Milestone] {
+        milestones.sorted { $0.sequenceOrder < $1.sequenceOrder }
+    }
+
+    /// The current active phase (first phase that is not complete)
     var activePhase: ProjectPhase? {
         sortedPhases.first { !$0.isComplete }
     }
 
-    /// Next planned session across all phases
-    var nextPlannedSession: PlannedSession? {
-        for phase in sortedPhases {
-            if let session = phase.nextPlannedSession {
-                return session
-            }
-        }
-        return nil
+    /// The next incomplete milestone
+    var nextMilestone: Milestone? {
+        sortedMilestones.first { !$0.isCompleted }
     }
 
-    /// Number of completed sessions across all phases
-    var completedSessionCount: Int {
-        phases.flatMap { $0.sessions }.filter { $0.status == .completed }.count
+    /// Number of completed milestones
+    var completedMilestoneCount: Int {
+        milestones.filter { $0.isCompleted }.count
     }
 
-    /// Total number of sessions across all phases
-    var totalSessionCount: Int {
-        phases.flatMap { $0.sessions }.count
+    /// Total number of milestones
+    var totalMilestoneCount: Int {
+        milestones.count
     }
 
-    /// Progress fraction (0.0 to 1.0) based on hours
+    /// Progress fraction (0.0 to 1.0)
+    /// - Phase mode: based on time invested vs planned
+    /// - Milestone mode: based on milestones completed
     var progress: Double {
-        guard totalPlannedMinutes > 0 else { return 0 }
-        return min(1.0, Double(totalMinutesInvested) / Double(totalPlannedMinutes))
+        switch mode {
+        case .phase:
+            guard totalPlannedMinutes > 0 else { return 0 }
+            return min(1.0, Double(totalMinutesInvested) / Double(totalPlannedMinutes))
+        case .milestone:
+            guard totalMilestoneCount > 0 else { return 0 }
+            return Double(completedMilestoneCount) / Double(totalMilestoneCount)
+        }
     }
 
-    /// Total estimated minutes for all sessions
+    /// Total estimated minutes from all phases
     var totalEstimatedMinutes: Int {
-        phases.flatMap { $0.sessions }.reduce(0) { $0 + $1.estimatedMinutes }
+        phases.reduce(0) { $0 + $1.estimatedMinutes }
     }
 
-    /// Remaining estimated minutes
+    /// Remaining estimated minutes (for phases with remaining time budget)
     var remainingEstimatedMinutes: Int {
-        phases.flatMap { $0.sessions }
-            .filter { $0.status == .planned }
-            .reduce(0) { $0 + $1.estimatedMinutes }
+        let invested = totalMinutesInvested
+        return max(0, totalPlannedMinutes - invested)
     }
 
-    /// Progress string like "2/6 sessions"
+    /// Progress string based on mode
     var progressString: String {
-        "\(completedSessionCount)/\(totalSessionCount) sessions"
-    }
-
-    /// Sessions that are completed or skipped (immutable during regeneration)
-    var lockedSessions: [PlannedSession] {
-        phases.flatMap { $0.sessions }.filter { $0.status != .planned }
-    }
-
-    /// Sessions that can be regenerated (only planned sessions)
-    var regenerableSessions: [PlannedSession] {
-        phases.flatMap { $0.sessions }.filter { $0.status == .planned }
+        switch mode {
+        case .phase:
+            if totalPlannedMinutes > 0 {
+                let invested = totalMinutesInvested / 60
+                let planned = totalPlannedMinutes / 60
+                return "\(invested)/\(planned) hrs"
+            } else {
+                return "\(totalMinutesInvested / 60) hrs"
+            }
+        case .milestone:
+            return "\(completedMilestoneCount)/\(totalMilestoneCount) done"
+        }
     }
 
     /// Summary of current progress for AI context
     var progressSummary: String {
-        let completed = completedSessionCount
-        let total = totalSessionCount
-        let phaseName = activePhase?.title ?? "None"
-        return "Progress: \(completed)/\(total) sessions completed. Current phase: \(phaseName)."
+        switch mode {
+        case .phase:
+            let invested = totalMinutesInvested / 60
+            let planned = totalPlannedMinutes / 60
+            let phaseName = activePhase?.title ?? "None"
+            return "Progress: \(invested)/\(planned) hours invested. Current phase: \(phaseName)."
+        case .milestone:
+            let completed = completedMilestoneCount
+            let total = totalMilestoneCount
+            let nextName = nextMilestone?.title ?? "None"
+            return "Progress: \(completed)/\(total) milestones completed. Next: \(nextName)."
+        }
     }
 
     /// Combined document context for AI refinement
@@ -262,6 +349,18 @@ final class Project {
             .compactMap { $0.extractedText }
             .filter { !$0.isEmpty }
             .joined(separator: "\n\n---\n\n")
+    }
+
+    /// Current intention text (for focus mode)
+    /// - Phase mode: active phase's mental rule
+    /// - Milestone mode: next milestone title
+    var currentIntention: String? {
+        switch mode {
+        case .phase:
+            return activePhase?.mentalRule
+        case .milestone:
+            return nextMilestone?.title
+        }
     }
 }
 

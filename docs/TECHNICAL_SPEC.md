@@ -15,20 +15,24 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        UI Layer                              │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌────────┐ │
-│  │  Flow   │ │  Plan   │ │Calendar │ │   Me    │ │Settings│ │
-│  │  Tab    │ │  Tab    │ │  Tab    │ │  Tab    │ │  Tab   │ │
-│  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └───┬────┘ │
-└───────┼──────────┼──────────┼──────────┼───────────┼────────┘
-        │          │          │          │           │
-┌───────▼──────────▼──────────▼──────────▼───────────▼────────┐
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌────────┐ │
+│  │    Flow     │ │  Calendar   │ │    Plan     │ │   Me   │ │
+│  │    Tab      │ │    Tab      │ │    Tab      │ │  Tab   │ │
+│  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └───┬────┘ │
+└─────────┼──────────────┼──────────────┼─────────────┼───────┘
+          │              │              │             │
+┌─────────▼──────────────▼──────────────▼─────────────▼───────┐
 │                     Service Layer                            │
 │  ┌──────────────┐ ┌────────────────┐ ┌───────────────────┐  │
-│  │   DayState   │ │ StrategyEngine │ │ PressureCalculator│  │
+│  │   DayState   │ │StrategyChatEng │ │ PressureCalculator│  │
 │  │  (Scheduler) │ │  (AI Planning) │ │   (Feasibility)   │  │
 │  └──────────────┘ └────────────────┘ └───────────────────┘  │
 │  ┌──────────────┐ ┌────────────────┐ ┌───────────────────┐  │
-│  │   Speech     │ │  OpenAIClient  │ │  UserPreferences  │  │
+│  │StoneParser   │ │  OpenAIClient  │ │  UserPreferences  │  │
+│  │  Service     │ │                │ │                   │  │
+│  └──────────────┘ └────────────────┘ └───────────────────┘  │
+│  ┌──────────────┐ ┌────────────────┐ ┌───────────────────┐  │
+│  │   Speech     │ │ WeeklyProgress │ │   DesignSystem    │  │
 │  │  Recognizer  │ │                │ │                   │  │
 │  └──────────────┘ └────────────────┘ └───────────────────┘  │
 └─────────────────────────────┬───────────────────────────────┘
@@ -739,9 +743,52 @@ recognizer.recognitionTask(with: request) { result, error in
 }
 ```
 
-### 4.6 SpeechParser
+### 4.6 StoneParserService (AI-Powered)
 
-Parse natural language to stone events.
+OpenAI-powered natural language parsing for stone events. Handles speech corrections and duration expressions.
+
+```swift
+actor StoneParserService {
+    struct ParsedStoneEvent: Codable {
+        let title: String
+        let startHour: Int          // 0-23
+        let startMinute: Int        // 0-59
+        let endHour: Int            // 0-23
+        let endMinute: Int          // 0-59
+        let recurrenceType: String  // none, daily, weekdays, weekends, weekly, custom
+        let customDays: [Int]?      // 1=Sun, 2=Mon, ... 7=Sat
+        let specificDate: String?   // YYYY-MM-DD for one-time events
+        let confidence: Double      // 0.0-1.0
+
+        var isValid: Bool { !title.isEmpty && confidence > 0.5 }
+    }
+
+    func parse(_ text: String) async throws -> ParsedStoneEvent
+    func createStoneEvent(from parsed: ParsedStoneEvent, defaultDate: Date) -> StoneEvent
+}
+```
+
+**Key Features:**
+- **Self-correction handling**: "10 AM oh no 11 AM" → uses 11 AM
+- **Duration expressions**: "one and a half hour" → 90 minutes
+- **Filler word filtering**: Ignores "um", "uh", "like"
+- **Smart time inference**: Hours 1-6 assumed PM, 7-11 assumed AM
+
+**Example Inputs:**
+```
+"Team meeting at 10 AM oh no 11 AM and that's for one and a half hour"
+→ title: "Team meeting", start: 11:00, end: 12:30
+
+"Gym at 6 PM for 2 hours on weekdays"
+→ title: "Gym", start: 18:00, end: 20:00, recurrence: weekdays
+
+"Meeting at 9 wait 9:30 for half an hour"
+→ title: "Meeting", start: 9:30, end: 10:00
+```
+
+### 4.6.1 SpeechParser (Fallback)
+
+Local regex-based parsing for offline use.
 
 ```swift
 class SpeechParser {
@@ -899,6 +946,91 @@ class DocumentTextExtractor {
 }
 ```
 
+### 4.11 WeeklyProgress
+
+Tracks weekly targets and progress per project for scheduling decisions.
+
+```swift
+struct WeeklyProgress {
+    let weekStart: Date
+    let weekEnd: Date
+    let projectProgress: [UUID: ProjectWeeklyProgress]
+
+    struct ProjectWeeklyProgress {
+        let targetHoursThisWeek: Double   // Derived from deadline or capacity
+        let completedHours: Double        // From TouchLog this week
+        let missedFromPreviousDays: Double
+        var onTrack: Bool                 // Within 80% of expected
+    }
+
+    static func calculate(
+        for projects: [Project],
+        referenceDate: Date,
+        dailyProductiveHours: Double
+    ) -> WeeklyProgress
+}
+```
+
+**Weekly Target Calculation:**
+- With deadline: `remainingHours / weeksUntilDeadline` (capped at daily capacity)
+- No deadline: `dailyProductiveHours / 3` per project (balanced share)
+
+### 4.12 DesignSystem
+
+Centralized design tokens for consistent UI styling.
+
+```swift
+enum DesignSystem {
+    enum Colors {
+        static let background: Color      // Main background
+        static let cardBackground: Color  // Card surfaces
+        static let textPrimary: Color     // Main text
+        static let textSecondary: Color   // Secondary text
+        static let textTertiary: Color    // Muted text
+        static let accent: Color          // Theme accent (from UserPreferences)
+        static let error: Color           // Error states
+        static let divider: Color         // Separator lines
+    }
+
+    enum Typography {
+        static let headline: Font         // Section headers
+        static let body: Font             // Body text
+        static let caption: Font          // Small labels
+        static let captionBold: Font      // Bold small labels
+        static let callout: Font          // Callout text
+    }
+
+    enum Spacing {
+        static let xs: CGFloat = 4
+        static let sm: CGFloat = 8
+        static let md: CGFloat = 12
+        static let lg: CGFloat = 16
+        static let xl: CGFloat = 20
+        static let xxl: CGFloat = 24
+    }
+
+    enum CornerRadius {
+        static let small: CGFloat = 8
+        static let medium: CGFloat = 12
+        static let large: CGFloat = 16
+        static let card: CGFloat = 20
+    }
+}
+```
+
+### 4.13 HapticService
+
+Centralized haptic feedback management.
+
+```swift
+enum HapticService {
+    static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle)
+    static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType)
+    static func selection()
+    static func tabSelect()
+}
+```
+
 ---
 
 ## 5. View Architecture
@@ -907,23 +1039,25 @@ class DocumentTextExtractor {
 
 ```swift
 struct ContentView: View {
-    @State private var selectedTab: Tab = .flow
-
-    enum Tab {
-        case flow
-        case plan
-        case calendar
-        case me
-        case settings
-    }
+    @State private var selectedTab = 0
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            TodayFlowView().tag(Tab.flow)
-            ProjectsListView().tag(Tab.plan)
-            CalendarView().tag(Tab.calendar)
-            MeView().tag(Tab.me)
-            SettingsView().tag(Tab.settings)
+            TodayFlowView()
+                .tabItem { Label("Flow", systemImage: "drop.fill") }
+                .tag(0)
+
+            CalendarView()
+                .tabItem { Label("Calendar", systemImage: "calendar") }
+                .tag(1)
+
+            ProjectsListView()
+                .tabItem { Label("Plan", systemImage: "square.grid.2x2") }
+                .tag(2)
+
+            MeView()
+                .tabItem { Label("Me", systemImage: "person") }
+                .tag(3)
         }
     }
 }
@@ -933,7 +1067,7 @@ struct ContentView: View {
 
 ```
 ContentView
-├── TodayFlowView
+├── TodayFlowView (Flow Tab)
 │   ├── WorkTodayPromptView
 │   ├── FlowTimelineView
 │   │   └── FlowItemRow (repeated)
@@ -942,28 +1076,29 @@ ContentView
 │   ├── PhasedSessionLogSheet
 │   └── StoneEditSheet
 │
-├── ProjectsListView
-│   ├── NewProjectChoiceView
-│   ├── ProjectFormView
-│   ├── ProjectDetailView (simple)
-│   └── StrategicProjectDetailView
+├── CalendarView (Calendar Tab)
+│   ├── DayDetailView
+│   │   └── StoneChatInputView (AI-powered stone creation)
+│   └── Workload heatmap with deadline indicators
+│
+├── ProjectsListView (Plan Tab)
+│   ├── SwipeToDeleteRow
+│   ├── ProjectCard
+│   ├── StrategicPlanningChatView (AI-powered project planning)
+│   │   ├── TotalTimeControl
+│   │   └── PhaseAllocationCard
+│   ├── ProjectDetailView (simple projects)
+│   └── StrategicProjectDetailView (AI-planned projects)
 │       ├── PhaseAllocationCard
 │       ├── SessionGoalsList
 │       └── EditableSessionRow
 │
-├── CalendarView
-│   └── DayDetailView
-│       └── StoneEventFormView
-│
-├── MeView
-│
-└── SettingsView
-    ├── WorkingHoursView
-    ├── DailyGoalView
-    ├── RulesListView
-    │   └── RuleFormView
-    ├── AppearanceView
-    └── APIKeyView
+└── MeView (Me Tab)
+    ├── SettingsView
+    │   ├── RulesListView
+    │   │   └── RuleFormView
+    │   └── API Key configuration
+    └── HistoryView
 ```
 
 ### 5.3 State Management
@@ -1008,18 +1143,44 @@ struct TodayFlowView: View {
 
 ## 6. Algorithms
 
-### 6.1 Project Priority Ordering
+### 6.1 Deadline-Aware Priority Scoring
 
-For liquid scheduler session assignment:
+For liquid scheduler session assignment with crunch mode support:
 
 ```
-1. Filter to active projects only
-2. Sort by:
-   a. Has deadline vs no deadline (deadline first)
-   b. Pressure ratio (higher pressure first)
-   c. Days until deadline (sooner first)
-   d. Created date (older first)
-3. Round-robin if multiple projects have similar priority
+Priority Score = remainingWorkScore + urgencyScore + dueThisWeekBonus + stalenessScore + weeklyAdjustment
+
+Components:
+- remainingWorkScore: 0-50 (has planned hours remaining)
+- urgencyScore: 0-200 (higher as deadline approaches)
+- dueThisWeekBonus: 0-75 (items due within 7 days)
+- stalenessScore: 0-50 (days since last touch, capped)
+- weeklyAdjustment: -25 to +25 (behind/ahead of weekly target)
+```
+
+**Urgency Tiers:**
+| Days Until Deadline | Score |
+|---------------------|-------|
+| Overdue             | 200   |
+| 1-3 days            | 150-195 |
+| 4-7 days            | 100-150 |
+| 8+ days             | Decays from 100 |
+
+**Crunch Mode:**
+When a project is within `crunchThresholdDays` (default: 2) of deadline AND has remaining work:
+1. Skip diversity constraints entirely
+2. Fill ALL available slots with crunch project(s)
+3. Multiple crunch projects sorted by earliest deadline
+4. Non-crunch projects only scheduled if capacity remains
+
+### 6.1.1 Project Diversity Constraints (Normal Mode)
+
+```
+Algorithm (when NOT in crunch mode):
+1. Select top N distinct projects (up to maxProjectsPerDay: 3)
+2. If fewer projects exist than minProjectsPerDay (2), use what's available
+3. Distribute sessions: interleave projects for cognitive variety
+4. Max 3 sessions per project per day to prevent hyperfocus
 ```
 
 ### 6.2 Break Insertion
@@ -1244,5 +1405,15 @@ enum TouchStoneError: Error {
 
 ---
 
-*Specification Version: 1.0*
-*Last Updated: January 2026*
+*Specification Version: 2.0*
+*Last Updated: January 21, 2026*
+
+**Version 2.0 Changes:**
+- Updated tab structure: 4 tabs (Flow, Calendar, Plan, Me)
+- Added StoneParserService for AI-powered stone creation with speech correction handling
+- Added WeeklyProgress service for deadline-aware scheduling
+- Added DesignSystem for consistent UI styling
+- Added HapticService for tactile feedback
+- Updated scheduling algorithm with crunch mode and project diversity constraints
+- Updated view hierarchy to reflect chat-based planning interfaces
+- Removed Settings as separate tab (now in Me tab)

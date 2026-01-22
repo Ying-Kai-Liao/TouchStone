@@ -5,30 +5,42 @@ actor StrategyEngine {
 
     // MARK: - Response Types
 
-    struct StrategyPlan: Codable {
+    /// Classification result for determining project mode
+    struct ModeClassification: Codable {
+        let mode: String          // "phase" or "milestone"
+        let archetype: String?    // Only for phase mode
+        let reasoning: String
+    }
+
+    /// Phase-mode plan structure
+    struct PhasePlan: Codable {
         let archetype: String
-        let phases: [PhasePlan]
+        let phases: [PhaseDetail]
         let totalEstimatedMinutes: Int
     }
 
-    struct PhasePlan: Codable {
+    struct PhaseDetail: Codable {
         let name: String
         let type: String
         let mentalRule: String
-        let sessions: [SessionPlan]
-    }
-
-    struct SessionPlan: Codable {
-        let title: String
-        let goal: String
         let estimatedMinutes: Int
     }
 
-    // MARK: - Generate Plan
+    /// Milestone-mode plan structure
+    struct MilestonePlan: Codable {
+        let milestones: [MilestoneDetail]
+    }
 
-    func generatePlan(for goal: String) async throws -> StrategyPlan {
+    struct MilestoneDetail: Codable {
+        let title: String
+        let description: String
+    }
+
+    // MARK: - Generate Phase-Mode Plan
+
+    func generatePhasePlan(for goal: String) async throws -> PhasePlan {
         let systemPrompt = """
-        You are a strategic planning assistant that helps break down large goals into manageable phases and sessions.
+        You are a strategic planning assistant that helps break down large goals into cognitive phases.
 
         ARCHETYPES - Classify the goal into ONE of these:
         - lab: Creative work, research, writing, design, exploration
@@ -44,19 +56,11 @@ actor StrategyEngine {
         - output: Produce, create, deliver
         - reflection: Review, iterate, improve
 
-        PHASE PATTERNS by archetype:
-        - lab: Research (divergent) → Synthesis (convergent) → Output (output)
-        - hunt: Audit (input) → Gather (execution) → Execute (output)
-        - spiral: Input (input) → Practice (output) → Reflection (reflection)
-        - build: Spec (convergent) → Dependencies (execution) → Assembly (output) → Testing (reflection)
-
-        Create 2-4 PHASES with 2-5 SESSIONS each.
-        Sessions should be 60-90 minute focused work blocks.
+        Create 2-4 PHASES with TIME BUDGETS (not individual sessions).
         Each phase needs a MENTAL RULE - a cognitive constraint like:
         - "Explore widely, no conclusions yet"
         - "Write fast, don't edit"
         - "Focus on quantity over quality"
-        - "Only organize, don't create"
 
         Return ONLY valid JSON matching this exact structure:
         {
@@ -66,110 +70,155 @@ actor StrategyEngine {
                     "name": "Phase Name",
                     "type": "divergent|convergent|execution|input|output|reflection",
                     "mentalRule": "The cognitive constraint for this phase",
-                    "sessions": [
-                        {
-                            "title": "Session title",
-                            "goal": "Specific goal for this session",
-                            "estimatedMinutes": 60
-                        }
-                    ]
+                    "estimatedMinutes": 120
                 }
             ],
             "totalEstimatedMinutes": 360
         }
         """
 
-        let userMessage = "Break down this goal into phases and sessions: \(goal)"
+        let userMessage = "Break down this goal into phases: \(goal)"
 
         return try await openAI.chatJSON(
             systemPrompt: systemPrompt,
             userMessage: userMessage,
             temperature: 0.7,
-            responseType: StrategyPlan.self
+            responseType: PhasePlan.self
         )
     }
 
-    // MARK: - Convert to Models
+    // MARK: - Generate Milestone-Mode Plan
 
-    func createProjectFromPlan(
+    func generateMilestonePlan(for goal: String) async throws -> MilestonePlan {
+        let systemPrompt = """
+        You are a strategic planning assistant that helps break down task-oriented goals into milestones.
+
+        Create 3-8 MILESTONES that represent clear deliverables.
+        Each milestone should be something the user can CHECK OFF when done.
+        Order milestones in logical sequence.
+
+        Return ONLY valid JSON matching this exact structure:
+        {
+            "milestones": [
+                {
+                    "title": "Clear deliverable name",
+                    "description": "What this milestone involves"
+                }
+            ]
+        }
+        """
+
+        let userMessage = "Break down this goal into milestones: \(goal)"
+
+        return try await openAI.chatJSON(
+            systemPrompt: systemPrompt,
+            userMessage: userMessage,
+            temperature: 0.7,
+            responseType: MilestonePlan.self
+        )
+    }
+
+    // MARK: - Convert to Phase-Mode Project
+
+    func createPhaseProjectFromPlan(
         title: String,
-        plan: StrategyPlan
+        plan: PhasePlan
     ) -> (Project, [ProjectPhase]) {
         let archetype = Archetype(rawValue: plan.archetype.lowercased())
 
         let project = Project(
             title: title,
-            archetype: archetype
+            mode: .phase,
+            archetype: archetype,
+            totalPlannedMinutes: plan.totalEstimatedMinutes
         )
 
         var projectPhases: [ProjectPhase] = []
 
-        for (index, phasePlan) in plan.phases.enumerated() {
-            let phaseType = PhaseType(rawValue: phasePlan.type.lowercased()) ?? .execution
+        for (index, phaseDetail) in plan.phases.enumerated() {
+            let phaseType = PhaseType(rawValue: phaseDetail.type.lowercased()) ?? .execution
 
             let phase = ProjectPhase(
-                title: phasePlan.name,
+                title: phaseDetail.name,
                 phaseType: phaseType,
-                mentalRule: phasePlan.mentalRule,
-                sequenceOrder: index
+                mentalRule: phaseDetail.mentalRule,
+                sequenceOrder: index,
+                estimatedMinutes: phaseDetail.estimatedMinutes
             )
             phase.project = project
-
-            for (sessionIndex, sessionPlan) in phasePlan.sessions.enumerated() {
-                let session = PlannedSession(
-                    title: sessionPlan.title,
-                    goal: sessionPlan.goal,
-                    estimatedMinutes: sessionPlan.estimatedMinutes,
-                    sequenceOrder: sessionIndex
-                )
-                session.phase = phase
-                phase.sessions.append(session)
-            }
-
             projectPhases.append(phase)
         }
 
         project.phases = projectPhases
         return (project, projectPhases)
     }
+
+    // MARK: - Convert to Milestone-Mode Project
+
+    func createMilestoneProjectFromPlan(
+        title: String,
+        plan: MilestonePlan
+    ) -> (Project, [Milestone]) {
+        let project = Project(
+            title: title,
+            mode: .milestone
+        )
+
+        var milestones: [Milestone] = []
+
+        for (index, milestoneDetail) in plan.milestones.enumerated() {
+            let milestone = Milestone(
+                title: milestoneDetail.title,
+                descriptionText: milestoneDetail.description,
+                sequenceOrder: index
+            )
+            milestone.project = project
+            milestones.append(milestone)
+        }
+
+        project.milestones = milestones
+        return (project, milestones)
+    }
 }
 
 // MARK: - Preview/Mock Data
 
 extension StrategyEngine {
-    static func mockPlan() -> StrategyPlan {
-        StrategyPlan(
+    static func mockPhasePlan() -> PhasePlan {
+        PhasePlan(
             archetype: "lab",
             phases: [
-                PhasePlan(
+                PhaseDetail(
                     name: "Research",
                     type: "divergent",
                     mentalRule: "Explore widely, no conclusions yet",
-                    sessions: [
-                        SessionPlan(title: "Literature review", goal: "Find and read 5 key papers", estimatedMinutes: 90),
-                        SessionPlan(title: "Concept mapping", goal: "Map relationships between ideas", estimatedMinutes: 60)
-                    ]
+                    estimatedMinutes: 180
                 ),
-                PhasePlan(
+                PhaseDetail(
                     name: "Draft",
-                    type: "convergent",
+                    type: "execution",
                     mentalRule: "Write fast, don't edit",
-                    sessions: [
-                        SessionPlan(title: "Outline structure", goal: "Create 5-section skeleton", estimatedMinutes: 60),
-                        SessionPlan(title: "First draft sprint", goal: "Write 2000 words minimum", estimatedMinutes: 90)
-                    ]
+                    estimatedMinutes: 300
                 ),
-                PhasePlan(
+                PhaseDetail(
                     name: "Polish",
-                    type: "output",
+                    type: "convergent",
                     mentalRule: "Refine and perfect",
-                    sessions: [
-                        SessionPlan(title: "Review and rewrite", goal: "Edit for clarity and flow", estimatedMinutes: 90),
-                        SessionPlan(title: "Final formatting", goal: "Format citations, figures", estimatedMinutes: 60)
-                    ]
+                    estimatedMinutes: 120
                 )
             ],
-            totalEstimatedMinutes: 450
+            totalEstimatedMinutes: 600
+        )
+    }
+
+    static func mockMilestonePlan() -> MilestonePlan {
+        MilestonePlan(
+            milestones: [
+                MilestoneDetail(title: "Gather W2s and 1099s", description: "Collect all income documents"),
+                MilestoneDetail(title: "Collect deduction receipts", description: "Organize all deductible expenses"),
+                MilestoneDetail(title: "Complete federal return", description: "Fill out Form 1040"),
+                MilestoneDetail(title: "Submit e-file", description: "File electronically")
+            ]
         )
     }
 }

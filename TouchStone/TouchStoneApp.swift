@@ -7,14 +7,13 @@ struct TouchStoneApp: App {
         let schema = Schema([
             Project.self,
             ProjectPhase.self,
-            PlannedSession.self,
+            Milestone.self,
             StoneEvent.self,
             TouchLog.self,
             FocusSession.self,
             ProjectDocument.self,
             DayPlan.self,
             Backlog.self,
-            ScheduledSession.self,
             Rule.self,
         ])
         let modelConfiguration = ModelConfiguration(

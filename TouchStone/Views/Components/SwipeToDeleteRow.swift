@@ -50,7 +50,7 @@ struct SwipeToDeleteRow<Content: View>: View {
         .frame(height: isDeleting ? 0 : nil)
         .opacity(isDeleting ? 0 : 1)
         .contentShape(Rectangle())
-        .highPriorityGesture(swipeGesture)
+        .gesture(swipeGesture)
         .onTapGesture {
             if isOpen && !isDeleting {
                 withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
@@ -81,14 +81,27 @@ struct SwipeToDeleteRow<Content: View>: View {
     }
 
     private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 8)
+        DragGesture(minimumDistance: 20)
             .onChanged { value in
+                // Only respond to horizontal swipes (allow vertical scrolling)
+                let horizontalAmount = abs(value.translation.width)
+                let verticalAmount = abs(value.translation.height)
+
+                // If gesture is more vertical than horizontal, ignore it
+                if verticalAmount > horizontalAmount * 1.5 {
+                    return
+                }
+
                 if !isDeleting {
                     dragOffset = value.translation.width
                 }
             }
             .onEnded { value in
                 if isDeleting { return }
+
+                // If we never started dragging horizontally, don't snap
+                if dragOffset == 0 { return }
+
                 let finalOffset = currentOffset + dragOffset
                 let velocity = value.predictedEndTranslation.width - value.translation.width
                 let projected = finalOffset + velocity * 0.3

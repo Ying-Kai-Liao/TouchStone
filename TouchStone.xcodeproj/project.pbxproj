@@ -14,12 +14,38 @@
 			remoteGlobalIDString = 6D31B5782F129914001FC9D3;
 			remoteInfo = TouchStone;
 		};
+		WIDGET001122334455EE0020 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6D31B5712F129914001FC9D3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = WIDGET001122334455EE0001;
+			remoteInfo = TouchStoneWidgetsExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		WIDGET001122334455EE0030 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				WIDGET001122334455EE0031 /* TouchStoneWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		6D31B5792F129914001FC9D3 /* TouchStone.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TouchStone.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AABB001122334455EEFF0001 /* TouchStoneUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TouchStoneUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		WIDGET001122334455EE0002 /* TouchStoneWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TouchStoneWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXBuildFile section */
+		WIDGET001122334455EE0031 /* TouchStoneWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = WIDGET001122334455EE0002 /* TouchStoneWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		6D31B5C92F135002001FC9D3 /* Exceptions for "TouchStone" folder in "TouchStone" target */ = {
@@ -28,6 +54,13 @@
 				Info.plist,
 			);
 			target = 6D31B5782F129914001FC9D3 /* TouchStone */;
+		};
+		WIDGET001122334455EE0040 /* Exceptions for "TouchStoneWidgets" folder in "TouchStoneWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = WIDGET001122334455EE0001 /* TouchStoneWidgetsExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -50,6 +83,14 @@
 			path = TouchStoneUITests;
 			sourceTree = "<group>";
 		};
+		WIDGET001122334455EE0003 /* TouchStoneWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				WIDGET001122334455EE0040 /* Exceptions for "TouchStoneWidgets" folder in "TouchStoneWidgetsExtension" target */,
+			);
+			path = TouchStoneWidgets;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,6 +108,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		WIDGET001122334455EE0004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -75,6 +123,7 @@
 			children = (
 				6D31B5E82F1526BB001FC9D3 /* docs */,
 				6D31B57B2F129914001FC9D3 /* TouchStone */,
+				WIDGET001122334455EE0003 /* TouchStoneWidgets */,
 				AABB001122334455EEFF0002 /* TouchStoneUITests */,
 				6D31B57A2F129914001FC9D3 /* Products */,
 			);
@@ -84,6 +133,7 @@
 			isa = PBXGroup;
 			children = (
 				6D31B5792F129914001FC9D3 /* TouchStone.app */,
+				WIDGET001122334455EE0002 /* TouchStoneWidgetsExtension.appex */,
 				AABB001122334455EEFF0001 /* TouchStoneUITests.xctest */,
 			);
 			name = Products;
@@ -99,10 +149,12 @@
 				6D31B5752F129914001FC9D3 /* Sources */,
 				6D31B5762F129914001FC9D3 /* Frameworks */,
 				6D31B5772F129914001FC9D3 /* Resources */,
+				WIDGET001122334455EE0030 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				WIDGET001122334455EE0021 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				6D31B57B2F129914001FC9D3 /* TouchStone */,
@@ -138,6 +190,28 @@
 			productReference = AABB001122334455EEFF0001 /* TouchStoneUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		WIDGET001122334455EE0001 /* TouchStoneWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = WIDGET001122334455EE0010 /* Build configuration list for PBXNativeTarget "TouchStoneWidgetsExtension" */;
+			buildPhases = (
+				WIDGET001122334455EE0005 /* Sources */,
+				WIDGET001122334455EE0004 /* Frameworks */,
+				WIDGET001122334455EE0006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				WIDGET001122334455EE0003 /* TouchStoneWidgets */,
+			);
+			name = TouchStoneWidgetsExtension;
+			packageProductDependencies = (
+			);
+			productName = TouchStoneWidgetsExtension;
+			productReference = WIDGET001122334455EE0002 /* TouchStoneWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -151,6 +225,9 @@
 					6D31B5782F129914001FC9D3 = {
 						CreatedOnToolsVersion = 26.2;
 					};
+					WIDGET001122334455EE0001 = {
+						CreatedOnToolsVersion = 26.2;
+					};
 				};
 			};
 			buildConfigurationList = 6D31B5742F129914001FC9D3 /* Build configuration list for PBXProject "TouchStone" */;
@@ -159,6 +236,7 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hant",
 			);
 			mainGroup = 6D31B5702F129914001FC9D3;
 			minimizedProjectReferenceProxies = 1;
@@ -168,6 +246,7 @@
 			projectRoot = "";
 			targets = (
 				6D31B5782F129914001FC9D3 /* TouchStone */,
+				WIDGET001122334455EE0001 /* TouchStoneWidgetsExtension */,
 				AABB001122334455EEFF0004 /* TouchStoneUITests */,
 			);
 		};
@@ -182,6 +261,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AABB001122334455EEFF0006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		WIDGET001122334455EE0006 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -205,6 +291,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		WIDGET001122334455EE0005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -212,6 +305,11 @@
 			isa = PBXTargetDependency;
 			target = 6D31B5782F129914001FC9D3 /* TouchStone */;
 			targetProxy = AABB001122334455EEFF0010 /* PBXContainerItemProxy */;
+		};
+		WIDGET001122334455EE0021 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = WIDGET001122334455EE0001 /* TouchStoneWidgetsExtension */;
+			targetProxy = WIDGET001122334455EE0020 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -449,6 +547,62 @@
 			};
 			name = Release;
 		};
+		WIDGET001122334455EE0011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T6DWQUSF55;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TouchStoneWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "TouchStone Widgets";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "-.TouchStone.Widgets";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		WIDGET001122334455EE0012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T6DWQUSF55;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TouchStoneWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "TouchStone Widgets";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "-.TouchStone.Widgets";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -475,6 +629,15 @@
 			buildConfigurations = (
 				AABB001122334455EEFF0007 /* Debug */,
 				AABB001122334455EEFF0008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		WIDGET001122334455EE0010 /* Build configuration list for PBXNativeTarget "TouchStoneWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				WIDGET001122334455EE0011 /* Debug */,
+				WIDGET001122334455EE0012 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

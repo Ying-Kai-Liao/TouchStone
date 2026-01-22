@@ -93,6 +93,14 @@ struct SettingsView: View {
                         )
                     }
 
+                    NavigationLink(destination: LanguageView()) {
+                        SettingsRow(
+                            icon: prefs.languageOption.icon,
+                            title: "Language",
+                            value: prefs.languageOption.displayName
+                        )
+                    }
+
                     // MARK: - AI Section
                     SettingsSectionHeader(title: "AI Assistant")
 
@@ -557,6 +565,94 @@ private struct AppearanceModeView: View {
         }
         .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Language View
+
+private struct LanguageView: View {
+    @Bindable private var prefs = UserPreferences.shared
+    @State private var showRestartAlert = false
+    @State private var pendingLanguage: LanguageOption?
+
+    var body: some View {
+        ZStack {
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: DesignSystem.Spacing.lg) {
+                    ForEach(LanguageOption.allCases) { option in
+                        Button {
+                            if option != prefs.languageOption {
+                                pendingLanguage = option
+                                showRestartAlert = true
+                            }
+                        } label: {
+                            HStack(spacing: DesignSystem.Spacing.lg) {
+                                Image(systemName: option.icon)
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(DesignSystem.Colors.accent)
+                                    .frame(width: 32)
+
+                                Text(option.displayName)
+                                    .font(DesignSystem.Typography.body)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                                Spacer()
+
+                                if prefs.languageOption == option {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundStyle(DesignSystem.Colors.accent)
+                                }
+                            }
+                            .padding(DesignSystem.Spacing.lg)
+                            .background(
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                    .fill(DesignSystem.Colors.cardBackground)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                                    .strokeBorder(
+                                        prefs.languageOption == option
+                                            ? DesignSystem.Colors.accent.opacity(0.5)
+                                            : DesignSystem.Colors.textTertiary.opacity(0.2),
+                                        lineWidth: prefs.languageOption == option ? 2 : 1
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Text("Changing the language requires restarting the app.")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, DesignSystem.Spacing.sm)
+                }
+                .padding(DesignSystem.Spacing.xl)
+            }
+        }
+        .navigationTitle("Language")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert("Restart Required", isPresented: $showRestartAlert) {
+            Button("Cancel", role: .cancel) {
+                pendingLanguage = nil
+            }
+            Button("Change & Quit") {
+                if let language = pendingLanguage {
+                    prefs.languageOption = language
+                    // Give time for UserDefaults to sync before exiting
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        exit(0)
+                    }
+                }
+            }
+        } message: {
+            Text("The app will quit to apply the language change. Please reopen the app manually.")
+        }
     }
 }
 

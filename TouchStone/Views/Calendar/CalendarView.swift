@@ -11,6 +11,7 @@ struct CalendarView: View {
     @State private var selectedDay: SelectedDay?
     @State private var showingAddStone = false
     @State private var addStoneDate: Date?
+    @State private var showingWorkloadLegend = false
 
     private let calendar = Calendar.current
     private let daysOfWeek = ["S", "M", "T", "W", "T", "F", "S"]
@@ -38,7 +39,6 @@ struct CalendarView: View {
                             monthNavigationHeader
                             weekdayHeader
                             calendarGrid
-                            energyGradientLegend
                         }
                         .padding(.vertical, DesignSystem.Spacing.sm)
                     }
@@ -61,7 +61,7 @@ struct CalendarView: View {
                 )
             }
             .sheet(isPresented: $showingAddStone) {
-                SpeechStoneInputView(initialDate: addStoneDate)
+                StoneChatInputView(initialDate: addStoneDate)
             }
         }
     }
@@ -75,6 +75,18 @@ struct CalendarView: View {
                 .foregroundStyle(DesignSystem.Colors.textPrimary)
 
             Spacer()
+
+            // Workload legend help button
+            Button {
+                showingWorkloadLegend = true
+            } label: {
+                Image(systemName: "questionmark.circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+            }
+            .popover(isPresented: $showingWorkloadLegend, arrowEdge: .top) {
+                workloadLegendPopover
+            }
 
             Button {
                 withAnimation(.spring(response: 0.3)) {
@@ -92,6 +104,35 @@ struct CalendarView: View {
                     )
             }
         }
+    }
+
+    private var workloadLegendPopover: some View {
+        VStack(spacing: DesignSystem.Spacing.md) {
+            Text("WORKLOAD COLORS")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .tracking(1.5)
+
+            VStack(spacing: DesignSystem.Spacing.sm) {
+                ForEach(WorkloadLevel.allCases, id: \.self) { level in
+                    HStack(spacing: DesignSystem.Spacing.md) {
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                            .fill(level.color)
+                            .frame(width: 24, height: 24)
+
+                        Text(level.label)
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                        Spacer()
+                    }
+                }
+            }
+        }
+        .padding(DesignSystem.Spacing.lg)
+        .frame(width: 160)
+        .background(DesignSystem.Colors.cardBackground)
+        .presentationCompactAdaptation(.popover)
     }
 
     private var monthNavigationHeader: some View {

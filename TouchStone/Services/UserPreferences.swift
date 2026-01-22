@@ -1,6 +1,41 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Language Option
+
+enum LanguageOption: String, CaseIterable, Identifiable {
+    case system = "system"
+    case english = "en"
+    case traditionalChinese = "zh-Hant"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: return String(localized: "System")
+        case .english: return "English"
+        case .traditionalChinese: return "繁體中文"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .system: return "globe"
+        case .english: return "a.circle"
+        case .traditionalChinese: return "character.zh"
+        }
+    }
+
+    /// The locale identifier for this language
+    var localeIdentifier: String? {
+        switch self {
+        case .system: return nil
+        case .english: return "en"
+        case .traditionalChinese: return "zh-Hant"
+        }
+    }
+}
+
 // MARK: - Appearance Mode Option
 
 enum AppearanceMode: String, CaseIterable, Identifiable {
@@ -272,11 +307,24 @@ class UserPreferences {
         didSet { defaults.set(dueThisWeekPriorityBoost, forKey: Keys.dueThisWeekPriorityBoost) }
     }
 
-    // MARK: - Language (Future)
+    // MARK: - Language
 
     /// App language setting (default: follow system)
-    var appLanguage: String {
-        didSet { defaults.set(appLanguage, forKey: Keys.appLanguage) }
+    var languageOption: LanguageOption {
+        didSet {
+            defaults.set(languageOption.rawValue, forKey: Keys.appLanguage)
+            applyLanguage()
+        }
+    }
+
+    /// Apply the selected language to the app
+    private func applyLanguage() {
+        if let localeId = languageOption.localeIdentifier {
+            UserDefaults.standard.set([localeId], forKey: "AppleLanguages")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        }
+        UserDefaults.standard.synchronize()
     }
 
     // MARK: - Appearance Mode
@@ -337,7 +385,14 @@ class UserPreferences {
         self.maxProjectsPerDay = defaults.object(forKey: Keys.maxProjectsPerDay) as? Int ?? 3
         self.crunchThresholdDays = defaults.object(forKey: Keys.crunchThresholdDays) as? Int ?? 2
         self.dueThisWeekPriorityBoost = defaults.object(forKey: Keys.dueThisWeekPriorityBoost) as? Bool ?? true
-        self.appLanguage = defaults.string(forKey: Keys.appLanguage) ?? "system"
+
+        // Load language option
+        if let langString = defaults.string(forKey: Keys.appLanguage),
+           let lang = LanguageOption(rawValue: langString) {
+            self.languageOption = lang
+        } else {
+            self.languageOption = .system
+        }
 
         // Load appearance mode
         if let modeString = defaults.string(forKey: Keys.appearanceMode),

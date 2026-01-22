@@ -40,7 +40,7 @@ struct ProjectsListView: View {
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showingAddSheet) {
-                NewProjectChoiceView()
+                StrategicPlanningChatView()
             }
             .alert("Delete Project", isPresented: $showDeleteAlert, presenting: projectToDelete) { project in
                 Button("Cancel", role: .cancel) {
@@ -319,5 +319,5 @@ struct ProjectRow: View {
 
 #Preview {
     ProjectsListView()
-        .modelContainer(for: [Project.self, ProjectPhase.self, PlannedSession.self, TouchLog.self], inMemory: true)
+        .modelContainer(for: [Project.self, ProjectPhase.self, Milestone.self, TouchLog.self], inMemory: true)
 }
