@@ -20,20 +20,19 @@ struct FocusModeView: View {
         project.activePhase
     }
 
-    var currentSession: PlannedSession? {
-        project.nextPlannedSession
-    }
-
-    // Get intention text from session goal or phase
+    // Get intention text based on project mode
     var intentionText: String {
-        if let session = currentSession, let goal = session.goal {
-            return goal
-        } else if let session = currentSession {
-            return session.title
-        } else if let phase = activePhase {
-            return phase.title
-        } else if let phase = project.currentPhase {
-            return phase
+        // Use the project's current intention (handles both modes)
+        if let intention = project.currentIntention {
+            return intention
+        }
+        // Fallback to phase title or mental rule
+        if let phase = activePhase {
+            return phase.mentalRule ?? phase.title
+        }
+        // Fallback to next milestone for milestone mode
+        if project.isMilestoneMode, let milestone = project.nextMilestone {
+            return milestone.title
         }
         return "Deep work"
     }
@@ -266,35 +265,51 @@ struct FocusModeView: View {
                 }
                 .padding(.top, DesignSystem.Spacing.sm)
 
-                // Phase section
-                if let phase = activePhase {
-                    detailSection(
-                        icon: "layers.fill",
-                        title: "Current Phase",
-                        content: phase.title,
-                        subtitle: phase.mentalRule
-                    )
-                } else if let phase = project.currentPhase {
-                    detailSection(
-                        icon: "layers.fill",
-                        title: "Current Phase",
-                        content: phase,
-                        subtitle: nil
-                    )
+                // Phase mode: show current phase
+                if project.isPhaseMode {
+                    if let phase = activePhase {
+                        detailSection(
+                            icon: "layers.fill",
+                            title: "Current Phase",
+                            content: phase.title,
+                            subtitle: "\(phase.progressString) invested"
+                        )
+                    } else if let phase = project.currentPhase {
+                        detailSection(
+                            icon: "layers.fill",
+                            title: "Current Phase",
+                            content: phase,
+                            subtitle: nil
+                        )
+                    }
                 }
 
-                // Session goal section
-                if let session = currentSession {
-                    detailSection(
-                        icon: "target",
-                        title: "Session Goal",
-                        content: session.title,
-                        subtitle: session.goal
-                    )
+                // Milestone mode: show next milestone
+                if project.isMilestoneMode {
+                    if let milestone = project.nextMilestone {
+                        detailSection(
+                            icon: "checkmark.circle",
+                            title: "Next Milestone",
+                            content: milestone.title,
+                            subtitle: milestone.descriptionText
+                        )
+                    }
+
+                    // Progress
+                    let completed = project.completedMilestoneCount
+                    let total = project.milestones.count
+                    if total > 0 {
+                        detailSection(
+                            icon: "chart.bar.fill",
+                            title: "Progress",
+                            content: "\(completed) of \(total) milestones",
+                            subtitle: nil
+                        )
+                    }
                 }
 
-                // Mental rule section
-                if let phase = activePhase, let rule = phase.mentalRule {
+                // Mental rule section (phase mode only)
+                if project.isPhaseMode, let phase = activePhase, let rule = phase.mentalRule {
                     VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
                         HStack(spacing: DesignSystem.Spacing.sm) {
                             Image(systemName: "brain.head.profile")
@@ -389,6 +404,10 @@ struct FocusModeView: View {
             note: note.isEmpty ? nil : note,
             project: project
         )
+        // Link to active phase if in phase mode
+        if project.isPhaseMode, let phase = activePhase {
+            touch.phase = phase
+        }
         modelContext.insert(touch)
         onDismiss()
     }
@@ -492,9 +511,9 @@ struct Arc: Shape {
     )
 }
 
-#Preview("Strategic Project") {
+#Preview("Phase Mode Project") {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: Project.self, ProjectPhase.self, PlannedSession.self, configurations: config)
+    let container = try! ModelContainer(for: Project.self, ProjectPhase.self, Milestone.self, TouchLog.self, configurations: config)
 
     let project = Project(title: "Research Paper", archetype: .lab)
     container.mainContext.insert(project)
@@ -503,22 +522,34 @@ struct Arc: Shape {
         title: "Exploration",
         phaseType: .divergent,
         mentalRule: "Explore widely, no conclusions yet",
-        sequenceOrder: 0
+        sequenceOrder: 0,
+        estimatedMinutes: 180
     )
     phase.project = project
     container.mainContext.insert(phase)
 
-    let session = PlannedSession(
-        title: "Literature Safari",
-        goal: "Find and bookmark 15 related papers on ML optimization",
-        estimatedMinutes: 90,
-        sequenceOrder: 0
-    )
-    session.phase = phase
-    container.mainContext.insert(session)
-
     project.phases = [phase]
-    phase.sessions = [session]
+
+    return FocusModeView(project: project, onDismiss: {})
+        .modelContainer(container)
+}
+
+#Preview("Milestone Mode Project") {
+    let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: Project.self, ProjectPhase.self, Milestone.self, TouchLog.self, configurations: config)
+
+    let project = Project(title: "Tax Filing 2025", mode: .milestone)
+    container.mainContext.insert(project)
+
+    let milestone1 = Milestone(title: "Gather W2s and 1099s", descriptionText: "Collect all income documents")
+    milestone1.project = project
+    container.mainContext.insert(milestone1)
+
+    let milestone2 = Milestone(title: "Complete federal return", descriptionText: "Fill out Form 1040")
+    milestone2.project = project
+    container.mainContext.insert(milestone2)
+
+    project.milestones = [milestone1, milestone2]
 
     return FocusModeView(project: project, onDismiss: {})
         .modelContainer(container)

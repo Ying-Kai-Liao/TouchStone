@@ -8,7 +8,7 @@ struct StrategicProjectInputView: View {
 
     @State private var goal = ""
     @State private var isGenerating = false
-    @State private var generatedPlan: StrategyEngine.StrategyPlan?
+    @State private var generatedPlan: StrategyEngine.PhasePlan?
     @State private var projectTitle = ""
     @State private var errorMessage: String?
     @State private var showReview = false
@@ -55,7 +55,7 @@ struct StrategicProjectInputView: View {
                     .font(.title3)
                     .fontWeight(.medium)
 
-                Text("Describe your goal and AI will break it into phases and sessions")
+                Text("Describe your goal and AI will break it into phases with time budgets")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -188,7 +188,7 @@ struct StrategicProjectInputView: View {
 
         Task {
             do {
-                let plan = try await strategyEngine.generatePlan(for: goal)
+                let plan = try await strategyEngine.generatePhasePlan(for: goal)
                 await MainActor.run {
                     generatedPlan = plan
                     // Default title from goal (first 50 chars)
@@ -207,7 +207,7 @@ struct StrategicProjectInputView: View {
     private func savePlan() {
         guard let plan = generatedPlan else { return }
 
-        let (project, phases) = strategyEngine.createProjectFromPlan(
+        let (project, phases) = strategyEngine.createPhaseProjectFromPlan(
             title: projectTitle,
             plan: plan
         )
@@ -230,34 +230,23 @@ struct StrategicProjectInputView: View {
 // MARK: - Phase Review Card
 
 struct PhaseReviewCard: View {
-    let phase: StrategyEngine.PhasePlan
+    let phase: StrategyEngine.PhaseDetail
     let index: Int
-
-    @State private var isExpanded = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Phase header
-            Button {
-                withAnimation {
-                    isExpanded.toggle()
-                }
-            } label: {
-                HStack {
-                    Text("Phase \(index): \(phase.name)")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
+            HStack {
+                Text("Phase \(index): \(phase.name)")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
 
-                    Spacer()
+                Spacer()
 
-                    if let phaseType = PhaseType(rawValue: phase.type.lowercased()) {
-                        Label(phaseType.displayName, systemImage: phaseType.icon)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .foregroundStyle(.tertiary)
+                if let phaseType = PhaseType(rawValue: phase.type.lowercased()) {
+                    Label(phaseType.displayName, systemImage: phaseType.icon)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -267,33 +256,14 @@ struct PhaseReviewCard: View {
                 .italic()
                 .foregroundStyle(UserPreferences.shared.accentColor)
 
-            // Sessions
-            if isExpanded {
-                VStack(spacing: 6) {
-                    ForEach(Array(phase.sessions.enumerated()), id: \.offset) { _, session in
-                        HStack(alignment: .top, spacing: 8) {
-                            Image(systemName: "circle")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                                .padding(.top, 4)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack {
-                                    Text(session.title)
-                                        .font(.subheadline)
-                                    Spacer()
-                                    Text("~\(session.estimatedMinutes)m")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Text(session.goal)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-                .padding(.leading, 8)
+            // Time budget
+            HStack {
+                Image(systemName: "clock")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("\(phase.estimatedMinutes / 60) hours budget")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding()

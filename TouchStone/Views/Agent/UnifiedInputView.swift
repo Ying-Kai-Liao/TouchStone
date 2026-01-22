@@ -104,6 +104,9 @@ struct UnifiedInputView: View {
                             },
                             onSuggestionTap: { suggestion in
                                 sendMessage(suggestion)
+                            },
+                            onProjectTimeChange: { projectId, newMinutes in
+                                updateProjectTime(projectId: projectId, newMinutes: newMinutes)
                             }
                         )
                         .padding(.horizontal)
@@ -371,6 +374,58 @@ struct UnifiedInputView: View {
         sendMessage("Cancel")
     }
 
+    /// Update the total time for a pending project (proportionally scales phases/milestones)
+    private func updateProjectTime(projectId: String, newMinutes: Int) {
+        guard let index = pendingActions.firstIndex(where: { $0.project?.id == projectId }),
+              let oldProject = pendingActions[index].project else {
+            return
+        }
+
+        // Calculate scaling factor
+        let oldTotal = max(oldProject.totalPlannedMinutes, 1)
+        let scaleFactor = Double(newMinutes) / Double(oldTotal)
+
+        // Scale each phase proportionally
+        let scaledPhases = oldProject.phases.map { phase in
+            AgentService.PendingPhase(
+                title: phase.title,
+                phaseType: phase.phaseType,
+                mentalRule: phase.mentalRule,
+                estimatedMinutes: max(30, Int(Double(phase.estimatedMinutes) * scaleFactor))
+            )
+        }
+
+        // Scale each milestone proportionally
+        let scaledMilestones = oldProject.milestones.map { milestone in
+            AgentService.PendingMilestone(
+                title: milestone.title,
+                description: milestone.description,
+                sequenceOrder: milestone.sequenceOrder,
+                estimatedMinutes: max(15, Int(Double(milestone.estimatedMinutes) * scaleFactor))
+            )
+        }
+
+        // Create updated project with new times
+        let updatedProject = AgentService.PendingProject(
+            tempId: oldProject.tempId,
+            title: oldProject.title,
+            mode: oldProject.mode,
+            archetype: oldProject.archetype,
+            deadline: oldProject.deadline,
+            totalPlannedMinutes: newMinutes,
+            phases: scaledPhases,
+            milestones: scaledMilestones
+        )
+
+        // Update the action
+        pendingActions[index] = AgentService.PendingAction(
+            actionType: pendingActions[index].actionType,
+            stone: nil,
+            project: updatedProject,
+            touchLog: nil
+        )
+    }
+
     /// Create SwiftData objects from pending actions (iOS-as-authority pattern)
     private func commitPendingActions() async {
         print("DEBUG: commitPendingActions called with \(pendingActions.count) actions")
@@ -471,13 +526,18 @@ struct UnifiedInputView: View {
         project.planningContext = pending.title
         project.totalPlannedMinutes = pending.totalPlannedMinutes
 
-        // Set archetype
-        switch pending.archetype.lowercased() {
-        case "lab": project.archetype = .lab
-        case "hunt": project.archetype = .hunt
-        case "spiral": project.archetype = .spiral
-        case "build": project.archetype = .build
-        default: break
+        // Set mode
+        project.mode = pending.isPhaseMode ? .phase : .milestone
+
+        // Set archetype (only for phase mode)
+        if let archetypeStr = pending.archetype?.lowercased() {
+            switch archetypeStr {
+            case "lab": project.archetype = .lab
+            case "hunt": project.archetype = .hunt
+            case "spiral": project.archetype = .spiral
+            case "build": project.archetype = .build
+            default: break
+            }
         }
 
         // Set deadline
@@ -489,29 +549,33 @@ struct UnifiedInputView: View {
 
         modelContext.insert(project)
 
-        // Create phases and sessions
-        for (phaseIndex, pendingPhase) in pending.phases.enumerated() {
-            let phase = ProjectPhase(
-                title: pendingPhase.title,
-                phaseType: parsePhaseType(pendingPhase.phaseType),
-                sequenceOrder: phaseIndex
-            )
-            phase.mentalRule = pendingPhase.mentalRule
-            phase.project = project
-
-            modelContext.insert(phase)
-
-            // Create sessions for this phase
-            for (sessionIndex, pendingSession) in pendingPhase.sessions.enumerated() {
-                let session = PlannedSession(
-                    title: pendingSession.title,
-                    sequenceOrder: sessionIndex
+        // Create phases (for phase mode)
+        if pending.isPhaseMode {
+            for (phaseIndex, pendingPhase) in pending.phases.enumerated() {
+                let phase = ProjectPhase(
+                    title: pendingPhase.title,
+                    phaseType: parsePhaseType(pendingPhase.phaseType),
+                    sequenceOrder: phaseIndex
                 )
-                session.goal = pendingSession.goal
-                session.estimatedMinutes = pendingSession.estimatedMinutes
-                session.phase = phase
+                phase.mentalRule = pendingPhase.mentalRule
+                phase.estimatedMinutes = pendingPhase.estimatedMinutes
+                phase.project = project
 
-                modelContext.insert(session)
+                modelContext.insert(phase)
+            }
+        }
+
+        // Create milestones (for milestone mode)
+        if pending.isMilestoneMode {
+            for (milestoneIndex, pendingMilestone) in pending.milestones.enumerated() {
+                let milestone = Milestone(
+                    title: pendingMilestone.title,
+                    sequenceOrder: milestoneIndex
+                )
+                milestone.descriptionText = pendingMilestone.description
+                milestone.project = project
+
+                modelContext.insert(milestone)
             }
         }
 

@@ -20,24 +20,30 @@ actor StrategyChatEngine {
     // MARK: - Response Types
 
     struct ClassificationResult: Codable {
-        let archetype: String
+        let mode: String          // "phase" or "milestone"
+        let archetype: String?    // Only for phase mode
         let reasoning: String
         let suggestedTitle: String
     }
 
-    struct SessionsResult: Codable {
+    struct PhaseResult: Codable {
         let phases: [PhasePlan]
     }
 
     struct PhasePlan: Codable {
         let name: String
-        let sessions: [SessionPlan]
+        let phaseType: String
+        let mentalRule: String
+        let estimatedMinutes: Int
     }
 
-    struct SessionPlan: Codable {
+    struct MilestoneResult: Codable {
+        let milestones: [MilestonePlan]
+    }
+
+    struct MilestonePlan: Codable {
         let title: String
-        let goal: String
-        let estimatedMinutes: Int
+        let description: String
     }
 
     // MARK: - Phase Allocation
@@ -114,26 +120,31 @@ actor StrategyChatEngine {
         }
     }
 
-    // MARK: - Step 1: Classify Goal
+    // MARK: - Step 1: Classify Goal and Determine Mode
 
     func classifyGoal(_ goal: String) async throws -> ClassificationResult {
         let systemPrompt = """
-        You are a strategic planning assistant. Analyze the user's goal and classify it into ONE archetype.
+        You are a strategic planning assistant. Analyze the user's goal and determine:
+        1. The best MODE for this project
+        2. The ARCHETYPE (if phase mode)
 
-        ARCHETYPES:
-        - lab: Creative work, research, writing, design. User needs to explore then synthesize.
-               Failure mode: Getting stuck in research forever.
-        - hunt: Administrative tasks, paperwork, applications.
-               Failure mode: Missing one document and getting blocked.
-        - spiral: Learning new skills, practice, study.
-               Failure mode: Passive consumption without doing.
-        - build: Engineering, coding, construction, building things.
-               Failure mode: Starting before materials ready.
+        MODES:
+        - phase: For creative/research work where the PROCESS matters. Work is tracked by time invested per phase.
+          Best for: writing, research, design, learning, skill building
+        - milestone: For task-oriented work with clear DELIVERABLES. Work is tracked by checking off items.
+          Best for: tax filing, moving, errands, applications, administrative tasks
+
+        ARCHETYPES (only for phase mode):
+        - lab: Creative work, research, writing, design
+        - hunt: Administrative tasks, paperwork, applications
+        - spiral: Learning new skills, practice, study
+        - build: Engineering, coding, construction
 
         Return ONLY valid JSON matching this structure:
         {
-            "archetype": "lab|hunt|spiral|build",
-            "reasoning": "One sentence explaining why this archetype fits",
+            "mode": "phase|milestone",
+            "archetype": "lab|hunt|spiral|build or null",
+            "reasoning": "One sentence explaining your choice",
             "suggestedTitle": "Action-oriented project title (3-5 words)"
         }
         """
@@ -148,25 +159,24 @@ actor StrategyChatEngine {
         )
     }
 
-    // MARK: - Step 2: Generate Sessions
+    // MARK: - Step 2a: Generate Phases (Phase Mode)
 
-    func generateSessions(
+    func generatePhases(
         title: String,
         goal: String,
         allocation: PhaseAllocation
-    ) async throws -> SessionsResult {
+    ) async throws -> PhaseResult {
         let phaseDescriptions = allocation.archetype.phaseStructure.enumerated().map { index, template in
             let minutes = allocation.minutesForPhase(index)
-            let sessionCount = allocation.sessionsForPhase(index)
             return """
             Phase \(index + 1): \(template.name) (\(template.type.displayName))
-            - Time: \(minutes) minutes (~\(sessionCount) sessions of 60-90 min)
+            - Time Budget: \(minutes) minutes (~\(minutes / 60) hours)
             - Mental Rule: "\(template.rule)"
             """
         }.joined(separator: "\n\n")
 
         let systemPrompt = """
-        You are a strategic planning assistant creating focused work sessions for a project.
+        You are a strategic planning assistant creating cognitive phases for a project.
 
         PROJECT: \(title)
         GOAL: \(goal)
@@ -175,125 +185,186 @@ actor StrategyChatEngine {
         PHASE STRUCTURE:
         \(phaseDescriptions)
 
-        RULES:
-        1. Create sessions for EACH phase with the specified session count
-        2. Each session should be 60-90 minutes
-        3. Session goals MUST align with the phase's mental rule
-        4. Be specific and actionable (e.g., "Write 1000 words" not "Write some")
-        5. Earlier sessions in a phase should build toward later ones
+        Create phases with TIME BUDGETS (not individual sessions).
+        Each phase has a mental rule that guides the user's mindset.
 
         Return ONLY valid JSON matching this structure:
         {
             "phases": [
                 {
                     "name": "Phase Name",
-                    "sessions": [
-                        {"title": "Session title", "goal": "Specific measurable goal", "estimatedMinutes": 60}
-                    ]
+                    "phaseType": "divergent|convergent|execution|input|output|reflection",
+                    "mentalRule": "The cognitive constraint for this phase",
+                    "estimatedMinutes": 120
                 }
             ]
         }
         """
 
-        let userMessage = "Generate session goals for this project."
+        let userMessage = "Generate phases for this project."
 
         return try await openAI.chatJSON(
             systemPrompt: systemPrompt,
             userMessage: userMessage,
             temperature: 0.7,
-            responseType: SessionsResult.self
+            responseType: PhaseResult.self
         )
     }
 
-    // MARK: - Create Project from Results
+    // MARK: - Step 2b: Generate Milestones (Milestone Mode)
 
-    func createProject(
+    func generateMilestones(
+        title: String,
+        goal: String
+    ) async throws -> MilestoneResult {
+        let systemPrompt = """
+        You are a strategic planning assistant creating checkable milestones for a task-oriented project.
+
+        PROJECT: \(title)
+        GOAL: \(goal)
+
+        Create 3-8 milestones that represent clear deliverables.
+        Each milestone should be something the user can CHECK OFF when done.
+        Order milestones in logical sequence.
+
+        Return ONLY valid JSON matching this structure:
+        {
+            "milestones": [
+                {
+                    "title": "Clear deliverable name",
+                    "description": "What this milestone involves"
+                }
+            ]
+        }
+        """
+
+        let userMessage = "Generate milestones for this project."
+
+        return try await openAI.chatJSON(
+            systemPrompt: systemPrompt,
+            userMessage: userMessage,
+            temperature: 0.7,
+            responseType: MilestoneResult.self
+        )
+    }
+
+    // MARK: - Create Phase-Mode Project
+
+    func createPhaseProject(
         title: String,
         archetype: Archetype,
         allocation: PhaseAllocation,
-        sessionsResult: SessionsResult
+        phaseResult: PhaseResult
     ) -> (Project, [ProjectPhase]) {
         let project = Project(
             title: title,
+            mode: .phase,
             archetype: archetype,
             totalPlannedMinutes: allocation.totalMinutes
         )
 
         var projectPhases: [ProjectPhase] = []
-        let phaseStructure = archetype.phaseStructure
 
-        for (index, phasePlan) in sessionsResult.phases.enumerated() {
-            guard index < phaseStructure.count else { continue }
-
-            let template = phaseStructure[index]
+        for (index, phasePlan) in phaseResult.phases.enumerated() {
+            let phaseType = PhaseType(rawValue: phasePlan.phaseType.lowercased()) ?? .execution
 
             let phase = ProjectPhase(
                 title: phasePlan.name,
-                phaseType: template.type,
-                mentalRule: template.rule,
-                sequenceOrder: index
+                phaseType: phaseType,
+                mentalRule: phasePlan.mentalRule,
+                sequenceOrder: index,
+                estimatedMinutes: phasePlan.estimatedMinutes
             )
             phase.project = project
-
-            for (sessionIndex, sessionPlan) in phasePlan.sessions.enumerated() {
-                let session = PlannedSession(
-                    title: sessionPlan.title,
-                    goal: sessionPlan.goal,
-                    estimatedMinutes: sessionPlan.estimatedMinutes,
-                    sequenceOrder: sessionIndex
-                )
-                session.phase = phase
-                phase.sessions.append(session)
-            }
-
             projectPhases.append(phase)
         }
 
         project.phases = projectPhases
         return (project, projectPhases)
     }
+
+    // MARK: - Create Milestone-Mode Project
+
+    func createMilestoneProject(
+        title: String,
+        milestoneResult: MilestoneResult
+    ) -> (Project, [Milestone]) {
+        let project = Project(
+            title: title,
+            mode: .milestone
+        )
+
+        var milestones: [Milestone] = []
+
+        for (index, milestonePlan) in milestoneResult.milestones.enumerated() {
+            let milestone = Milestone(
+                title: milestonePlan.title,
+                descriptionText: milestonePlan.description,
+                sequenceOrder: index
+            )
+            milestone.project = project
+            milestones.append(milestone)
+        }
+
+        project.milestones = milestones
+        return (project, milestones)
+    }
 }
 
 // MARK: - Mock Data for Previews
 
 extension StrategyChatEngine {
-    static func mockClassification() -> ClassificationResult {
+    static func mockClassificationPhase() -> ClassificationResult {
         ClassificationResult(
+            mode: "phase",
             archetype: "lab",
             reasoning: "This is a research and writing project requiring exploration followed by synthesis.",
             suggestedTitle: "ML Optimization Research"
         )
     }
 
-    static func mockSessions() -> SessionsResult {
-        SessionsResult(
+    static func mockClassificationMilestone() -> ClassificationResult {
+        ClassificationResult(
+            mode: "milestone",
+            archetype: nil,
+            reasoning: "This is a task-oriented project with clear deliverables to check off.",
+            suggestedTitle: "Tax Filing 2025"
+        )
+    }
+
+    static func mockPhases() -> PhaseResult {
+        PhaseResult(
             phases: [
                 PhasePlan(
                     name: "Exploration",
-                    sessions: [
-                        SessionPlan(title: "Literature Safari", goal: "Find and bookmark 15 related papers on ML optimization", estimatedMinutes: 90),
-                        SessionPlan(title: "Concept Mapping", goal: "Create a mind map connecting key optimization techniques", estimatedMinutes: 75),
-                        SessionPlan(title: "Dataset Discovery", goal: "Identify 3 potential benchmark datasets", estimatedMinutes: 60)
-                    ]
+                    phaseType: "divergent",
+                    mentalRule: "Explore widely, no conclusions yet. Let ideas marinate.",
+                    estimatedMinutes: 180
                 ),
                 PhasePlan(
                     name: "Bricklaying",
-                    sessions: [
-                        SessionPlan(title: "Outline Sprint", goal: "Create full document skeleton with section headers", estimatedMinutes: 60),
-                        SessionPlan(title: "Introduction Draft", goal: "Write introduction section (~1000 words)", estimatedMinutes: 90),
-                        SessionPlan(title: "Methods Draft", goal: "Write methodology section (~1500 words)", estimatedMinutes: 90),
-                        SessionPlan(title: "Results Draft", goal: "Draft results section with placeholder figures", estimatedMinutes: 90),
-                        SessionPlan(title: "Discussion Draft", goal: "Write discussion section (~1200 words)", estimatedMinutes: 90)
-                    ]
+                    phaseType: "execution",
+                    mentalRule: "Hermit mode: no new inputs, no editing worry, just produce.",
+                    estimatedMinutes: 360
                 ),
                 PhasePlan(
                     name: "Refining",
-                    sessions: [
-                        SessionPlan(title: "Flow Polish", goal: "Edit for clarity and smooth transitions", estimatedMinutes: 90),
-                        SessionPlan(title: "Citation Cleanup", goal: "Format all citations and references", estimatedMinutes: 60),
-                        SessionPlan(title: "Final Review", goal: "Read aloud and fix remaining issues", estimatedMinutes: 75)
-                    ]
+                    phaseType: "convergent",
+                    mentalRule: "No new research, only polish and perfect.",
+                    estimatedMinutes: 180
                 )
+            ]
+        )
+    }
+
+    static func mockMilestones() -> MilestoneResult {
+        MilestoneResult(
+            milestones: [
+                MilestonePlan(title: "Gather W2s and 1099s", description: "Collect all income documents from employers and banks"),
+                MilestonePlan(title: "Collect deduction receipts", description: "Organize charitable donations, medical expenses, business costs"),
+                MilestonePlan(title: "Complete federal return", description: "Fill out Form 1040 with all schedules"),
+                MilestonePlan(title: "Complete state return", description: "Fill out state tax form"),
+                MilestonePlan(title: "Submit e-file", description: "E-file or mail completed returns")
             ]
         )
     }

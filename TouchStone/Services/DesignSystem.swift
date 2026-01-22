@@ -163,6 +163,44 @@ enum DesignSystem {
                 ? Color.white.opacity(0.15)
                 : Color.black.opacity(0.1)
         }
+
+        // MARK: - Archetype Colors
+
+        static var archetypeLab: Color {
+            isDarkMode
+                ? Color(red: 0.45, green: 0.60, blue: 0.85)  // Blue
+                : Color(red: 0.30, green: 0.50, blue: 0.80)
+        }
+
+        static var archetypeHunt: Color {
+            isDarkMode
+                ? Color(red: 0.90, green: 0.60, blue: 0.35)  // Orange
+                : Color(red: 0.85, green: 0.50, blue: 0.25)
+        }
+
+        static var archetypeSpiral: Color {
+            isDarkMode
+                ? Color(red: 0.70, green: 0.50, blue: 0.80)  // Purple
+                : Color(red: 0.60, green: 0.40, blue: 0.75)
+        }
+
+        static var archetypeBuild: Color {
+            isDarkMode
+                ? Color(red: 0.50, green: 0.75, blue: 0.50)  // Green
+                : Color(red: 0.35, green: 0.65, blue: 0.40)
+        }
+
+        /// Get color for an archetype string
+        static func archetypeColor(for archetype: String?) -> Color {
+            guard let archetype = archetype?.lowercased() else { return accent }
+            switch archetype {
+            case "lab": return archetypeLab
+            case "hunt": return archetypeHunt
+            case "spiral": return archetypeSpiral
+            case "build": return archetypeBuild
+            default: return accent
+            }
+        }
     }
 
     // MARK: - Typography
@@ -252,5 +290,97 @@ struct CircleButtonStyle: ButtonStyle {
             .background(DesignSystem.Colors.cardBackground)
             .clipShape(Circle())
             .opacity(configuration.isPressed ? 0.7 : 1.0)
+    }
+}
+
+// MARK: - Noisy Gradient Background
+
+/// A soft noise texture overlay
+struct NoiseView: View {
+    let opacity: Double
+
+    init(opacity: Double = 0.03) {
+        self.opacity = opacity
+    }
+
+    var body: some View {
+        Canvas { context, size in
+            // Use a deterministic seed for consistent noise
+            var rng = SeededRandomGenerator(seed: 42)
+            let cellSize: CGFloat = 2
+
+            for x in stride(from: 0, to: size.width, by: cellSize) {
+                for y in stride(from: 0, to: size.height, by: cellSize) {
+                    let value = Double.random(in: 0...1, using: &rng)
+                    let gray = value > 0.5 ? 1.0 : 0.0
+                    context.fill(
+                        Path(CGRect(x: x, y: y, width: cellSize, height: cellSize)),
+                        with: .color(Color.white.opacity(gray * opacity))
+                    )
+                }
+            }
+        }
+        .drawingGroup()
+    }
+}
+
+/// Seeded random number generator for consistent noise
+struct SeededRandomGenerator: RandomNumberGenerator {
+    var state: UInt64
+
+    init(seed: UInt64) {
+        state = seed
+    }
+
+    mutating func next() -> UInt64 {
+        state = state &* 6364136223846793005 &+ 1442695040888963407
+        return state
+    }
+}
+
+/// A soft gradient background with noise texture overlay
+struct NoisyGradientBackground: View {
+    private var accentColor: Color { UserPreferences.shared.accentColor }
+
+    var body: some View {
+        ZStack {
+            // Base background color
+            DesignSystem.Colors.background
+
+            // Soft radial gradient from center
+            RadialGradient(
+                colors: [
+                    accentColor.opacity(0.08),
+                    accentColor.opacity(0.03),
+                    Color.clear
+                ],
+                center: .top,
+                startRadius: 100,
+                endRadius: 600
+            )
+
+            // Subtle secondary gradient
+            LinearGradient(
+                colors: [
+                    DesignSystem.Colors.background,
+                    DesignSystem.Colors.backgroundLight.opacity(0.5)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .blendMode(.softLight)
+
+            // Noise overlay
+            NoiseView(opacity: 0.025)
+                .blendMode(.overlay)
+        }
+        .ignoresSafeArea()
+    }
+}
+
+extension View {
+    /// Apply the app's noisy gradient background
+    func noisyGradientBackground() -> some View {
+        self.background(NoisyGradientBackground())
     }
 }

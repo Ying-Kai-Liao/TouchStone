@@ -27,7 +27,6 @@ struct TodayFlowView: View {
     @State private var showUndoToast = false
     @State private var showAddStone = false
     @State private var showSpeechInput = false
-    @State private var showEditMode = false
     @State private var showCapacityAlert = false
     @State private var pendingTouchProject: Project?
 
@@ -167,18 +166,6 @@ struct TodayFlowView: View {
                     focusProject = nil
                 }
             }
-            .sheet(isPresented: $showEditMode) {
-                if let plan = todaysPlan {
-                    FlowEditModeView(
-                        dayPlan: plan,
-                        allProjects: Array(activeProjects),
-                        onDismiss: {
-                            showEditMode = false
-                            computeDayState()
-                        }
-                    )
-                }
-            }
         }
     }
 
@@ -238,7 +225,6 @@ struct TodayFlowView: View {
 
     private var scrollContent: some View {
         let deleteHandler: ((WorkflowItem) -> Void)? = isWorkDayActive ? { item in self.deleteFlowItem(item) } : nil
-        let editHandler: (() -> Void)? = isWorkDayActive ? { showEditMode = true } : nil
         let bottomPadding: CGFloat = showWorkPrompt ? 140 : 0
 
         return ScrollView(.vertical, showsIndicators: true) {
@@ -250,7 +236,7 @@ struct TodayFlowView: View {
                 onFocus: { project in focusProject = project },
                 onDelete: deleteHandler,
                 onDeleteStone: { stone in deleteStone(stone) },
-                onEditMode: editHandler
+                onEditMode: nil
             )
             .padding(.top, 16)
             .padding(.bottom, bottomPadding)
@@ -290,29 +276,23 @@ struct TodayFlowView: View {
     private func computeDayState() {
         dayState = DayState(date: selectedDate)
 
-        // Check if we have a persisted schedule for today
-        if let plan = todaysPlan, plan.isWorkDay, plan.hasSchedule {
-            // Auto-skip expired sessions first
-            DayState.autoSkipExpiredSessions(dayPlan: plan)
-            // Load from persisted schedule (locked-in times) with rules for meal badges
-            dayState.loadFromPersistedSchedule(dayPlan: plan, stones: Array(allStones), rules: Array(activeRules))
-        } else if isRestDay && calendar.isDateInToday(selectedDate) {
+        if isRestDay && calendar.isDateInToday(selectedDate) {
             // Rest day - only show stones (no work suggestions)
             dayState.computeStonesOnly(stones: Array(allStones))
         } else {
-            // Preview mode (before "Let's go") - compute ephemeral suggestions
+            // Compute suggestions dynamically based on stones, projects, and rules
             dayState.compute(stones: Array(allStones), projects: Array(activeProjects), rules: Array(activeRules))
         }
     }
 
-    /// User confirmed they want to work today - record start time and lock in schedule
+    /// User confirmed they want to work today - record start time
     private func confirmWorkToday() {
         let plan = getOrCreateTodayPlan()
         plan.wantsToWork = true
         plan.startedAt = Date()
 
-        // Generate and persist the schedule NOW (one-time, locked in)
-        dayState.commitSchedule(
+        // Commit work day decision (updates backlog)
+        dayState.commitWorkDay(
             to: plan,
             context: modelContext,
             stones: Array(allStones),
@@ -339,10 +319,6 @@ struct TodayFlowView: View {
         if let plan = todaysPlan {
             plan.wantsToWork = nil
             plan.startedAt = nil
-            // Clear any scheduled sessions
-            for session in plan.scheduledSessions {
-                modelContext.delete(session)
-            }
         }
 
         withAnimation(.easeInOut(duration: 0.3)) {
@@ -360,28 +336,9 @@ struct TodayFlowView: View {
         return newPlan
     }
 
-    /// Reschedule work sessions if there's an existing schedule
+    /// Recompute day state when stones change
     private func rescheduleIfNeeded() {
-        print("[Reschedule] Called - stones count: \(allStones.count)")
-
-        // Only reschedule if viewing today and there's a locked-in schedule
-        if let plan = todaysPlan {
-            print("[Reschedule] Has plan - isWorkDay: \(plan.isWorkDay), hasSchedule: \(plan.hasSchedule), isToday: \(calendar.isDateInToday(selectedDate))")
-
-            if plan.isWorkDay, plan.hasSchedule, calendar.isDateInToday(selectedDate) {
-                print("[Reschedule] Rescheduling around \(allStones.count) stones...")
-                dayState.rescheduleAroundStones(
-                    dayPlan: plan,
-                    context: modelContext,
-                    stones: Array(allStones),
-                    projects: Array(activeProjects)
-                )
-                print("[Reschedule] Done - sessions count: \(plan.scheduledSessions.count)")
-            }
-        } else {
-            print("[Reschedule] No plan for today")
-        }
-
+        // Simply recompute the day state - suggestions are generated dynamically
         withAnimation(.easeInOut(duration: 0.3)) {
             computeDayState()
         }
@@ -409,18 +366,14 @@ struct TodayFlowView: View {
     /// Actually perform the touch (called directly or after user confirms)
     private func performTouch(_ project: Project) {
         let touch = TouchLog(project: project)
+
+        // If project is in phase mode, link touch to active phase
+        if project.isPhaseMode, let activePhase = project.activePhase {
+            touch.phase = activePhase
+        }
+
         modelContext.insert(touch)
         lastTouch = touch
-
-        // If we have a persisted schedule, mark the corresponding session as completed
-        if let plan = todaysPlan, plan.hasSchedule {
-            // Find a pending session for this project and mark it completed
-            if let session = plan.scheduledSessions.first(where: {
-                $0.project?.id == project.id && $0.status == .pending
-            }) {
-                session.complete(with: touch)
-            }
-        }
 
         withAnimation {
             showUndoToast = true
@@ -440,21 +393,10 @@ struct TodayFlowView: View {
     }
 
     private func deleteFlowItem(_ item: WorkflowItem) {
-        guard let plan = todaysPlan, plan.hasSchedule else { return }
-        guard let project = item.project else { return }
-
-        // Find the scheduled session matching this workflow item
-        if let session = plan.scheduledSessions.first(where: {
-            $0.project?.id == project.id &&
-            $0.scheduledStart == item.startTime &&
-            $0.scheduledEnd == item.endTime
-        }) {
-            modelContext.delete(session)
-
-            // Recompute to update the view
-            withAnimation(.easeInOut(duration: 0.3)) {
-                computeDayState()
-            }
+        // Suggestions are computed dynamically, no persisted sessions to delete
+        // Just recompute the day state
+        withAnimation(.easeInOut(duration: 0.3)) {
+            computeDayState()
         }
     }
 
@@ -527,5 +469,5 @@ struct DateTabButton: View {
 
 #Preview {
     TodayFlowView()
-        .modelContainer(for: [Project.self, StoneEvent.self, TouchLog.self, Rule.self, DayPlan.self, ScheduledSession.self], inMemory: true)
+        .modelContainer(for: [Project.self, StoneEvent.self, TouchLog.self, Rule.self, DayPlan.self, Milestone.self], inMemory: true)
 }

@@ -132,49 +132,115 @@ class AgentService: ObservableObject {
         }
     }
 
-    struct PendingSession: Codable {
-        let title: String
-        let goal: String?
-        let estimatedMinutes: Int
-
-        enum CodingKeys: String, CodingKey {
-            case title
-            case goal
-            case estimatedMinutes = "estimated_minutes"
-        }
-    }
-
     struct PendingPhase: Codable {
         let title: String
         let phaseType: String
         let mentalRule: String
-        let sessions: [PendingSession]
+        let estimatedMinutes: Int
+
+        init(title: String, phaseType: String, mentalRule: String, estimatedMinutes: Int) {
+            self.title = title
+            self.phaseType = phaseType
+            self.mentalRule = mentalRule
+            self.estimatedMinutes = estimatedMinutes
+        }
 
         enum CodingKeys: String, CodingKey {
             case title
             case phaseType = "phase_type"
             case mentalRule = "mental_rule"
-            case sessions
+            case estimatedMinutes = "estimated_minutes"
+        }
+    }
+
+    struct PendingMilestone: Codable {
+        let title: String
+        let description: String?
+        let sequenceOrder: Int
+        let estimatedMinutes: Int
+
+        init(title: String, description: String? = nil, sequenceOrder: Int, estimatedMinutes: Int = 60) {
+            self.title = title
+            self.description = description
+            self.sequenceOrder = sequenceOrder
+            self.estimatedMinutes = estimatedMinutes
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case title
+            case description
+            case sequenceOrder = "sequence_order"
+            case estimatedMinutes = "estimated_minutes"
+        }
+
+        // Decoder with default for backward compatibility
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            title = try container.decode(String.self, forKey: .title)
+            description = try container.decodeIfPresent(String.self, forKey: .description)
+            sequenceOrder = try container.decodeIfPresent(Int.self, forKey: .sequenceOrder) ?? 0
+            estimatedMinutes = try container.decodeIfPresent(Int.self, forKey: .estimatedMinutes) ?? 60
         }
     }
 
     struct PendingProject: Codable, Identifiable {
         let tempId: String
         let title: String
-        let archetype: String
+        let mode: String  // "phase" or "milestone"
+        let archetype: String?  // Only for phase mode
         let deadline: String?
         let totalPlannedMinutes: Int
         let phases: [PendingPhase]
+        let milestones: [PendingMilestone]
 
         var id: String { tempId }
+
+        var isPhaseMode: Bool { mode == "phase" }
+        var isMilestoneMode: Bool { mode == "milestone" }
 
         enum CodingKeys: String, CodingKey {
             case tempId = "temp_id"
             case title
+            case mode
             case archetype
             case deadline
             case totalPlannedMinutes = "total_planned_minutes"
             case phases
+            case milestones
+        }
+
+        // Regular memberwise initializer
+        init(
+            tempId: String,
+            title: String,
+            mode: String = "phase",
+            archetype: String? = nil,
+            deadline: String? = nil,
+            totalPlannedMinutes: Int = 0,
+            phases: [PendingPhase] = [],
+            milestones: [PendingMilestone] = []
+        ) {
+            self.tempId = tempId
+            self.title = title
+            self.mode = mode
+            self.archetype = archetype
+            self.deadline = deadline
+            self.totalPlannedMinutes = totalPlannedMinutes
+            self.phases = phases
+            self.milestones = milestones
+        }
+
+        // Provide defaults for backward compatibility
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            tempId = try container.decode(String.self, forKey: .tempId)
+            title = try container.decode(String.self, forKey: .title)
+            mode = try container.decodeIfPresent(String.self, forKey: .mode) ?? "phase"
+            archetype = try container.decodeIfPresent(String.self, forKey: .archetype)
+            deadline = try container.decodeIfPresent(String.self, forKey: .deadline)
+            totalPlannedMinutes = try container.decodeIfPresent(Int.self, forKey: .totalPlannedMinutes) ?? 0
+            phases = try container.decodeIfPresent([PendingPhase].self, forKey: .phases) ?? []
+            milestones = try container.decodeIfPresent([PendingMilestone].self, forKey: .milestones) ?? []
         }
     }
 

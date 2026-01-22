@@ -6,7 +6,7 @@ struct NewProjectChoiceView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var showQuickProject = false
-    @State private var showStrategicProject = false
+    @State private var showAIChat = false
 
     var body: some View {
         NavigationStack {
@@ -55,12 +55,12 @@ struct NewProjectChoiceView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
 
-                    // Strategic Project
+                    // AI-Assisted Project (new chat interface)
                     Button {
-                        showStrategicProject = true
+                        showAIChat = true
                     } label: {
                         HStack(spacing: 16) {
-                            Image(systemName: "brain.head.profile")
+                            Image(systemName: "sparkles")
                                 .font(.title2)
                                 .foregroundStyle(UserPreferences.shared.accentColor)
                                 .frame(width: 44, height: 44)
@@ -68,10 +68,10 @@ struct NewProjectChoiceView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Strategic Project")
+                                Text("AI Assistant")
                                     .font(.headline)
                                     .foregroundStyle(.primary)
-                                Text("AI breaks it into phases and sessions")
+                                Text("Chat to create projects, events, and more")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -84,14 +84,6 @@ struct NewProjectChoiceView: View {
                         .padding()
                         .background(Color(.secondarySystemGroupedBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    .disabled(!APIKeyManager.shared.hasAPIKey)
-                    .opacity(APIKeyManager.shared.hasAPIKey ? 1 : 0.5)
-
-                    if !APIKeyManager.shared.hasAPIKey {
-                        Text("Add OpenAI API key in Settings to use AI planning")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
                 }
                 .padding(.horizontal)
@@ -114,8 +106,8 @@ struct NewProjectChoiceView: View {
                     dismiss()
                 }
             }
-            .sheet(isPresented: $showStrategicProject) {
-                StrategicPlanningChatView()
+            .sheet(isPresented: $showAIChat) {
+                UnifiedInputView()
                     .onDisappear {
                         dismiss()
                     }

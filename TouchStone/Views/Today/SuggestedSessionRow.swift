@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 /// Suggested session row with tap to touch and long press or button for focus mode.
+/// Handles both phase mode and milestone mode projects.
 struct SuggestedSessionRow: View {
     let session: SuggestedSession
     let onTouch: () -> Void
@@ -32,19 +33,19 @@ struct SuggestedSessionRow: View {
                             .fontWeight(.medium)
                             .foregroundStyle(.primary)
 
-                        // Phase name
-                        if let phase = session.project.activePhase {
-                            Text(phase.title)
-                                .font(.caption)
-                                .foregroundStyle(UserPreferences.shared.accentColor)
-                        } else if let phase = session.project.currentPhase {
-                            Text(phase)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                        // Show intention (phase or milestone based)
+                        Text(session.intentionText)
+                            .font(.caption)
+                            .foregroundStyle(UserPreferences.shared.accentColor)
+                            .lineLimit(1)
                     }
 
                     Spacer()
+
+                    // Mode indicator
+                    Image(systemName: session.project.isMilestoneMode ? "checklist" : "layers.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 .padding(.leading, 16)
                 .padding(.vertical, 12)
