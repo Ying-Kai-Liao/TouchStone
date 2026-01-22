@@ -307,11 +307,18 @@ class DayState {
         // Select top N distinct projects
         let selectedProjects = Array(uniqueProjects.prefix(targetProjects))
 
+        // Calculate max sessions each project actually needs based on remaining work
+        let sessionDurationHours = Double(prefs.sessionMaxMinutes) / 60.0
+        func maxSessionsNeeded(for project: Project) -> Int {
+            guard project.totalPlannedMinutes > 0 else { return 3 } // Unlimited for unplanned projects
+            let needed = Int(ceil(Double(project.remainingHours) / sessionDurationHours))
+            return max(1, min(needed, 3)) // At least 1, at most 3
+        }
+
         // Distribute sessions across selected projects (interleaved for cognitive variety)
         var result: [Project] = []
-        let maxSessionsPerProject = 3 // Prevent hyperfocus on one project
 
-        // Round-robin distribution
+        // Round-robin distribution respecting each project's actual needs
         var sessionCounts: [UUID: Int] = [:]
         var projectIndex = 0
         let maxTotalSessions = max(sessionSlots, 1)
@@ -319,16 +326,25 @@ class DayState {
         while result.count < maxTotalSessions {
             let project = selectedProjects[projectIndex % selectedProjects.count]
             let currentCount = sessionCounts[project.id, default: 0]
+            let maxForThisProject = maxSessionsNeeded(for: project)
 
-            if currentCount < maxSessionsPerProject {
+            if currentCount < maxForThisProject {
                 result.append(project)
                 sessionCounts[project.id] = currentCount + 1
             }
 
             projectIndex += 1
 
-            // Safety: break if we've cycled through all projects and can't add more
-            if projectIndex >= selectedProjects.count * maxSessionsPerProject {
+            // Safety: check if all projects have reached their max sessions
+            let allProjectsMaxed = selectedProjects.allSatisfy { p in
+                sessionCounts[p.id, default: 0] >= maxSessionsNeeded(for: p)
+            }
+            if allProjectsMaxed {
+                break
+            }
+
+            // Safety: break if we've cycled too many times
+            if projectIndex >= selectedProjects.count * 10 {
                 break
             }
         }
