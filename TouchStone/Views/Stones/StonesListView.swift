@@ -6,6 +6,7 @@ struct StonesListView: View {
     @Query(sort: \StoneEvent.createdAt, order: .reverse) private var stones: [StoneEvent]
 
     @State private var showingAddSheet = false
+    @State private var showingImportSheet = false
     @State private var stoneToDelete: StoneEvent?
     @State private var showDeleteAlert = false
 
@@ -44,6 +45,13 @@ struct StonesListView: View {
             } message: { stone in
                 Text("Delete \"\(stone.title)\"? This cannot be undone.")
             }
+            .sheet(isPresented: $showingImportSheet) {
+                ImportEventsView { importedStones in
+                    for stone in importedStones {
+                        modelContext.insert(stone)
+                    }
+                }
+            }
         }
     }
 
@@ -57,6 +65,25 @@ struct StonesListView: View {
 
             Spacer()
 
+            // Import from Calendar button
+            Button {
+                showingImportSheet = true
+            } label: {
+                Image(systemName: "calendar.badge.plus")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(DesignSystem.Colors.cardBackground)
+                    )
+                    .overlay(
+                        Circle()
+                            .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.3), lineWidth: 1)
+                    )
+            }
+
+            // Add manually button
             Button {
                 showingAddSheet = true
             } label: {
@@ -115,22 +142,42 @@ struct StonesListView: View {
                 .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .multilineTextAlignment(.center)
 
-            Button {
-                showingAddSheet = true
-            } label: {
-                Text("Add Stone")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(DesignSystem.Colors.accent)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(
-                        Capsule()
-                            .fill(DesignSystem.Colors.accent.opacity(0.15))
-                    )
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(DesignSystem.Colors.accent.opacity(0.3), lineWidth: 1)
-                    )
+            HStack(spacing: 12) {
+                Button {
+                    showingAddSheet = true
+                } label: {
+                    Text("Add Stone")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(DesignSystem.Colors.accent)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(
+                            Capsule()
+                                .fill(DesignSystem.Colors.accent.opacity(0.15))
+                        )
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(DesignSystem.Colors.accent.opacity(0.3), lineWidth: 1)
+                        )
+                }
+
+                Button {
+                    showingImportSheet = true
+                } label: {
+                    Label("Import", systemImage: "calendar.badge.plus")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(
+                            Capsule()
+                                .fill(DesignSystem.Colors.cardBackground)
+                        )
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.3), lineWidth: 1)
+                        )
+                }
             }
             .padding(.top, 8)
 

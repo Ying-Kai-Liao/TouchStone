@@ -8,5 +8,7 @@
 	</array>
 	<key>CFBundleSignature</key>
 	<string></string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>TouchStone needs access to your calendar to import events as stones (fixed time blocks).</string>
 </dict>
 </plist>
