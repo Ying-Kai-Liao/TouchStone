@@ -266,6 +266,7 @@ struct TodayView: View {
 
     private func computeDayState() {
         dayState.compute(stones: allStones, projects: activeProjects)
+        syncWidgetData()
     }
 
     private func touchProject(_ project: Project) {
@@ -277,6 +278,9 @@ struct TodayView: View {
             showUndoToast = true
         }
 
+        // Sync widget data after touch
+        syncWidgetData()
+
         // Hide toast after 5 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
             withAnimation {
@@ -285,6 +289,13 @@ struct TodayView: View {
                 }
             }
         }
+    }
+
+    private func syncWidgetData() {
+        WidgetDataSync.shared.sync(
+            stones: allStones,
+            projects: activeProjects
+        )
     }
 
     private func undoTouch() {
