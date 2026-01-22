@@ -186,6 +186,44 @@ enum DesignSystem {
                 ? Color.white.opacity(0.15)
                 : Color.black.opacity(0.1)
         }
+
+        // MARK: - Archetype Colors
+
+        static var archetypeLab: Color {
+            isDarkMode
+                ? Color(red: 0.45, green: 0.60, blue: 0.85)  // Blue
+                : Color(red: 0.30, green: 0.50, blue: 0.80)
+        }
+
+        static var archetypeHunt: Color {
+            isDarkMode
+                ? Color(red: 0.90, green: 0.60, blue: 0.35)  // Orange
+                : Color(red: 0.85, green: 0.50, blue: 0.25)
+        }
+
+        static var archetypeSpiral: Color {
+            isDarkMode
+                ? Color(red: 0.70, green: 0.50, blue: 0.80)  // Purple
+                : Color(red: 0.60, green: 0.40, blue: 0.75)
+        }
+
+        static var archetypeBuild: Color {
+            isDarkMode
+                ? Color(red: 0.50, green: 0.75, blue: 0.50)  // Green
+                : Color(red: 0.35, green: 0.65, blue: 0.40)
+        }
+
+        /// Get color for an archetype string
+        static func archetypeColor(for archetype: String?) -> Color {
+            guard let archetype = archetype?.lowercased() else { return accent }
+            switch archetype {
+            case "lab": return archetypeLab
+            case "hunt": return archetypeHunt
+            case "spiral": return archetypeSpiral
+            case "build": return archetypeBuild
+            default: return accent
+            }
+        }
     }
 
     // MARK: - Typography

@@ -15,9 +15,6 @@ final class DayPlan {
     var wantsToWork: Bool?            // nil = not answered, true = yes, false = no
 
     // Relationships
-    @Relationship(deleteRule: .cascade, inverse: \ScheduledSession.dayPlan)
-    var scheduledSessions: [ScheduledSession] = []
-
     @Relationship(deleteRule: .cascade, inverse: \Backlog.dayPlan)
     var backlog: Backlog?
 
@@ -54,23 +51,8 @@ final class DayPlan {
         return formatter.string(from: startedAt)
     }
 
-    /// Scheduled sessions sorted by sequence order
-    var sortedSessions: [ScheduledSession] {
-        scheduledSessions.sorted { $0.sequenceOrder < $1.sequenceOrder }
-    }
-
     /// Remaining capacity hours from the backlog
     var remainingCapacity: Int {
         backlog?.remainingHours ?? 0
-    }
-
-    /// Whether this day has a locked-in schedule
-    var hasSchedule: Bool {
-        !scheduledSessions.isEmpty
-    }
-
-    /// Total scheduled minutes for today
-    var totalScheduledMinutes: Int {
-        scheduledSessions.reduce(0) { $0 + $1.durationMinutes }
     }
 }

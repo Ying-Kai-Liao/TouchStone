@@ -8,7 +8,7 @@ struct StrategicProjectInputView: View {
 
     @State private var goal = ""
     @State private var isGenerating = false
-    @State private var generatedPlan: StrategyEngine.StrategyPlan?
+    @State private var generatedPlan: StrategyEngine.PhasePlan?
     @State private var projectTitle = ""
     @State private var errorMessage: String?
     @State private var showReview = false
@@ -19,15 +19,15 @@ struct StrategicProjectInputView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: DesignSystem.Spacing.xl) {
+            VStack(spacing: 24) {
                 if generatedPlan == nil {
                     inputSection
                 } else {
                     reviewSection
                 }
             }
-            .padding(DesignSystem.Spacing.lg)
-            .background(DesignSystem.Colors.background)
+            .padding()
+            .background(Color(.systemGroupedBackground))
             .navigationTitle(generatedPlan == nil ? "Strategic Project" : "Review Plan")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -35,7 +35,6 @@ struct StrategicProjectInputView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
             }
         }
@@ -44,51 +43,43 @@ struct StrategicProjectInputView: View {
     // MARK: - Input Section
 
     private var inputSection: some View {
-        VStack(spacing: DesignSystem.Spacing.xl) {
+        VStack(spacing: 24) {
             Spacer()
 
-            VStack(spacing: DesignSystem.Spacing.md) {
+            VStack(spacing: 12) {
                 Image(systemName: "brain.head.profile")
                     .font(.system(size: 50))
-                    .foregroundStyle(DesignSystem.Colors.accent)
+                    .foregroundStyle(prefs.accentColor)
 
                 Text("What do you want to accomplish?")
-                    .font(DesignSystem.Typography.title2)
-                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    .font(.title3)
+                    .fontWeight(.medium)
 
-                Text("Describe your goal and AI will break it into phases and sessions")
-                    .font(DesignSystem.Typography.callout)
-                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                Text("Describe your goal and AI will break it into phases with time budgets")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
 
             TextEditor(text: $goal)
-                .font(DesignSystem.Typography.body)
-                .foregroundStyle(DesignSystem.Colors.textPrimary)
-                .scrollContentBackground(.hidden)
                 .frame(height: 120)
-                .padding(DesignSystem.Spacing.sm)
-                .background(DesignSystem.Colors.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
-                .overlay(
-                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                        .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
-                )
+                .padding(8)
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(alignment: .topLeading) {
                     if goal.isEmpty {
                         Text("e.g., Write a research paper on machine learning optimization techniques")
-                            .font(DesignSystem.Typography.body)
-                            .foregroundStyle(DesignSystem.Colors.textTertiary)
-                            .padding(.horizontal, DesignSystem.Spacing.md)
-                            .padding(.vertical, DesignSystem.Spacing.lg)
+                            .foregroundStyle(.tertiary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 16)
                             .allowsHitTesting(false)
                     }
                 }
 
             if let error = errorMessage {
                 Text(error)
-                    .font(DesignSystem.Typography.caption)
-                    .foregroundStyle(DesignSystem.Colors.error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
             }
 
@@ -100,7 +91,7 @@ struct StrategicProjectInputView: View {
                 HStack {
                     if isGenerating {
                         ProgressView()
-                            .tint(DesignSystem.Colors.background)
+                            .tint(.white)
                     } else {
                         Image(systemName: "sparkles")
                     }
@@ -108,10 +99,10 @@ struct StrategicProjectInputView: View {
                 }
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity)
-                .padding(DesignSystem.Spacing.lg)
-                .background(goal.isEmpty || isGenerating ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.accent)
-                .foregroundStyle(DesignSystem.Colors.background)
-                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+                .padding()
+                .background(goal.isEmpty || isGenerating ? Color.gray : prefs.accentColor)
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
             .disabled(goal.isEmpty || isGenerating)
         }
@@ -122,47 +113,37 @@ struct StrategicProjectInputView: View {
     @ViewBuilder
     private var reviewSection: some View {
         if let plan = generatedPlan {
-            VStack(spacing: DesignSystem.Spacing.lg) {
+            VStack(spacing: 16) {
                 // Title input
-                VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Project Title")
-                        .font(DesignSystem.Typography.caption)
-                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     TextField("Project title", text: $projectTitle)
-                        .textFieldStyle(.plain)
-                        .font(DesignSystem.Typography.body)
-                        .foregroundStyle(DesignSystem.Colors.textPrimary)
-                        .padding(DesignSystem.Spacing.md)
-                        .background(DesignSystem.Colors.cardBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
-                        )
+                        .textFieldStyle(.roundedBorder)
                 }
 
                 // Archetype badge
                 HStack {
                     if let archetype = Archetype(rawValue: plan.archetype.lowercased()) {
                         Label(archetype.displayName, systemImage: archetype.icon)
-                            .font(DesignSystem.Typography.caption)
-                            .padding(.horizontal, DesignSystem.Spacing.md)
-                            .padding(.vertical, DesignSystem.Spacing.xs)
-                            .background(DesignSystem.Colors.accent.opacity(0.15))
-                            .foregroundStyle(DesignSystem.Colors.accent)
+                            .font(.caption)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(prefs.accentColor.opacity(0.15))
                             .clipShape(Capsule())
                     }
 
                     Spacer()
 
                     Text("\(formatDuration(plan.totalEstimatedMinutes)) total")
-                        .font(DesignSystem.Typography.caption)
-                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 // Phases list
                 ScrollView {
-                    VStack(spacing: DesignSystem.Spacing.md) {
+                    VStack(spacing: 12) {
                         ForEach(Array(plan.phases.enumerated()), id: \.offset) { index, phase in
                             PhaseReviewCard(phase: phase, index: index + 1)
                         }
@@ -170,21 +151,16 @@ struct StrategicProjectInputView: View {
                 }
 
                 // Action buttons
-                HStack(spacing: DesignSystem.Spacing.md) {
+                HStack(spacing: 12) {
                     Button {
                         generatedPlan = nil
                         projectTitle = ""
                     } label: {
                         Text("Regenerate")
                             .frame(maxWidth: .infinity)
-                            .padding(DesignSystem.Spacing.lg)
-                            .background(DesignSystem.Colors.cardBackground)
-                            .foregroundStyle(DesignSystem.Colors.textPrimary)
-                            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                                    .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
-                            )
+                            .padding()
+                            .background(Color(.secondarySystemGroupedBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
 
                     Button {
@@ -193,10 +169,10 @@ struct StrategicProjectInputView: View {
                         Text("Looks Good")
                             .fontWeight(.semibold)
                             .frame(maxWidth: .infinity)
-                            .padding(DesignSystem.Spacing.lg)
-                            .background(projectTitle.isEmpty ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.accent)
-                            .foregroundStyle(DesignSystem.Colors.background)
-                            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+                            .padding()
+                            .background(projectTitle.isEmpty ? Color.gray : prefs.accentColor)
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .disabled(projectTitle.isEmpty)
                 }
@@ -212,7 +188,7 @@ struct StrategicProjectInputView: View {
 
         Task {
             do {
-                let plan = try await strategyEngine.generatePlan(for: goal)
+                let plan = try await strategyEngine.generatePhasePlan(for: goal)
                 await MainActor.run {
                     generatedPlan = plan
                     // Default title from goal (first 50 chars)
@@ -231,7 +207,7 @@ struct StrategicProjectInputView: View {
     private func savePlan() {
         guard let plan = generatedPlan else { return }
 
-        let (project, phases) = strategyEngine.createProjectFromPlan(
+        let (project, phases) = strategyEngine.createPhaseProjectFromPlan(
             title: projectTitle,
             plan: plan
         )
@@ -254,80 +230,45 @@ struct StrategicProjectInputView: View {
 // MARK: - Phase Review Card
 
 struct PhaseReviewCard: View {
-    let phase: StrategyEngine.PhasePlan
+    let phase: StrategyEngine.PhaseDetail
     let index: Int
 
-    @State private var isExpanded = true
-
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+        VStack(alignment: .leading, spacing: 8) {
             // Phase header
-            Button {
-                withAnimation {
-                    isExpanded.toggle()
-                }
-            } label: {
-                HStack {
-                    Text("Phase \(index): \(phase.name)")
-                        .font(DesignSystem.Typography.headline)
-                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+            HStack {
+                Text("Phase \(index): \(phase.name)")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
 
-                    Spacer()
+                Spacer()
 
-                    if let phaseType = PhaseType(rawValue: phase.type.lowercased()) {
-                        Label(phaseType.displayName, systemImage: phaseType.icon)
-                            .font(DesignSystem.Typography.caption)
-                            .foregroundStyle(DesignSystem.Colors.textSecondary)
-                    }
-
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                if let phaseType = PhaseType(rawValue: phase.type.lowercased()) {
+                    Label(phaseType.displayName, systemImage: phaseType.icon)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
             // Mental rule
             Text("\"\(phase.mentalRule)\"")
-                .font(DesignSystem.Typography.caption)
+                .font(.caption)
                 .italic()
-                .foregroundStyle(DesignSystem.Colors.accent)
+                .foregroundStyle(UserPreferences.shared.accentColor)
 
-            // Sessions
-            if isExpanded {
-                VStack(spacing: DesignSystem.Spacing.sm) {
-                    ForEach(Array(phase.sessions.enumerated()), id: \.offset) { _, session in
-                        HStack(alignment: .top, spacing: DesignSystem.Spacing.sm) {
-                            Image(systemName: "circle")
-                                .font(.caption2)
-                                .foregroundStyle(DesignSystem.Colors.textTertiary)
-                                .padding(.top, DesignSystem.Spacing.xs)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack {
-                                    Text(session.title)
-                                        .font(DesignSystem.Typography.callout)
-                                        .foregroundStyle(DesignSystem.Colors.textPrimary)
-                                    Spacer()
-                                    Text("~\(session.estimatedMinutes)m")
-                                        .font(DesignSystem.Typography.caption)
-                                        .foregroundStyle(DesignSystem.Colors.textSecondary)
-                                }
-                                Text(session.goal)
-                                    .font(DesignSystem.Typography.caption)
-                                    .foregroundStyle(DesignSystem.Colors.textSecondary)
-                            }
-                        }
-                    }
-                }
-                .padding(.leading, DesignSystem.Spacing.sm)
+            // Time budget
+            HStack {
+                Image(systemName: "clock")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("\(phase.estimatedMinutes / 60) hours budget")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
-        .padding(DesignSystem.Spacing.lg)
-        .background(DesignSystem.Colors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
-        )
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 

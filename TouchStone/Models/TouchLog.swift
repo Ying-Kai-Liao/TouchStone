@@ -6,6 +6,7 @@ import SwiftData
 /// A TouchLog records when a project was "touched" - acknowledging work done.
 /// This is not about tracking exact time, but about acknowledging effort.
 /// Duration is approximate (~30min, ~1h, ~2h) - no need to be exact.
+/// For phase-mode projects, can optionally be linked to a specific phase.
 @Model
 final class TouchLog {
     var id: UUID
@@ -14,19 +15,22 @@ final class TouchLog {
     var note: String?               // Optional reflection
 
     var project: Project?
+    var phase: ProjectPhase?        // Optional link to specific phase (for phase-mode projects)
 
     init(
         id: UUID = UUID(),
         timestamp: Date = Date(),
         durationMinutes: Int = 60,
         note: String? = nil,
-        project: Project? = nil
+        project: Project? = nil,
+        phase: ProjectPhase? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
         self.durationMinutes = durationMinutes
         self.note = note
         self.project = project
+        self.phase = phase
     }
 
     // MARK: - Computed Properties
@@ -59,5 +63,9 @@ final class TouchLog {
 
     var projectTitle: String {
         project?.title ?? "Untitled"
+    }
+
+    var phaseName: String? {
+        phase?.title
     }
 }

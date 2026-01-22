@@ -1,7 +1,7 @@
 import Foundation
 
 /// AI-powered engine for refining existing strategic plans.
-/// Handles plan modifications while preserving completed work.
+/// Works with phase time budgets (no sessions).
 actor PlanRefinementEngine {
     private let openAI = OpenAIClient()
     private let textExtractor = DocumentTextExtractor()
@@ -30,13 +30,8 @@ actor PlanRefinementEngine {
 
     struct PhasePlan: Codable {
         let name: String
-        let sessions: [SessionPlan]
-    }
-
-    struct SessionPlan: Codable {
-        let title: String
-        let goal: String
         let estimatedMinutes: Int
+        let mentalRule: String?
     }
 
     // MARK: - Main Refinement
@@ -59,17 +54,11 @@ actor PlanRefinementEngine {
     private func buildRefinementPrompt(context: RefinementContext) -> String {
         let project = context.project
 
-        // Build locked sessions description
-        let lockedSessionsDesc = buildLockedSessionsDescription(project)
-
-        // Build regenerable sessions description
-        let regenerableDesc = buildRegenerableSessionsDescription(project)
+        // Build phase progress description
+        let phaseProgress = buildPhaseProgressDescription(project)
 
         // Build document context
         let documentContext = buildDocumentContext(context)
-
-        // Build phase structure
-        let phaseStructure = buildPhaseStructureDescription(project)
 
         return """
         You are a strategic planning assistant refining an existing project plan.
@@ -82,84 +71,45 @@ actor PlanRefinementEngine {
         CURRENT PROGRESS:
         \(project.progressSummary)
 
-        COMPLETED SESSIONS (DO NOT MODIFY OR REMOVE - these are locked):
-        \(lockedSessionsDesc)
-
-        REMAINING PLANNED SESSIONS (can be modified):
-        \(regenerableDesc)
-
-        PHASE STRUCTURE:
-        \(phaseStructure)
+        PHASE TIME BUDGETS:
+        \(phaseProgress)
         \(documentContext)
 
         RULES:
-        1. NEVER modify, remove, or reference completed/skipped sessions - they are permanently locked
-        2. Only generate sessions for REMAINING work in each phase
-        3. Maintain the archetype's phase structure and mental rules
-        4. Session goals must be specific and actionable (e.g., "Write 1000 words" not "Write some")
-        5. Each session should be 60-90 minutes
-        6. Earlier sessions in a phase should build toward later ones
-        7. Consider the user's request and any document context provided
-        8. Provide reasoning explaining what you changed and why
+        1. Maintain the archetype's phase structure
+        2. Adjust time budgets based on the user's request
+        3. Consider work already logged when redistributing time
+        4. Mental rules guide the cognitive approach for each phase
+        5. Provide reasoning explaining what you changed and why
 
         Return ONLY valid JSON matching this structure:
         {
             "phases": [
                 {
                     "name": "Phase Name",
-                    "sessions": [
-                        {"title": "Session title", "goal": "Specific measurable goal", "estimatedMinutes": 60}
-                    ]
+                    "estimatedMinutes": 120,
+                    "mentalRule": "Optional new mental rule"
                 }
             ],
             "reasoning": "Brief explanation of changes made"
         }
 
-        IMPORTANT: Only include phases that have REMAINING (non-completed) sessions to generate.
-        If a phase is fully completed, do NOT include it in your response.
+        Include ALL phases in your response, even if unchanged.
         """
     }
 
-    private func buildLockedSessionsDescription(_ project: Project) -> String {
-        let locked = project.lockedSessions
-        if locked.isEmpty {
-            return "None (no sessions completed yet)"
-        }
-
-        return locked.map { session in
-            let status = session.status == .completed ? "COMPLETED" : "SKIPPED"
-            let phase = session.phase?.title ?? "Unknown"
-            return "- [\(status)] \(session.title) (Phase: \(phase))"
-        }.joined(separator: "\n")
-    }
-
-    private func buildRegenerableSessionsDescription(_ project: Project) -> String {
-        let regenerable = project.regenerableSessions
-        if regenerable.isEmpty {
-            return "None (all sessions completed)"
-        }
-
-        return regenerable.map { session in
-            let phase = session.phase?.title ?? "Unknown"
-            let goal = session.goal ?? "No goal specified"
-            return "- \(session.title): \(goal) (~\(session.estimatedMinutes)min, Phase: \(phase))"
-        }.joined(separator: "\n")
-    }
-
-    private func buildPhaseStructureDescription(_ project: Project) -> String {
-        guard let archetype = project.archetype else {
-            return "No archetype specified"
-        }
-
-        return archetype.phaseStructure.enumerated().map { index, template in
-            let phase = project.sortedPhases.first { $0.title == template.name }
-            let completedCount = phase?.sessions.filter { $0.status != .planned }.count ?? 0
-            let totalCount = phase?.sessions.count ?? 0
+    private func buildPhaseProgressDescription(_ project: Project) -> String {
+        return project.sortedPhases.enumerated().map { index, phase in
+            let loggedMinutes = phase.touchLogs.reduce(0) { $0 + $1.durationMinutes }
+            let remaining = max(0, phase.estimatedMinutes - loggedMinutes)
 
             return """
-            Phase \(index + 1): \(template.name) (\(template.type.displayName))
-            - Mental Rule: "\(template.rule)"
-            - Progress: \(completedCount)/\(totalCount) sessions done
+            Phase \(index + 1): \(phase.title)
+            - Type: \(phase.phaseType.displayName)
+            - Mental Rule: "\(phase.mentalRule ?? "None")"
+            - Time Budget: \(phase.estimatedMinutes) minutes
+            - Logged: \(loggedMinutes) minutes
+            - Remaining: \(remaining) minutes
             """
         }.joined(separator: "\n\n")
     }
@@ -202,44 +152,23 @@ actor PlanRefinementEngine {
 
     // MARK: - Apply Refinement
 
-    /// Apply refinement result to a project, preserving completed sessions
+    /// Apply refinement result to a project, updating phase time budgets
     func applyRefinement(
         to project: Project,
         result: RefinementResult
     ) -> [ProjectPhase] {
         var updatedPhases: [ProjectPhase] = []
 
-        for (index, existingPhase) in project.sortedPhases.enumerated() {
-            // Keep completed/skipped sessions
-            let lockedSessions = existingPhase.sessions.filter { $0.status != .planned }
+        for existingPhase in project.sortedPhases {
+            // Find the corresponding phase in the result
+            if let phasePlan = result.phases.first(where: { $0.name == existingPhase.title }) {
+                // Update time budget
+                existingPhase.estimatedMinutes = phasePlan.estimatedMinutes
 
-            // Find new sessions for this phase from the result
-            let newSessionPlans = result.phases
-                .first { $0.name == existingPhase.title }?
-                .sessions ?? []
-
-            // Create new PlannedSession objects for the regenerated sessions
-            var newSessions: [PlannedSession] = []
-            for (sessionIndex, plan) in newSessionPlans.enumerated() {
-                let session = PlannedSession(
-                    title: plan.title,
-                    goal: plan.goal,
-                    estimatedMinutes: plan.estimatedMinutes,
-                    sequenceOrder: lockedSessions.count + sessionIndex
-                )
-                session.phase = existingPhase
-                newSessions.append(session)
-            }
-
-            // Remove old planned sessions (will be replaced)
-            let oldPlanned = existingPhase.sessions.filter { $0.status == .planned }
-
-            // Update phase sessions
-            existingPhase.sessions = lockedSessions + newSessions
-
-            // Update sequence orders for locked sessions
-            for (i, session) in lockedSessions.enumerated() {
-                session.sequenceOrder = i
+                // Update mental rule if provided
+                if let newRule = phasePlan.mentalRule, !newRule.isEmpty {
+                    existingPhase.mentalRule = newRule
+                }
             }
 
             updatedPhases.append(existingPhase)
@@ -260,20 +189,16 @@ extension PlanRefinementEngine {
             phases: [
                 PhasePlan(
                     name: "Exploration",
-                    sessions: [
-                        SessionPlan(title: "Updated Research", goal: "Focus on specific subtopic based on new context", estimatedMinutes: 75),
-                        SessionPlan(title: "Competitive Analysis", goal: "Review 5 competitor approaches", estimatedMinutes: 60)
-                    ]
+                    estimatedMinutes: 180,
+                    mentalRule: "Divergent thinking - explore widely"
                 ),
                 PhasePlan(
                     name: "Bricklaying",
-                    sessions: [
-                        SessionPlan(title: "Draft Outline", goal: "Create detailed outline with new structure", estimatedMinutes: 60),
-                        SessionPlan(title: "First Draft", goal: "Write 2000 words following outline", estimatedMinutes: 90)
-                    ]
+                    estimatedMinutes: 240,
+                    mentalRule: "Iterative progress - build steadily"
                 )
             ],
-            reasoning: "Adjusted the plan to focus more on competitive analysis based on the uploaded document context. Reduced exploration sessions since initial research phase was partially completed."
+            reasoning: "Adjusted the plan to allocate more time to the execution phase based on the user's feedback that they need more time for detailed implementation."
         )
     }
 }

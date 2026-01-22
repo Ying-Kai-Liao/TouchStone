@@ -1,6 +1,8 @@
 import SwiftUI
 import SwiftData
 
+/// Simplified touch logging sheet for both phase and milestone mode projects.
+/// Logs time invested without session-level tracking.
 struct PhasedSessionLogSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -13,10 +15,6 @@ struct PhasedSessionLogSheet: View {
 
     private let durationOptions = [30, 60, 90, 120]
 
-    var nextSession: PlannedSession? {
-        project.nextPlannedSession
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -24,10 +22,8 @@ struct PhasedSessionLogSheet: View {
                     // Project header
                     projectHeader
 
-                    // Session context
-                    if let session = nextSession {
-                        sessionContext(session)
-                    }
+                    // Context card (phase or milestone)
+                    contextCard
 
                     // Duration picker
                     durationPicker
@@ -35,13 +31,13 @@ struct PhasedSessionLogSheet: View {
                     // Note field
                     noteField
 
-                    // Action buttons
-                    actionButtons
+                    // Log button
+                    logButton
                 }
                 .padding()
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("Log Session")
+            .navigationTitle("Log Work")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -62,69 +58,97 @@ struct PhasedSessionLogSheet: View {
                     .font(.title2)
                     .fontWeight(.bold)
 
+                // Mode badge
+                Text(project.isPhaseMode ? "PHASE" : "MILESTONE")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(UserPreferences.shared.accentColor.opacity(0.15))
+                    .clipShape(Capsule())
+
                 if let archetype = project.archetype {
                     Text(archetype.displayName)
                         .font(.caption)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(UserPreferences.shared.accentColor.opacity(0.15))
+                        .background(Color.secondary.opacity(0.15))
                         .clipShape(Capsule())
                 }
-            }
-
-            if let phase = project.activePhase {
-                HStack {
-                    Image(systemName: phase.phaseType.icon)
-                        .foregroundStyle(UserPreferences.shared.accentColor)
-                    Text("Phase: \(phase.title)")
-                        .foregroundStyle(.secondary)
-                    Text("(\(phase.progressString))")
-                        .foregroundStyle(.tertiary)
-                }
-                .font(.subheadline)
             }
         }
     }
 
-    // MARK: - Session Context
+    // MARK: - Context Card
 
-    private func sessionContext(_ session: PlannedSession) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Session title
-            HStack {
-                Image(systemName: "target")
-                    .foregroundStyle(UserPreferences.shared.accentColor)
-                Text(session.title)
-                    .font(.headline)
-            }
-
-            // Mental rule
-            if let rule = session.mentalRule {
-                HStack(alignment: .top) {
-                    Image(systemName: "brain.head.profile")
-                        .foregroundStyle(UserPreferences.shared.accentColor.opacity(0.7))
-                    Text("\"\(rule)\"")
-                        .italic()
+    @ViewBuilder
+    private var contextCard: some View {
+        if project.isPhaseMode, let phase = project.activePhase {
+            // Phase mode context
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: phase.phaseType.icon)
                         .foregroundStyle(UserPreferences.shared.accentColor)
+                    Text(phase.title)
+                        .font(.headline)
+                    Spacer()
+                    Text(phase.progressString)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
-                .font(.subheadline)
-            }
 
-            // Goal
-            if let goal = session.goal {
-                HStack(alignment: .top) {
-                    Image(systemName: "flag")
-                        .foregroundStyle(.secondary)
-                    Text("Goal: \(goal)")
+                if let rule = phase.mentalRule {
+                    HStack(alignment: .top) {
+                        Image(systemName: "brain.head.profile")
+                            .foregroundStyle(UserPreferences.shared.accentColor.opacity(0.7))
+                        Text("\"\(rule)\"")
+                            .italic()
+                            .foregroundStyle(UserPreferences.shared.accentColor)
+                    }
+                    .font(.subheadline)
+                }
+
+                // Progress bar
+                ProgressView(value: phase.progress)
+                    .tint(UserPreferences.shared.accentColor)
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(UserPreferences.shared.accentColor.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        } else if project.isMilestoneMode, let milestone = project.nextMilestone {
+            // Milestone mode context
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "circle")
+                        .foregroundStyle(UserPreferences.shared.accentColor)
+                    Text("Next: \(milestone.title)")
+                        .font(.headline)
+                }
+
+                if let description = milestone.descriptionText {
+                    Text(description)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                .font(.subheadline)
+
+                // Progress
+                let completed = project.completedMilestoneCount
+                let total = project.milestones.count
+                if total > 0 {
+                    HStack {
+                        Text("\(completed) of \(total) milestones completed")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                }
             }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(UserPreferences.shared.accentColor.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(UserPreferences.shared.accentColor.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Duration Picker
@@ -182,92 +206,77 @@ struct PhasedSessionLogSheet: View {
         }
     }
 
-    // MARK: - Action Buttons
+    // MARK: - Log Button
 
-    private var actionButtons: some View {
-        VStack(spacing: 12) {
-            // Mark session complete
-            if nextSession != nil {
-                Button {
-                    markSessionComplete()
-                } label: {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                        Text("Mark Session Complete")
-                    }
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(UserPreferences.shared.accentColor)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
+    private var logButton: some View {
+        Button {
+            logWork()
+        } label: {
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                Text("Log Work")
             }
-
-            // Just log touch
-            Button {
-                justLogTouch()
-            } label: {
-                Text("Just Log Touch")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-
-            // Skip session
-            if nextSession != nil {
-                Button {
-                    skipSession()
-                } label: {
-                    Text("Skip This Session")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            .fontWeight(.semibold)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(UserPreferences.shared.accentColor)
+            .foregroundStyle(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
 
     // MARK: - Actions
 
-    private func markSessionComplete() {
+    private func logWork() {
         let touch = TouchLog(
             durationMinutes: selectedDuration,
             note: note.isEmpty ? nil : note,
             project: project
         )
 
-        if let session = nextSession {
-            session.markComplete(with: touch)
+        // Link to active phase if in phase mode
+        if project.isPhaseMode, let phase = project.activePhase {
+            touch.phase = phase
         }
 
         onLog(touch)
         dismiss()
     }
-
-    private func justLogTouch() {
-        let touch = TouchLog(
-            durationMinutes: selectedDuration,
-            note: note.isEmpty ? nil : note,
-            project: project
-        )
-
-        onLog(touch)
-        dismiss()
-    }
-
-    private func skipSession() {
-        nextSession?.markSkipped()
-        dismiss()
-    }
 }
 
-#Preview {
+#Preview("Phase Mode") {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: Project.self, configurations: config)
+    let container = try! ModelContainer(for: Project.self, ProjectPhase.self, Milestone.self, TouchLog.self, configurations: config)
 
-    let project = Project(title: "Test Project")
+    let project = Project(title: "Research Paper", archetype: .lab)
     container.mainContext.insert(project)
+
+    let phase = ProjectPhase(
+        title: "Exploration",
+        phaseType: .divergent,
+        mentalRule: "Explore widely, no conclusions yet",
+        sequenceOrder: 0,
+        estimatedMinutes: 180
+    )
+    phase.project = project
+    container.mainContext.insert(phase)
+    project.phases = [phase]
+
+    return PhasedSessionLogSheet(project: project) { _ in }
+        .modelContainer(container)
+}
+
+#Preview("Milestone Mode") {
+    let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: Project.self, ProjectPhase.self, Milestone.self, TouchLog.self, configurations: config)
+
+    let project = Project(title: "Tax Filing 2025", mode: .milestone)
+    container.mainContext.insert(project)
+
+    let milestone = Milestone(title: "Gather W2s and 1099s", descriptionText: "Collect all income documents")
+    milestone.project = project
+    container.mainContext.insert(milestone)
+    project.milestones = [milestone]
 
     return PhasedSessionLogSheet(project: project) { _ in }
         .modelContainer(container)

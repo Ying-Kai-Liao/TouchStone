@@ -319,5 +319,5 @@ struct ProjectRow: View {
 
 #Preview {
     ProjectsListView()
-        .modelContainer(for: [Project.self, ProjectPhase.self, PlannedSession.self, TouchLog.self], inMemory: true)
+        .modelContainer(for: [Project.self, ProjectPhase.self, Milestone.self, TouchLog.self], inMemory: true)
 }

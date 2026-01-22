@@ -261,14 +261,24 @@ struct WaterFlowRow: View {
                         .foregroundStyle(DesignSystem.Colors.textPrimary)
                         .multilineTextAlignment(.leading)
 
-                    // Description - show subtitle or session goal
-                    if let project = item.project,
-                       let session = project.nextPlannedSession,
-                       let goal = session.goal, !goal.isEmpty {
-                        Text(goal)
-                            .font(.system(size: 15))
-                            .foregroundStyle(DesignSystem.Colors.textSecondary.opacity(0.9))
-                            .lineSpacing(4)
+                    // Description - show phase mental rule or next milestone
+                    if let project = item.project {
+                        if project.isPhaseMode, let phase = project.activePhase, let rule = phase.mentalRule, !rule.isEmpty {
+                            Text(rule)
+                                .font(.system(size: 15))
+                                .foregroundStyle(DesignSystem.Colors.textSecondary.opacity(0.9))
+                                .lineSpacing(4)
+                        } else if project.isMilestoneMode, let milestone = project.nextMilestone {
+                            Text(milestone.title)
+                                .font(.system(size: 15))
+                                .foregroundStyle(DesignSystem.Colors.textSecondary.opacity(0.9))
+                                .lineSpacing(4)
+                        } else if let subtitle = item.subtitle {
+                            Text(subtitle)
+                                .font(.system(size: 15))
+                                .foregroundStyle(DesignSystem.Colors.textSecondary.opacity(0.9))
+                                .lineSpacing(4)
+                        }
                     } else if let subtitle = item.subtitle {
                         Text(subtitle)
                             .font(.system(size: 15))
