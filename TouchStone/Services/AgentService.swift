@@ -358,9 +358,9 @@ class AgentService: ObservableObject {
     // MARK: - Properties
 
     /// The base URL for the agent backend
-    /// Automatically uses localhost in DEBUG builds and production URL in release builds
+    /// Uses localhost only in simulator, production URL for physical devices and release builds
     private var baseURL: String {
-        #if DEBUG
+        #if DEBUG && targetEnvironment(simulator)
         return "http://localhost:8000"
         #else
         return "https://touchstone-agent-backend.fly.dev"
