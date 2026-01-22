@@ -1,6 +1,41 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Language Option
+
+enum LanguageOption: String, CaseIterable, Identifiable {
+    case system = "system"
+    case english = "en"
+    case traditionalChinese = "zh-Hant"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: return String(localized: "System")
+        case .english: return "English"
+        case .traditionalChinese: return "繁體中文"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .system: return "globe"
+        case .english: return "a.circle"
+        case .traditionalChinese: return "character.zh"
+        }
+    }
+
+    /// The locale identifier for this language
+    var localeIdentifier: String? {
+        switch self {
+        case .system: return nil
+        case .english: return "en"
+        case .traditionalChinese: return "zh-Hant"
+        }
+    }
+}
+
 // MARK: - Appearance Mode Option
 
 enum AppearanceMode: String, CaseIterable, Identifiable {
@@ -183,6 +218,11 @@ class UserPreferences {
         static let themeColor = "themeColor"
         static let appearanceMode = "appearanceMode"
         static let deadlineBufferPercent = "deadlineBufferPercent"
+        // Deadline-aware scheduling settings
+        static let minProjectsPerDay = "minProjectsPerDay"
+        static let maxProjectsPerDay = "maxProjectsPerDay"
+        static let crunchThresholdDays = "crunchThresholdDays"
+        static let dueThisWeekPriorityBoost = "dueThisWeekPriorityBoost"
     }
 
     // MARK: - Productive Hours
@@ -245,11 +285,46 @@ class UserPreferences {
         didSet { defaults.set(deadlineBufferPercent, forKey: Keys.deadlineBufferPercent) }
     }
 
-    // MARK: - Language (Future)
+    // MARK: - Deadline-Aware Scheduling
+
+    /// Minimum number of distinct projects to schedule per day (flexible, default: 2)
+    var minProjectsPerDay: Int {
+        didSet { defaults.set(minProjectsPerDay, forKey: Keys.minProjectsPerDay) }
+    }
+
+    /// Maximum number of distinct projects to schedule per day (hard limit, default: 3)
+    var maxProjectsPerDay: Int {
+        didSet { defaults.set(maxProjectsPerDay, forKey: Keys.maxProjectsPerDay) }
+    }
+
+    /// Days before deadline to enter "crunch mode" where all time goes to that project (default: 2)
+    var crunchThresholdDays: Int {
+        didSet { defaults.set(crunchThresholdDays, forKey: Keys.crunchThresholdDays) }
+    }
+
+    /// Whether to give priority boost to items due within the week (default: true)
+    var dueThisWeekPriorityBoost: Bool {
+        didSet { defaults.set(dueThisWeekPriorityBoost, forKey: Keys.dueThisWeekPriorityBoost) }
+    }
+
+    // MARK: - Language
 
     /// App language setting (default: follow system)
-    var appLanguage: String {
-        didSet { defaults.set(appLanguage, forKey: Keys.appLanguage) }
+    var languageOption: LanguageOption {
+        didSet {
+            defaults.set(languageOption.rawValue, forKey: Keys.appLanguage)
+            applyLanguage()
+        }
+    }
+
+    /// Apply the selected language to the app
+    private func applyLanguage() {
+        if let localeId = languageOption.localeIdentifier {
+            UserDefaults.standard.set([localeId], forKey: "AppleLanguages")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        }
+        UserDefaults.standard.synchronize()
     }
 
     // MARK: - Appearance Mode
@@ -305,7 +380,19 @@ class UserPreferences {
         self.workIntervalMinutes = defaults.object(forKey: Keys.workIntervalMinutes) as? Int ?? 60
         self.restDurationMinutes = defaults.object(forKey: Keys.restDurationMinutes) as? Int ?? 15
         self.deadlineBufferPercent = defaults.object(forKey: Keys.deadlineBufferPercent) as? Int ?? 20
-        self.appLanguage = defaults.string(forKey: Keys.appLanguage) ?? "system"
+        // Deadline-aware scheduling settings
+        self.minProjectsPerDay = defaults.object(forKey: Keys.minProjectsPerDay) as? Int ?? 2
+        self.maxProjectsPerDay = defaults.object(forKey: Keys.maxProjectsPerDay) as? Int ?? 3
+        self.crunchThresholdDays = defaults.object(forKey: Keys.crunchThresholdDays) as? Int ?? 2
+        self.dueThisWeekPriorityBoost = defaults.object(forKey: Keys.dueThisWeekPriorityBoost) as? Bool ?? true
+
+        // Load language option
+        if let langString = defaults.string(forKey: Keys.appLanguage),
+           let lang = LanguageOption(rawValue: langString) {
+            self.languageOption = lang
+        } else {
+            self.languageOption = .system
+        }
 
         // Load appearance mode
         if let modeString = defaults.string(forKey: Keys.appearanceMode),

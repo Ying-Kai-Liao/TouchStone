@@ -37,71 +37,22 @@ struct StoneEditSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Event name", text: $title)
-                        .textInputAutocapitalization(.sentences)
-                }
+            ZStack {
+                DesignSystem.Colors.background
+                    .ignoresSafeArea()
 
-                Section("Time") {
-                    HStack {
-                        Text("Start")
-                        Spacer()
-                        Picker("Hour", selection: $startHour) {
-                            ForEach(hours, id: \.self) { hour in
-                                Text(formatHour(hour)).tag(hour)
-                            }
-                        }
-                        .pickerStyle(.menu)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                        // Name section
+                        nameSection
 
-                        Text(":")
+                        // Time section
+                        timeSection
 
-                        Picker("Minute", selection: $startMinute) {
-                            ForEach(minutes, id: \.self) { minute in
-                                Text(String(format: "%02d", minute)).tag(minute)
-                            }
-                        }
-                        .pickerStyle(.menu)
+                        // Recurrence section
+                        recurrenceSection
                     }
-
-                    HStack {
-                        Text("End")
-                        Spacer()
-                        Picker("Hour", selection: $endHour) {
-                            ForEach(hours, id: \.self) { hour in
-                                Text(formatHour(hour)).tag(hour)
-                            }
-                        }
-                        .pickerStyle(.menu)
-
-                        Text(":")
-
-                        Picker("Minute", selection: $endMinute) {
-                            ForEach(minutes, id: \.self) { minute in
-                                Text(String(format: "%02d", minute)).tag(minute)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                    }
-                }
-
-                Section("Repeats") {
-                    Picker("Recurrence", selection: $recurrenceType) {
-                        Text("One time").tag(RecurrenceType.none)
-                        Text("Daily").tag(RecurrenceType.daily)
-                        Text("Weekdays").tag(RecurrenceType.weekdays)
-                        Text("Weekends").tag(RecurrenceType.weekends)
-                        Text("Weekly").tag(RecurrenceType.weekly)
-                        Text("Custom days").tag(RecurrenceType.custom)
-                    }
-
-                    if recurrenceType == .none || recurrenceType == .weekly {
-                        DatePicker("Date", selection: $specificDate, displayedComponents: .date)
-                    }
-
-                    if recurrenceType == .custom {
-                        customDaysSelector
-                    }
+                    .padding(DesignSystem.Spacing.xl)
                 }
             }
             .navigationTitle("Edit Stone")
@@ -111,23 +62,199 @@ struct StoneEditSheet: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         saveChanges()
                     }
                     .disabled(title.isEmpty || !isValidTimeRange)
+                    .foregroundStyle(title.isEmpty || !isValidTimeRange ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.accent)
                     .fontWeight(.semibold)
                 }
             }
         }
     }
 
+    // MARK: - Name Section
+
+    private var nameSection: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+            Text("NAME")
+                .font(DesignSystem.Typography.captionBold)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .tracking(1)
+
+            TextField("Event name", text: $title)
+                .font(DesignSystem.Typography.body)
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                .textInputAutocapitalization(.sentences)
+                .padding(DesignSystem.Spacing.lg)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                        .fill(DesignSystem.Colors.cardBackground)
+                )
+        }
+    }
+
+    // MARK: - Time Section
+
+    private var timeSection: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+            Text("TIME")
+                .font(DesignSystem.Typography.captionBold)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .tracking(1)
+
+            VStack(spacing: 0) {
+                // Start time
+                HStack {
+                    Text("Start")
+                        .font(DesignSystem.Typography.body)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    Spacer()
+                    Picker("Hour", selection: $startHour) {
+                        ForEach(hours, id: \.self) { hour in
+                            Text(formatHour(hour)).tag(hour)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .tint(DesignSystem.Colors.accent)
+
+                    Text(":")
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+
+                    Picker("Minute", selection: $startMinute) {
+                        ForEach(minutes, id: \.self) { minute in
+                            Text(String(format: "%02d", minute)).tag(minute)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .tint(DesignSystem.Colors.accent)
+                }
+                .padding(DesignSystem.Spacing.lg)
+
+                Divider()
+                    .background(DesignSystem.Colors.divider)
+
+                // End time
+                HStack {
+                    Text("End")
+                        .font(DesignSystem.Typography.body)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    Spacer()
+                    Picker("Hour", selection: $endHour) {
+                        ForEach(hours, id: \.self) { hour in
+                            Text(formatHour(hour)).tag(hour)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .tint(DesignSystem.Colors.accent)
+
+                    Text(":")
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+
+                    Picker("Minute", selection: $endMinute) {
+                        ForEach(minutes, id: \.self) { minute in
+                            Text(String(format: "%02d", minute)).tag(minute)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .tint(DesignSystem.Colors.accent)
+                }
+                .padding(DesignSystem.Spacing.lg)
+            }
+            .background(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                    .fill(DesignSystem.Colors.cardBackground)
+            )
+        }
+    }
+
+    // MARK: - Recurrence Section
+
+    private var recurrenceSection: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+            Text("REPEATS")
+                .font(DesignSystem.Typography.captionBold)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .tracking(1)
+
+            VStack(spacing: 0) {
+                // Recurrence type picker
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+                    recurrenceOptionRow("One time", type: .none)
+                    recurrenceOptionRow("Daily", type: .daily)
+                    recurrenceOptionRow("Weekdays", type: .weekdays)
+                    recurrenceOptionRow("Weekends", type: .weekends)
+                    recurrenceOptionRow("Weekly", type: .weekly)
+                    recurrenceOptionRow("Custom days", type: .custom)
+                }
+                .padding(DesignSystem.Spacing.lg)
+
+                // Date picker for one-time or weekly
+                if recurrenceType == .none || recurrenceType == .weekly {
+                    Divider()
+                        .background(DesignSystem.Colors.divider)
+
+                    HStack {
+                        Text("Date")
+                            .font(DesignSystem.Typography.body)
+                            .foregroundStyle(DesignSystem.Colors.textPrimary)
+                        Spacer()
+                        DatePicker("", selection: $specificDate, displayedComponents: .date)
+                            .labelsHidden()
+                            .tint(DesignSystem.Colors.accent)
+                    }
+                    .padding(DesignSystem.Spacing.lg)
+                }
+
+                // Custom days selector
+                if recurrenceType == .custom {
+                    Divider()
+                        .background(DesignSystem.Colors.divider)
+
+                    customDaysSelector
+                        .padding(DesignSystem.Spacing.lg)
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                    .fill(DesignSystem.Colors.cardBackground)
+            )
+        }
+    }
+
+    private func recurrenceOptionRow(_ label: String, type: RecurrenceType) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                recurrenceType = type
+            }
+        } label: {
+            HStack {
+                Text(label)
+                    .font(DesignSystem.Typography.body)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                Spacer()
+                if recurrenceType == type {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(DesignSystem.Colors.accent)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
     private var customDaysSelector: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
             Text("Select days")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(DesignSystem.Typography.caption)
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
 
             HStack(spacing: 8) {
                 ForEach([(1, "S"), (2, "M"), (3, "T"), (4, "W"), (5, "T"), (6, "F"), (7, "S")], id: \.0) { day, label in
@@ -139,11 +266,11 @@ struct StoneEditSheet: View {
                         }
                     } label: {
                         Text(label)
-                            .font(.caption)
+                            .font(DesignSystem.Typography.caption)
                             .fontWeight(.medium)
-                            .frame(width: 32, height: 32)
-                            .background(customDays.contains(day) ? UserPreferences.shared.accentColor : Color(.tertiarySystemFill))
-                            .foregroundStyle(customDays.contains(day) ? .white : .primary)
+                            .frame(width: 36, height: 36)
+                            .background(customDays.contains(day) ? DesignSystem.Colors.accent : DesignSystem.Colors.backgroundLight)
+                            .foregroundStyle(customDays.contains(day) ? DesignSystem.Colors.background : DesignSystem.Colors.textPrimary)
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)

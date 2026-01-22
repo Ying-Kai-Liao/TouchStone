@@ -287,6 +287,7 @@ struct TodayFlowView: View {
 
     /// User confirmed they want to work today - record start time
     private func confirmWorkToday() {
+        HapticService.confirmDay()
         let plan = getOrCreateTodayPlan()
         plan.wantsToWork = true
         plan.startedAt = Date()
@@ -306,6 +307,7 @@ struct TodayFlowView: View {
 
     /// User declined to work today - hide work suggestions
     private func declineWorkToday() {
+        HapticService.buttonPress()
         let plan = getOrCreateTodayPlan()
         plan.wantsToWork = false
 
@@ -365,6 +367,7 @@ struct TodayFlowView: View {
 
     /// Actually perform the touch (called directly or after user confirms)
     private func performTouch(_ project: Project) {
+        HapticService.touch()
         let touch = TouchLog(project: project)
 
         // If project is in phase mode, link touch to active phase
@@ -409,6 +412,7 @@ struct TodayFlowView: View {
 
     private func undoTouch() {
         if let touch = lastTouch {
+            HapticService.undo()
             modelContext.delete(touch)
             withAnimation {
                 showUndoToast = false

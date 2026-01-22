@@ -40,7 +40,7 @@ struct ProjectsListView: View {
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showingAddSheet) {
-                NewProjectChoiceView()
+                StrategicPlanningChatView()
             }
             .alert("Delete Project", isPresented: $showDeleteAlert, presenting: projectToDelete) { project in
                 Button("Cancel", role: .cancel) {

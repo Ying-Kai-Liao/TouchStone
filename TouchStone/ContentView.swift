@@ -3,18 +3,21 @@ import SwiftData
 
 struct ContentView: View {
     private var prefs = UserPreferences.shared
+    @State private var selectedTab = 0
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             TodayFlowView()
                 .tabItem {
                     Label("Flow", systemImage: "drop.fill")
                 }
+                .tag(0)
 
             CalendarView()
                 .tabItem {
                     Label("Calendar", systemImage: "calendar")
                 }
+                .tag(1)
 
             UnifiedInputView()
                 .tabItem {
@@ -25,13 +28,18 @@ struct ContentView: View {
                 .tabItem {
                     Label("Plan", systemImage: "square.grid.2x2")
                 }
+                .tag(2)
 
             MeView()
                 .tabItem {
                     Label("Me", systemImage: "person")
                 }
+                .tag(3)
         }
         .tint(prefs.accentColor)
+        .onChange(of: selectedTab) {
+            HapticService.tabSelect()
+        }
     }
 }
 

@@ -150,6 +150,29 @@ enum DesignSystem {
                 : Color(red: 0.40, green: 0.58, blue: 0.50)
         }
 
+        // MARK: - Badge Colors (Monochromatic)
+
+        /// Primary badge color - subtle, neutral
+        static var badge: Color {
+            isDarkMode
+                ? Color.white.opacity(0.55)
+                : Color.black.opacity(0.50)
+        }
+
+        /// Badge background fill
+        static var badgeBackground: Color {
+            isDarkMode
+                ? Color.white.opacity(0.08)
+                : Color.black.opacity(0.05)
+        }
+
+        /// Badge border
+        static var badgeBorder: Color {
+            isDarkMode
+                ? Color.white.opacity(0.12)
+                : Color.black.opacity(0.08)
+        }
+
         // MARK: - Divider/Border Colors
 
         static var divider: Color {
