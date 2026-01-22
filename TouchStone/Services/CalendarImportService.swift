@@ -1,15 +1,18 @@
 import Foundation
 import EventKit
+import SwiftUI
 
 /// Service for importing events from the system calendar
-class CalendarImportService: ObservableObject {
+@MainActor
+@Observable
+class CalendarImportService {
     private let eventStore = EKEventStore()
 
-    @Published var authorizationStatus: EKAuthorizationStatus = .notDetermined
-    @Published var calendars: [EKCalendar] = []
-    @Published var events: [EKEvent] = []
-    @Published var isLoading = false
-    @Published var error: String?
+    var authorizationStatus: EKAuthorizationStatus = .notDetermined
+    var calendars: [EKCalendar] = []
+    var events: [EKEvent] = []
+    var isLoading = false
+    var error: String?
 
     init() {
         updateAuthorizationStatus()
@@ -24,14 +27,10 @@ class CalendarImportService: ObservableObject {
     func requestAccess() async -> Bool {
         do {
             let granted = try await eventStore.requestFullAccessToEvents()
-            await MainActor.run {
-                updateAuthorizationStatus()
-            }
+            updateAuthorizationStatus()
             return granted
         } catch {
-            await MainActor.run {
-                self.error = error.localizedDescription
-            }
+            self.error = error.localizedDescription
             return false
         }
     }

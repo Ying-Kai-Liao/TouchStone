@@ -3,7 +3,7 @@ import EventKit
 
 struct ImportEventsView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var importService = CalendarImportService()
+    @State private var importService = CalendarImportService()
 
     let onImport: ([StoneEvent]) -> Void
 
@@ -59,8 +59,8 @@ struct ImportEventsView: View {
         } actions: {
             Button("Grant Access") {
                 Task {
-                    await importService.requestAccess()
-                    if importService.authorizationStatus == .fullAccess {
+                    let granted = await importService.requestAccess()
+                    if granted {
                         loadCalendarsAndEvents()
                     }
                 }
