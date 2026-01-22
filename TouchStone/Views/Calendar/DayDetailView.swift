@@ -22,12 +22,19 @@ struct DayDetailView: View {
     @State private var stoneToDelete: StoneEvent?
     @State private var showDeleteAlert = false
     @State private var stoneToEdit: StoneEvent?
+    @State private var dayState: DayState?
+    @State private var showTimeAllocation = false
 
     let date: Date
     let stones: [StoneEvent]
     let onAddStone: () -> Void
 
     private let calendar = Calendar.current
+
+    // Computed suggested sessions for this day
+    private var suggestedSessions: [SuggestedSession] {
+        dayState?.suggestedSessions ?? []
+    }
 
     var body: some View {
         NavigationStack {
@@ -47,11 +54,19 @@ struct DayDetailView: View {
                             emptyScheduleHint
                         }
 
-                        // Pie chart section
-                        dayAllocationChart
+                        // Suggested work section
+                        if !suggestedSessions.isEmpty {
+                            suggestedWorkSection
+                        }
+
+                        // Time allocation chart (collapsible)
+                        timeAllocationSection
                             .padding(.horizontal, DesignSystem.Spacing.xl)
                     }
                     .padding(.bottom, 100)
+                }
+                .onAppear {
+                    computeDayState()
                 }
                 .safeAreaInset(edge: .bottom) {
                     addStoneButton
@@ -115,6 +130,70 @@ struct DayDetailView: View {
             }
         }
         .padding(.vertical, DesignSystem.Spacing.xl)
+    }
+
+    // MARK: - Compute Day State
+
+    private func computeDayState() {
+        let state = DayState(date: date)
+        state.compute(stones: Array(allStones), projects: Array(activeProjects))
+        dayState = state
+    }
+
+    // MARK: - Suggested Work Section
+
+    private var suggestedWorkSection: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            Text("SUGGESTED WORK")
+                .font(DesignSystem.Typography.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .tracking(1)
+                .padding(.horizontal, DesignSystem.Spacing.xl)
+
+            ForEach(suggestedSessions) { session in
+                SuggestedWorkRow(session: session)
+                    .padding(.horizontal, DesignSystem.Spacing.xl)
+            }
+        }
+        .padding(.bottom, DesignSystem.Spacing.xl)
+    }
+
+    // MARK: - Time Allocation Section (Collapsible)
+
+    private var timeAllocationSection: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showTimeAllocation.toggle()
+                }
+            } label: {
+                HStack {
+                    Text("TIME ALLOCATION")
+                        .font(DesignSystem.Typography.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .tracking(1)
+
+                    Spacer()
+
+                    Image(systemName: showTimeAllocation ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                }
+                .padding(DesignSystem.Spacing.lg)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                        .fill(DesignSystem.Colors.cardBackground)
+                )
+            }
+            .buttonStyle(.plain)
+
+            if showTimeAllocation {
+                dayAllocationChart
+                    .padding(.top, DesignSystem.Spacing.sm)
+            }
+        }
     }
 
     // MARK: - Pie Chart Data
@@ -186,14 +265,8 @@ struct DayDetailView: View {
         let loadPercent = Int(data.loadResult.load * 100)
 
         return VStack(spacing: DesignSystem.Spacing.lg) {
-            // Header with day type badge
+            // Day type badge
             HStack {
-                Text("TIME ALLOCATION")
-                    .font(DesignSystem.Typography.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(DesignSystem.Colors.textTertiary)
-                    .tracking(1)
-
                 Spacer()
 
                 if data.loadResult.isBufferDay {
@@ -499,6 +572,54 @@ struct StoneRowView: View {
                 return days.map { dayLabels[$0 - 1] }.joined(separator: ", ")
             }
             return "Custom"
+        }
+    }
+}
+
+// MARK: - Suggested Work Row
+
+struct SuggestedWorkRow: View {
+    let session: SuggestedSession
+    private let prefs = UserPreferences.shared
+
+    var body: some View {
+        HStack(spacing: DesignSystem.Spacing.md) {
+            // Time indicator
+            VStack(alignment: .leading, spacing: 2) {
+                Text(session.periodLabel)
+                    .font(DesignSystem.Typography.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                Text("~\(session.suggestedMinutes)m")
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+            }
+            .frame(width: 70, alignment: .leading)
+
+            // Project card
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+                Text(session.project.title)
+                    .font(DesignSystem.Typography.body)
+                    .fontWeight(.medium)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                // Phase name
+                if let phase = session.project.activePhase {
+                    Text(phase.title)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(prefs.accentColor)
+                } else if let phase = session.project.currentPhase {
+                    Text(phase)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(DesignSystem.Spacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                    .fill(DesignSystem.Colors.accent.opacity(0.1))
+            )
         }
     }
 }
