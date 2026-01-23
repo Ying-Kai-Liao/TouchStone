@@ -3,22 +3,32 @@ import SwiftData
 
 // MARK: - Context Form View
 
-/// Form for creating or editing a day context.
+/// Form for creating or editing a day context/day plan.
 struct ContextFormView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
     let context: DayContext?
+    let initialDate: Date
 
     @State private var name: String = ""
-    @State private var startDate: Date = Date()
-    @State private var endDate: Date = Date()
+    @State private var startDate: Date
+    @State private var endDate: Date
     @State private var contextType: DayContextType = .custom
     @State private var workMode: DayContextWorkMode = .normal
     @State private var capacityPercent: Int = 50
     @State private var fixedTaskDescription: String = ""
     @State private var notes: String = ""
     @State private var showSaveError = false
+
+    init(context: DayContext?, initialDate: Date = Date()) {
+        self.context = context
+        self.initialDate = initialDate
+        // Pre-fill with initialDate for new contexts
+        let dateToUse = context?.startDate ?? initialDate
+        _startDate = State(initialValue: dateToUse)
+        _endDate = State(initialValue: context?.endDate ?? dateToUse)
+    }
 
     private var isEditing: Bool { context != nil }
 
@@ -42,7 +52,7 @@ struct ContextFormView: View {
                 .padding(DesignSystem.Spacing.xl)
             }
         }
-        .navigationTitle(isEditing ? "Edit Context" : "New Context")
+        .navigationTitle(isEditing ? "Edit Day Plan" : "New Day Plan")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {

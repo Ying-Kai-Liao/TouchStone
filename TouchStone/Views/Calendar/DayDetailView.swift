@@ -30,6 +30,7 @@ struct DayDetailView: View {
     @State private var stoneToEdit: StoneEvent?
     @State private var dayState: DayState?
     @State private var showTimeAllocation = false
+    @State private var showingAddContext = false
 
     let date: Date
     let stones: [StoneEvent]
@@ -127,6 +128,11 @@ struct DayDetailView: View {
             }
             .sheet(item: $stoneToEdit) { stone in
                 StoneEditSheet(stone: stone, onSave: {})
+            }
+            .sheet(isPresented: $showingAddContext) {
+                NavigationStack {
+                    ContextFormView(context: nil, initialDate: date)
+                }
             }
         }
     }
@@ -443,22 +449,44 @@ struct DayDetailView: View {
     }
 
     private var addStoneButton: some View {
-        Button {
-            onAddStone()
-        } label: {
-            HStack(spacing: DesignSystem.Spacing.md) {
-                Image(systemName: "mic.fill")
-                    .font(.system(size: 20))
-                Text("Add Stone")
-                    .font(DesignSystem.Typography.headline)
+        HStack(spacing: DesignSystem.Spacing.md) {
+            // Add Event button
+            Button {
+                onAddStone()
+            } label: {
+                HStack(spacing: DesignSystem.Spacing.sm) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 18))
+                    Text("Add Event")
+                        .font(DesignSystem.Typography.headline)
+                }
+                .foregroundStyle(DesignSystem.Colors.background)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, DesignSystem.Spacing.lg)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                        .fill(DesignSystem.Colors.accent)
+                )
             }
-            .foregroundStyle(DesignSystem.Colors.background)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, DesignSystem.Spacing.lg)
-            .background(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
-                    .fill(DesignSystem.Colors.accent)
-            )
+
+            // Day Plan button
+            Button {
+                showingAddContext = true
+            } label: {
+                HStack(spacing: DesignSystem.Spacing.sm) {
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 18))
+                    Text("Day Plan")
+                        .font(DesignSystem.Typography.headline)
+                }
+                .foregroundStyle(DesignSystem.Colors.accent)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, DesignSystem.Spacing.lg)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                        .strokeBorder(DesignSystem.Colors.accent, lineWidth: 2)
+                )
+            }
         }
         .padding(DesignSystem.Spacing.lg)
         .background(DesignSystem.Colors.background)

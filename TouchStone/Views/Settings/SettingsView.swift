@@ -39,7 +39,7 @@ struct SettingsView: View {
                     }
 
                     NavigationLink(destination: ContextListView()) {
-                        SettingsRow(icon: "calendar.badge.plus", title: "Day Contexts")
+                        SettingsRow(icon: "calendar.badge.plus", title: "Day Plans")
                     }
 
                     // MARK: - Focus Section

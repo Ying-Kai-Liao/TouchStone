@@ -51,7 +51,7 @@ struct ContextListView: View {
                 .padding(DesignSystem.Spacing.xl)
             }
         }
-        .navigationTitle("Day Contexts")
+        .navigationTitle("Day Plans")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -83,7 +83,7 @@ struct ContextListView: View {
                 .font(.system(size: 40))
                 .foregroundStyle(DesignSystem.Colors.textTertiary)
 
-            Text("No day contexts")
+            Text("No day plans")
                 .font(DesignSystem.Typography.body)
                 .foregroundStyle(DesignSystem.Colors.textSecondary)
 
@@ -132,7 +132,7 @@ struct ContextListView: View {
     // MARK: - Help Text
 
     private var helpText: some View {
-        Text("Day contexts affect how work is scheduled. Use them to mark holidays, vacations, or days with reduced capacity.")
+        Text("Day plans affect how work is scheduled. Use them to mark holidays, vacations, or days with reduced capacity.")
             .font(DesignSystem.Typography.caption)
             .foregroundStyle(DesignSystem.Colors.textTertiary)
             .padding(.horizontal, DesignSystem.Spacing.sm)
