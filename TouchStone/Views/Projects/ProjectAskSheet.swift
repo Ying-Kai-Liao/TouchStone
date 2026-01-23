@@ -23,6 +23,9 @@ struct ProjectAskSheet: View {
     @State private var suggestions: [String] = []
     @State private var conversationState: AgentService.ConversationState = .initial
 
+    // Confirmed actions (displayed after commit)
+    @State private var confirmedActions: [AgentService.PendingAction] = []
+
     @SwiftUI.FocusState private var isInputFocused: Bool
 
     var body: some View {
@@ -98,6 +101,17 @@ struct ProjectAskSheet: View {
                         .padding(.horizontal)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .id("pending-actions")
+                    }
+
+                    // Confirmed actions preview (shown after user confirms)
+                    if !confirmedActions.isEmpty {
+                        ConfirmedActionsPreview(confirmedActions: confirmedActions)
+                            .padding(.horizontal)
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.95).combined(with: .opacity),
+                                removal: .opacity
+                            ))
+                            .id("confirmed-actions")
                     }
 
                     // Streaming response
@@ -265,8 +279,20 @@ struct ProjectAskSheet: View {
                 suggestions = response.suggestions
                 conversationState = response.conversationState
 
-                if response.conversationState == .confirmed {
-                    await commitPendingActions()
+                // Handle confirmed actions from backend (multi-task flow)
+                if !response.confirmedActions.isEmpty {
+                    // Commit to local storage
+                    await commitActions(response.confirmedActions)
+
+                    // Show confirmed preview
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        confirmedActions = response.confirmedActions
+                    }
+
+                    // Dismiss after showing confirmation
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        dismiss()
+                    }
                 }
             } catch {
                 errorMessage = error.localizedDescription
@@ -322,9 +348,20 @@ struct ProjectAskSheet: View {
                 self.suggestions = response.suggestions
                 conversationState = response.conversationState
 
-                // Handle confirmed state
-                if response.conversationState == .confirmed {
-                    await commitPendingActions()
+                // Handle confirmed actions from backend (multi-task flow)
+                if !response.confirmedActions.isEmpty {
+                    // Commit to local storage
+                    await commitActions(response.confirmedActions)
+
+                    // Show confirmed preview
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        confirmedActions = response.confirmedActions
+                    }
+
+                    // Dismiss after showing confirmation
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        dismiss()
+                    }
                 }
             } catch {
                 // Rollback on failure: restore the pending actions
@@ -403,8 +440,33 @@ struct ProjectAskSheet: View {
         }
     }
 
+    /// Commit pending actions from state (legacy path)
     private func commitPendingActions() async {
-        for action in pendingActions {
+        // Store actions for confirmed preview before processing
+        let actionsToConfirm = pendingActions
+
+        // Commit the actions
+        await commitActions(actionsToConfirm)
+
+        // Clear pending state
+        pendingActions = []
+        suggestions = []
+        conversationState = .initial
+
+        // Show confirmed actions preview
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            confirmedActions = actionsToConfirm
+        }
+
+        // Dismiss after a brief delay to show confirmation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            dismiss()
+        }
+    }
+
+    /// Create SwiftData objects from a list of actions
+    private func commitActions(_ actions: [AgentService.PendingAction]) async {
+        for action in actions {
             switch action.actionType {
             case "add_project":
                 if let project = action.project {
@@ -413,18 +475,6 @@ struct ProjectAskSheet: View {
             default:
                 break
             }
-        }
-
-        pendingActions = []
-        suggestions = []
-        conversationState = .initial
-
-        let confirmMessage = AgentChatMessage(role: .assistant, content: "Done! Your project has been created.")
-        messages.append(confirmMessage)
-
-        // Dismiss after a brief delay to show confirmation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            dismiss()
         }
     }
 

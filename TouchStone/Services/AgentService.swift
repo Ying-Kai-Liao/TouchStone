@@ -339,6 +339,7 @@ class AgentService: ObservableObject {
 
         // Phase 2: Pending actions for GenUI preview
         let pendingActions: [PendingAction]
+        let confirmedActions: [PendingAction]  // Actions just confirmed (for multi-task flow)
         let confirmationRequired: Bool
         let conversationState: ConversationState
 
@@ -353,6 +354,7 @@ class AgentService: ObservableObject {
             case message
             case sessionId = "session_id"
             case pendingActions = "pending_actions"
+            case confirmedActions = "confirmed_actions"
             case confirmationRequired = "confirmation_required"
             case conversationState = "conversation_state"
             case suggestions
@@ -366,6 +368,7 @@ class AgentService: ObservableObject {
             message = try container.decode(String.self, forKey: .message)
             sessionId = try container.decode(String.self, forKey: .sessionId)
             pendingActions = try container.decodeIfPresent([PendingAction].self, forKey: .pendingActions) ?? []
+            confirmedActions = try container.decodeIfPresent([PendingAction].self, forKey: .confirmedActions) ?? []
             confirmationRequired = try container.decodeIfPresent(Bool.self, forKey: .confirmationRequired) ?? false
             conversationState = try container.decodeIfPresent(ConversationState.self, forKey: .conversationState) ?? .initial
             suggestions = try container.decodeIfPresent([String].self, forKey: .suggestions) ?? []

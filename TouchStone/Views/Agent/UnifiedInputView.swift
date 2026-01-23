@@ -26,6 +26,9 @@ struct UnifiedInputView: View {
     @State private var suggestions: [String] = []
     @State private var conversationState: AgentService.ConversationState = .initial
 
+    // Confirmed actions (displayed after commit)
+    @State private var confirmedActions: [AgentService.PendingAction] = []
+
     @SwiftUI.FocusState private var isInputFocused: Bool
 
     // MARK: - Body
@@ -121,6 +124,17 @@ struct UnifiedInputView: View {
                         .padding(.horizontal)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .id("pending-actions")
+                    }
+
+                    // Confirmed actions preview (shown after user confirms)
+                    if !confirmedActions.isEmpty {
+                        ConfirmedActionsPreview(confirmedActions: confirmedActions)
+                            .padding(.horizontal)
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.95).combined(with: .opacity),
+                                removal: .opacity
+                            ))
+                            .id("confirmed-actions")
                     }
 
                     // Streaming response
@@ -323,17 +337,6 @@ struct UnifiedInputView: View {
                 // Send to backend
                 let response = try await agentService.chat(message: text, context: context)
 
-                // DEBUG: Log response details
-                print("DEBUG: Response received")
-                print("DEBUG: conversationState = \(response.conversationState)")
-                print("DEBUG: pendingActions count = \(response.pendingActions.count)")
-                for action in response.pendingActions {
-                    print("DEBUG: action type = \(action.actionType)")
-                    if let stone = action.stone {
-                        print("DEBUG: stone = \(stone.title) on \(stone.date ?? "no date")")
-                    }
-                }
-
                 // Add assistant response
                 let assistantMessage = AgentChatMessage(role: .assistant, content: response.message)
                 messages.append(assistantMessage)
@@ -343,12 +346,22 @@ struct UnifiedInputView: View {
                 suggestions = response.suggestions
                 conversationState = response.conversationState
 
-                // Handle confirmed state - create data locally
-                if response.conversationState == .confirmed {
-                    print("DEBUG: State is CONFIRMED, calling commitPendingActions()")
-                    await commitPendingActions()
-                } else {
-                    print("DEBUG: State is NOT confirmed: \(response.conversationState)")
+                // Handle confirmed actions from backend (multi-task flow)
+                if !response.confirmedActions.isEmpty {
+                    // Commit to local storage
+                    await commitActions(response.confirmedActions)
+
+                    // Show confirmed preview
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        confirmedActions = response.confirmedActions
+                    }
+
+                    // Clear confirmed preview after delay (user can add more)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        withAnimation {
+                            confirmedActions = []
+                        }
+                    }
                 }
 
                 // Process any legacy actions
@@ -430,9 +443,22 @@ struct UnifiedInputView: View {
                 self.suggestions = response.suggestions
                 conversationState = response.conversationState
 
-                // Handle confirmed state
-                if response.conversationState == .confirmed {
-                    await commitPendingActions()
+                // Handle confirmed actions from backend (multi-task flow)
+                if !response.confirmedActions.isEmpty {
+                    // Commit to local storage
+                    await commitActions(response.confirmedActions)
+
+                    // Show confirmed preview
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        confirmedActions = response.confirmedActions
+                    }
+
+                    // Clear confirmed preview after delay (user can add more)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        withAnimation {
+                            confirmedActions = []
+                        }
+                    }
                 }
             } catch {
                 // Rollback on failure: restore the pending actions
@@ -519,18 +545,32 @@ struct UnifiedInputView: View {
     }
 
     /// Create SwiftData objects from pending actions (iOS-as-authority pattern)
+    /// This version uses the current pendingActions state
     private func commitPendingActions() async {
-        print("DEBUG: commitPendingActions called with \(pendingActions.count) actions")
+        // Store actions for confirmed preview before processing
+        let actionsToConfirm = pendingActions
 
-        for action in pendingActions {
-            print("DEBUG: Processing action: \(action.actionType)")
+        // Commit the actions
+        await commitActions(actionsToConfirm)
+
+        // Clear pending state
+        pendingActions = []
+        suggestions = []
+        conversationState = .initial
+
+        // Show confirmed actions preview
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            confirmedActions = actionsToConfirm
+        }
+    }
+
+    /// Create SwiftData objects from a list of actions (used by both commitPendingActions and direct confirmed actions)
+    private func commitActions(_ actions: [AgentService.PendingAction]) async {
+        for action in actions {
             switch action.actionType {
             case "add_stone":
                 if let stone = action.stone {
-                    print("DEBUG: Creating stone: \(stone.title)")
                     await createStoneEvent(from: stone)
-                } else {
-                    print("DEBUG: action.stone is nil!")
                 }
             case "add_project":
                 if let project = action.project {
@@ -541,20 +581,9 @@ struct UnifiedInputView: View {
                     await createTouchLog(from: log)
                 }
             default:
-                print("DEBUG: Unknown action type: \(action.actionType)")
                 break
             }
         }
-
-        // Clear pending state
-        pendingActions = []
-        suggestions = []
-        conversationState = .initial
-
-        // Add confirmation message
-        let confirmMessage = AgentChatMessage(role: .assistant, content: "Done! I've added everything to your schedule.")
-        messages.append(confirmMessage)
-        print("DEBUG: commitPendingActions completed")
     }
 
     /// Create a StoneEvent from pending data
@@ -710,6 +739,10 @@ struct UnifiedInputView: View {
         agentService.startNewSession()
         messages = []
         briefing = nil
+        pendingActions = []
+        confirmedActions = []
+        suggestions = []
+        conversationState = .initial
 
         Task {
             await checkBackendAndLoadBriefing()
