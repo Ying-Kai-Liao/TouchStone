@@ -3,6 +3,7 @@ import SwiftData
 
 /// GenUI preview component for pending actions (stones, projects, logs).
 /// Shows what will be created before user confirms.
+/// Tapping on items opens detail sheets for editing.
 struct PendingActionsPreview: View {
     let pendingActions: [AgentService.PendingAction]
     let suggestions: [String]
@@ -10,6 +11,28 @@ struct PendingActionsPreview: View {
     let onCancel: () -> Void
     let onSuggestionTap: (String) -> Void
     var onProjectTimeChange: ((String, Int) -> Void)? = nil  // (projectId, newTotalMinutes)
+    var onActionUpdate: ((Int, AgentService.PendingAction) -> Void)? = nil  // (index, updatedAction)
+    var onActionDelete: ((Int) -> Void)? = nil  // (index)
+    var availableProjects: [PendingLogDetailSheet.ProjectOption] = []  // For log editing
+
+    // Sheet presentation state
+    @State private var selectedStoneIndex: Int?
+    @State private var selectedProjectIndex: Int?
+    @State private var selectedLogIndex: Int?
+
+    /// Words/phrases that indicate confirmation-like suggestions which duplicate the confirm/cancel buttons
+    private static let confirmationKeywords: Set<String> = [
+        "looks good", "lgtm", "confirm", "yes", "ok", "okay", "approve",
+        "cancel", "no", "reject", "nevermind", "never mind", "stop"
+    ]
+
+    /// Filtered suggestions that exclude confirmation-like phrases to avoid button duplication
+    private var filteredSuggestions: [String] {
+        suggestions.filter { suggestion in
+            let lowercased = suggestion.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            return !Self.confirmationKeywords.contains(lowercased)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
@@ -31,8 +54,8 @@ struct PendingActionsPreview: View {
                 pendingLogsSection(logs)
             }
 
-            // Quick suggestions
-            if !suggestions.isEmpty {
+            // Quick suggestions (filtered to remove confirmation-like duplicates)
+            if !filteredSuggestions.isEmpty {
                 suggestionButtons
             }
 
@@ -57,10 +80,44 @@ struct PendingActionsPreview: View {
                 .font(DesignSystem.Typography.captionBold)
                 .foregroundStyle(DesignSystem.Colors.textSecondary)
 
-            ForEach(stones) { stone in
+            ForEach(Array(stones.enumerated()), id: \.element.id) { index, stone in
                 PendingStoneRow(stone: stone)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        // Find the index in the original pendingActions array
+                        if let actionIndex = findActionIndex(for: stone) {
+                            selectedStoneIndex = actionIndex
+                        }
+                    }
             }
         }
+        .sheet(item: Binding(
+            get: { selectedStoneIndex.map { StoneSheetItem(index: $0) } },
+            set: { selectedStoneIndex = $0?.index }
+        )) { item in
+            if let stone = pendingActions[safe: item.index]?.stone {
+                PendingStoneDetailSheet(
+                    stone: stone,
+                    onSave: { updatedStone in
+                        let updatedAction = AgentService.PendingAction(
+                            actionType: "add_stone",
+                            stone: updatedStone,
+                            project: nil,
+                            touchLog: nil
+                        )
+                        onActionUpdate?(item.index, updatedAction)
+                    },
+                    onDelete: {
+                        onActionDelete?(item.index)
+                    }
+                )
+            }
+        }
+    }
+
+    /// Find the index of an action containing a specific stone
+    private func findActionIndex(for stone: AgentService.PendingStone) -> Int? {
+        pendingActions.firstIndex { $0.stone?.id == stone.id }
     }
 
     // MARK: - Projects Section
@@ -71,13 +128,46 @@ struct PendingActionsPreview: View {
                 .font(DesignSystem.Typography.captionBold)
                 .foregroundStyle(DesignSystem.Colors.textSecondary)
 
-            ForEach(projects) { project in
+            ForEach(Array(projects.enumerated()), id: \.element.id) { index, project in
                 ProjectPreviewCard(
                     project: project,
                     onTimeChange: onProjectTimeChange
                 )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if let actionIndex = findActionIndex(for: project) {
+                        selectedProjectIndex = actionIndex
+                    }
+                }
             }
         }
+        .sheet(item: Binding(
+            get: { selectedProjectIndex.map { ProjectSheetItem(index: $0) } },
+            set: { selectedProjectIndex = $0?.index }
+        )) { item in
+            if let project = pendingActions[safe: item.index]?.project {
+                PendingProjectDetailSheet(
+                    project: project,
+                    onSave: { updatedProject in
+                        let updatedAction = AgentService.PendingAction(
+                            actionType: "add_project",
+                            stone: nil,
+                            project: updatedProject,
+                            touchLog: nil
+                        )
+                        onActionUpdate?(item.index, updatedAction)
+                    },
+                    onDelete: {
+                        onActionDelete?(item.index)
+                    }
+                )
+            }
+        }
+    }
+
+    /// Find the index of an action containing a specific project
+    private func findActionIndex(for project: AgentService.PendingProject) -> Int? {
+        pendingActions.firstIndex { $0.project?.id == project.id }
     }
 
     // MARK: - Logs Section
@@ -88,10 +178,44 @@ struct PendingActionsPreview: View {
                 .font(DesignSystem.Typography.captionBold)
                 .foregroundStyle(DesignSystem.Colors.textSecondary)
 
-            ForEach(logs) { log in
+            ForEach(Array(logs.enumerated()), id: \.element.id) { index, log in
                 PendingLogRow(log: log)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if let actionIndex = findActionIndex(for: log) {
+                            selectedLogIndex = actionIndex
+                        }
+                    }
             }
         }
+        .sheet(item: Binding(
+            get: { selectedLogIndex.map { LogSheetItem(index: $0) } },
+            set: { selectedLogIndex = $0?.index }
+        )) { item in
+            if let log = pendingActions[safe: item.index]?.touchLog {
+                PendingLogDetailSheet(
+                    log: log,
+                    availableProjects: availableProjects,
+                    onSave: { updatedLog in
+                        let updatedAction = AgentService.PendingAction(
+                            actionType: "log_work",
+                            stone: nil,
+                            project: nil,
+                            touchLog: updatedLog
+                        )
+                        onActionUpdate?(item.index, updatedAction)
+                    },
+                    onDelete: {
+                        onActionDelete?(item.index)
+                    }
+                )
+            }
+        }
+    }
+
+    /// Find the index of an action containing a specific log
+    private func findActionIndex(for log: AgentService.PendingTouchLog) -> Int? {
+        pendingActions.firstIndex { $0.touchLog?.id == log.id }
     }
 
     // MARK: - Suggestion Buttons
@@ -99,7 +223,7 @@ struct PendingActionsPreview: View {
     private var suggestionButtons: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: DesignSystem.Spacing.sm) {
-                ForEach(suggestions, id: \.self) { suggestion in
+                ForEach(filteredSuggestions, id: \.self) { suggestion in
                     Button {
                         onSuggestionTap(suggestion)
                     } label: {
@@ -697,6 +821,34 @@ struct PendingProjectRow: View {
 
     var body: some View {
         ProjectPreviewCard(project: project)
+    }
+}
+
+// MARK: - Sheet Item Helpers
+
+/// Identifiable wrapper for stone sheet presentation
+private struct StoneSheetItem: Identifiable {
+    let index: Int
+    var id: Int { index }
+}
+
+/// Identifiable wrapper for project sheet presentation
+private struct ProjectSheetItem: Identifiable {
+    let index: Int
+    var id: Int { index }
+}
+
+/// Identifiable wrapper for log sheet presentation
+private struct LogSheetItem: Identifiable {
+    let index: Int
+    var id: Int { index }
+}
+
+// MARK: - Safe Array Subscript
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 

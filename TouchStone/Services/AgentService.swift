@@ -118,6 +118,31 @@ class AgentService: ObservableObject {
             String(format: "%d:%02d - %d:%02d", startHour, startMinute, endHour, endMinute)
         }
 
+        // Memberwise initializer
+        init(
+            tempId: String,
+            title: String,
+            startHour: Int,
+            startMinute: Int,
+            endHour: Int,
+            endMinute: Int,
+            date: String? = nil,
+            isRecurring: Bool = false,
+            recurrenceType: String? = nil,
+            customDays: [Int]? = nil
+        ) {
+            self.tempId = tempId
+            self.title = title
+            self.startHour = startHour
+            self.startMinute = startMinute
+            self.endHour = endHour
+            self.endMinute = endMinute
+            self.date = date
+            self.isRecurring = isRecurring
+            self.recurrenceType = recurrenceType
+            self.customDays = customDays
+        }
+
         enum CodingKeys: String, CodingKey {
             case tempId = "temp_id"
             case title
@@ -253,6 +278,21 @@ class AgentService: ObservableObject {
 
         var id: String { tempId }
 
+        // Memberwise initializer
+        init(
+            tempId: String,
+            projectId: String? = nil,
+            projectTitle: String? = nil,
+            durationMinutes: Int,
+            note: String? = nil
+        ) {
+            self.tempId = tempId
+            self.projectId = projectId
+            self.projectTitle = projectTitle
+            self.durationMinutes = durationMinutes
+            self.note = note
+        }
+
         enum CodingKeys: String, CodingKey {
             case tempId = "temp_id"
             case projectId = "project_id"
@@ -270,6 +310,19 @@ class AgentService: ObservableObject {
 
         var id: String {
             stone?.id ?? project?.id ?? touchLog?.id ?? UUID().uuidString
+        }
+
+        // Memberwise initializer
+        init(
+            actionType: String,
+            stone: PendingStone? = nil,
+            project: PendingProject? = nil,
+            touchLog: PendingTouchLog? = nil
+        ) {
+            self.actionType = actionType
+            self.stone = stone
+            self.project = project
+            self.touchLog = touchLog
         }
 
         enum CodingKeys: String, CodingKey {

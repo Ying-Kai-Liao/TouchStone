@@ -84,6 +84,15 @@ struct ProjectAskSheet: View {
                             onSuggestionTap: { suggestion in sendMessage(suggestion) },
                             onProjectTimeChange: { projectId, newMinutes in
                                 updateProjectTime(projectId: projectId, newMinutes: newMinutes)
+                            },
+                            onActionUpdate: { index, updatedAction in
+                                updatePendingAction(at: index, with: updatedAction)
+                            },
+                            onActionDelete: { index in
+                                deletePendingAction(at: index)
+                            },
+                            availableProjects: activeProjects.map {
+                                PendingLogDetailSheet.ProjectOption(id: $0.id.uuidString, title: $0.title)
                             }
                         )
                         .padding(.horizontal)
@@ -282,8 +291,49 @@ struct ProjectAskSheet: View {
         )
     }
 
+    /// Uses optimistic UI: hides genui block immediately, restores on failure
     private func confirmPendingActions() {
-        sendMessage("Looks good")
+        // Store pending actions before clearing (for potential rollback)
+        let actionsToConfirm = pendingActions
+
+        // Optimistic UI: Hide genui block immediately
+        withAnimation(.easeOut(duration: 0.2)) {
+            pendingActions = []
+            suggestions = []
+        }
+
+        // Send confirmation message
+        let userMessage = AgentChatMessage(role: .user, content: "Looks good")
+        messages.append(userMessage)
+        inputText = ""
+        isInputFocused = false
+
+        Task {
+            do {
+                let context = buildContext()
+                let response = try await agentService.chat(message: "Looks good", context: context)
+
+                // Add assistant response
+                let assistantMessage = AgentChatMessage(role: .assistant, content: response.message)
+                messages.append(assistantMessage)
+
+                // Update state from response
+                pendingActions = response.pendingActions
+                self.suggestions = response.suggestions
+                conversationState = response.conversationState
+
+                // Handle confirmed state
+                if response.conversationState == .confirmed {
+                    await commitPendingActions()
+                }
+            } catch {
+                // Rollback on failure: restore the pending actions
+                withAnimation(.easeIn(duration: 0.2)) {
+                    pendingActions = actionsToConfirm
+                }
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     private func cancelPendingActions() {
@@ -337,6 +387,20 @@ struct ProjectAskSheet: View {
             project: updatedProject,
             touchLog: nil
         )
+    }
+
+    /// Update a pending action at a specific index (called from detail sheets)
+    private func updatePendingAction(at index: Int, with updatedAction: AgentService.PendingAction) {
+        guard index >= 0 && index < pendingActions.count else { return }
+        pendingActions[index] = updatedAction
+    }
+
+    /// Delete a pending action at a specific index (called from detail sheets)
+    private func deletePendingAction(at index: Int) {
+        guard index >= 0 && index < pendingActions.count else { return }
+        withAnimation(.easeOut(duration: 0.2)) {
+            pendingActions.remove(at: index)
+        }
     }
 
     private func commitPendingActions() async {
