@@ -136,6 +136,14 @@ struct UnifiedInputView: View {
                         .padding()
                         .id("loading")
                     }
+
+                    // Suggestions while connected (shown when messages exist and no pending actions)
+                    if !messages.isEmpty && pendingActions.isEmpty && isBackendAvailable && !agentService.isLoading {
+                        connectedSuggestionsView
+                            .padding(.horizontal)
+                            .padding(.top, DesignSystem.Spacing.sm)
+                            .id("connected-suggestions")
+                    }
                 }
                 .padding(.bottom, DesignSystem.Spacing.lg)
             }
@@ -192,6 +200,26 @@ struct UnifiedInputView: View {
             }
 
             Spacer()
+        }
+    }
+
+    /// Suggestions shown when connected with existing messages
+    private var connectedSuggestionsView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: DesignSystem.Spacing.sm) {
+                CompactSuggestionChip(text: "New project", icon: "folder.badge.plus") {
+                    sendMessage("I want to start a new project")
+                }
+                CompactSuggestionChip(text: "Add event", icon: "calendar.badge.plus") {
+                    sendMessage("I have an event to add")
+                }
+                CompactSuggestionChip(text: "Log work", icon: "checkmark.circle") {
+                    sendMessage("I want to log some work")
+                }
+                CompactSuggestionChip(text: "What's next?", icon: "arrow.forward.circle") {
+                    sendMessage("What should I work on next?")
+                }
+            }
         }
     }
 
@@ -766,6 +794,38 @@ struct SuggestionChip: View {
     }
 }
 
+/// Compact suggestion chip for horizontal scroll in connected state
+struct CompactSuggestionChip: View {
+    let text: String
+    let icon: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .foregroundStyle(DesignSystem.Colors.accent)
+
+                Text(text)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(DesignSystem.Colors.cardBackground)
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Speech Input Sheet
 
 struct SpeechInputSheet: View {
@@ -783,7 +843,7 @@ struct SpeechInputSheet: View {
             VStack(spacing: DesignSystem.Spacing.xl) {
                 Spacer()
 
-                // Listening indicator
+                // Listening indicator - tappable to stop recording
                 ZStack {
                     Circle()
                         .fill(DesignSystem.Colors.accent.opacity(isRecording ? 0.3 : 0.1))
@@ -791,9 +851,23 @@ struct SpeechInputSheet: View {
                         .scaleEffect(isRecording ? 1.2 : 1.0)
                         .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: isRecording)
 
-                    Image(systemName: "mic.fill")
+                    Image(systemName: isRecording ? "stop.fill" : "mic.fill")
                         .font(.system(size: 50))
                         .foregroundStyle(isRecording ? DesignSystem.Colors.accent : DesignSystem.Colors.textSecondary)
+                }
+                .contentShape(Circle())
+                .onTapGesture {
+                    if isRecording {
+                        speechRecognizer.stopRecording()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            if !speechRecognizer.transcript.isEmpty {
+                                onTranscribe(speechRecognizer.transcript)
+                                dismiss()
+                            }
+                        }
+                    } else {
+                        try? speechRecognizer.startRecording()
+                    }
                 }
 
                 // Transcribed text
@@ -804,7 +878,7 @@ struct SpeechInputSheet: View {
                         .multilineTextAlignment(.center)
                         .padding()
                 } else {
-                    Text(isRecording ? "Listening..." : "Tap to start")
+                    Text(isRecording ? "Tap to stop" : "Tap to start")
                         .font(DesignSystem.Typography.body)
                         .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
