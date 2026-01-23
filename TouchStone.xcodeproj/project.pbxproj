@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		WIDGET001122334455EE0031 /* TouchStoneWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = WIDGET001122334455EE0002 /* TouchStoneWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		AABB001122334455EEFF0010 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;

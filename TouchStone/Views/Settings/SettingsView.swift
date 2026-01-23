@@ -38,6 +38,10 @@ struct SettingsView: View {
                         SettingsRow(icon: "calendar.badge.clock", title: "Time Blocks")
                     }
 
+                    NavigationLink(destination: ContextListView()) {
+                        SettingsRow(icon: "calendar.badge.plus", title: "Day Contexts")
+                    }
+
                     // MARK: - Focus Section
                     SettingsSectionHeader(title: "Focus")
 

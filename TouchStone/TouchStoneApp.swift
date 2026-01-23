@@ -15,6 +15,7 @@ struct TouchStoneApp: App {
             DayPlan.self,
             Backlog.self,
             Rule.self,
+            DayContext.self,
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,
