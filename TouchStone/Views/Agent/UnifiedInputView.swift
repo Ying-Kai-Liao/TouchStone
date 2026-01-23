@@ -25,6 +25,7 @@ struct UnifiedInputView: View {
     @State private var pendingActions: [AgentService.PendingAction] = []
     @State private var suggestions: [String] = []
     @State private var conversationState: AgentService.ConversationState = .initial
+    @State private var hasUserEdits: Bool = false  // Track if user made local edits
 
     // Confirmed actions (displayed after commit, cleared when user types)
     @State private var confirmedActions: [AgentService.PendingAction] = []
@@ -110,16 +111,20 @@ struct UnifiedInputView: View {
                             },
                             onProjectTimeChange: { projectId, newMinutes in
                                 updateProjectTime(projectId: projectId, newMinutes: newMinutes)
+                                hasUserEdits = true
                             },
                             onActionUpdate: { index, updatedAction in
                                 updatePendingAction(at: index, with: updatedAction)
+                                hasUserEdits = true
                             },
                             onActionDelete: { index in
                                 deletePendingAction(at: index)
+                                hasUserEdits = true
                             },
                             availableProjects: activeProjects.map {
                                 PendingLogDetailSheet.ProjectOption(id: $0.id.uuidString, title: $0.title)
-                            }
+                            },
+                            hasUserEdits: hasUserEdits
                         )
                         .padding(.horizontal)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -353,6 +358,7 @@ struct UnifiedInputView: View {
                 pendingActions = response.pendingActions
                 suggestions = response.suggestions
                 conversationState = response.conversationState
+                hasUserEdits = false  // Reset when new actions come from backend
 
                 // Handle confirmed actions from backend (multi-task flow)
                 if !response.confirmedActions.isEmpty {
@@ -412,19 +418,45 @@ struct UnifiedInputView: View {
 
     // MARK: - Phase 2: Pending Actions
 
-    /// User confirmed pending actions - send confirmation to backend
+    /// User confirmed pending actions - send confirmation to backend or commit locally if edited
     /// Uses optimistic UI: hides genui block immediately, restores on failure
     private func confirmPendingActions() {
         // Store pending actions before clearing (for potential rollback)
         let actionsToConfirm = pendingActions
+        let userMadeEdits = hasUserEdits
 
         // Optimistic UI: Hide genui block immediately
         withAnimation(.easeOut(duration: 0.2)) {
             pendingActions = []
             suggestions = []
+            hasUserEdits = false
         }
 
-        // Send confirmation message
+        // If user made local edits, commit directly without backend roundtrip
+        if userMadeEdits {
+            let userMessage = AgentChatMessage(role: .user, content: "Save changes")
+            messages.append(userMessage)
+            inputText = ""
+            isInputFocused = false
+
+            Task {
+                // Commit local edited actions directly
+                await commitActions(actionsToConfirm)
+
+                // Add confirmation message
+                let assistantMessage = AgentChatMessage(role: .assistant, content: "Done! I've saved your changes.")
+                messages.append(assistantMessage)
+
+                // Show confirmed preview
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    confirmedActions = actionsToConfirm
+                }
+                conversationState = .initial
+            }
+            return
+        }
+
+        // No edits - send confirmation to backend
         let userMessage = AgentChatMessage(role: .user, content: "Looks good")
         messages.append(userMessage)
         inputText = ""
@@ -443,6 +475,7 @@ struct UnifiedInputView: View {
                 pendingActions = response.pendingActions
                 self.suggestions = response.suggestions
                 conversationState = response.conversationState
+                hasUserEdits = false
 
                 // Handle confirmed actions from backend (multi-task flow)
                 if !response.confirmedActions.isEmpty {
@@ -458,6 +491,7 @@ struct UnifiedInputView: View {
                 // Rollback on failure: restore the pending actions
                 withAnimation(.easeIn(duration: 0.2)) {
                     pendingActions = actionsToConfirm
+                    hasUserEdits = userMadeEdits
                 }
                 errorMessage = error.localizedDescription
             }
@@ -469,6 +503,7 @@ struct UnifiedInputView: View {
         pendingActions = []
         suggestions = []
         conversationState = .initial
+        hasUserEdits = false
         sendMessage("Cancel")
     }
 
@@ -737,6 +772,7 @@ struct UnifiedInputView: View {
         confirmedActions = []
         suggestions = []
         conversationState = .initial
+        hasUserEdits = false
 
         Task {
             await checkBackendAndLoadBriefing()

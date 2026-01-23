@@ -14,6 +14,7 @@ struct PendingActionsPreview: View {
     var onActionUpdate: ((Int, AgentService.PendingAction) -> Void)? = nil  // (index, updatedAction)
     var onActionDelete: ((Int) -> Void)? = nil  // (index)
     var availableProjects: [PendingLogDetailSheet.ProjectOption] = []  // For log editing
+    var hasUserEdits: Bool = false  // Whether user has made local edits
 
     // Sheet presentation state
     @State private var selectedStoneIndex: Int?
@@ -64,11 +65,14 @@ struct PendingActionsPreview: View {
                 confirmationButtons
             }
         }
-        .padding()
+        .padding(DesignSystem.Spacing.lg)
         .background(
-            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
                 .fill(DesignSystem.Colors.cardBackground)
-                .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
         )
     }
 
@@ -246,42 +250,53 @@ struct PendingActionsPreview: View {
     // MARK: - Confirmation Buttons
 
     private var confirmationButtons: some View {
-        HStack(spacing: DesignSystem.Spacing.md) {
+        HStack(spacing: 12) {
+            // Cancel button - subtle outline style
             Button {
                 onCancel()
             } label: {
                 Text("Cancel")
-                    .font(DesignSystem.Typography.body)
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(DesignSystem.Colors.textSecondary)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, DesignSystem.Spacing.md)
+                    .padding(.vertical, 14)
                     .background(
-                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                            .stroke(DesignSystem.Colors.border, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                            .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.3), lineWidth: 1)
                     )
             }
             .buttonStyle(.plain)
 
+            // Confirm button - prominent accent style
             Button {
                 onConfirm()
             } label: {
-                HStack(spacing: DesignSystem.Spacing.xs) {
-                    Text("Looks Good")
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 12, weight: .bold))
+                HStack(spacing: 6) {
+                    Text(hasUserEdits ? "Save Changes" : "Looks Good")
+                    Image(systemName: hasUserEdits ? "square.and.arrow.down" : "checkmark")
+                        .font(.system(size: 11, weight: .bold))
                 }
-                .font(DesignSystem.Typography.headline)
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, DesignSystem.Spacing.md)
+                .padding(.vertical, 14)
                 .background(
-                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                        .fill(DesignSystem.Colors.accent)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    DesignSystem.Colors.accent,
+                                    DesignSystem.Colors.accent.opacity(0.85)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
                 )
             }
             .buttonStyle(.plain)
         }
-        .padding(.top, DesignSystem.Spacing.sm)
+        .padding(.top, DesignSystem.Spacing.md)
     }
 }
 
@@ -304,45 +319,161 @@ struct ProjectPreviewCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-            // Header: Icon + Title
-            projectHeader
+        VStack(alignment: .leading, spacing: 0) {
+            // Project gradient header
+            projectGradientHeader
+                .padding(.horizontal, 8)
+                .padding(.top, 8)
 
-            // Archetype badge and deadline row
-            HStack(spacing: DesignSystem.Spacing.sm) {
-                if project.isPhaseMode, let archetype = project.archetype {
-                    ArchetypeBadge(archetype: archetype)
+            // Content section
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+                // Title
+                Text(project.title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                // Archetype badge and deadline row
+                HStack(spacing: DesignSystem.Spacing.sm) {
+                    if project.isPhaseMode, let archetype = project.archetype {
+                        ArchetypeBadge(archetype: archetype)
+                    }
+
+                    if let deadline = project.deadline {
+                        DeadlineBadge(deadline: deadline)
+                    }
+
+                    Spacer()
                 }
 
-                if let deadline = project.deadline {
-                    DeadlineBadge(deadline: deadline)
+                // Time slider (only for phase mode projects with time budgets)
+                if project.isPhaseMode && project.totalPlannedMinutes > 0 {
+                    timeSlider
                 }
 
-                Spacer()
+                // Phases or Milestones
+                if project.isPhaseMode {
+                    phasesSection
+                } else if project.isMilestoneMode {
+                    milestonesSection
+                }
             }
-
-            // Time slider (only for phase mode projects with time budgets)
-            if project.isPhaseMode && project.totalPlannedMinutes > 0 {
-                timeSlider
-            }
-
-            // Phases or Milestones
-            if project.isPhaseMode {
-                phasesSection
-            } else if project.isMilestoneMode {
-                milestonesSection
-            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
         }
-        .padding(DesignSystem.Spacing.md)
         .background(
-            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                .fill(DesignSystem.Colors.background)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .fill(DesignSystem.Colors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
         )
         .onAppear {
             sliderValue = totalHours
         }
         .onChange(of: project.totalPlannedMinutes) { _, newValue in
             sliderValue = Double(newValue) / 60.0
+        }
+    }
+
+    /// Project gradient header with archetype-based coloring
+    private var projectGradientHeader: some View {
+        ZStack(alignment: .topLeading) {
+            // Gradient background based on archetype
+            LinearGradient(
+                colors: gradientColors,
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .frame(height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card - 8, style: .continuous))
+            .overlay(
+                // Decorative pattern
+                ZStack {
+                    if project.isMilestoneMode {
+                        // Checklist pattern for milestones
+                        ForEach(0..<4, id: \.self) { i in
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.white.opacity(0.04))
+                                .frame(width: 40, height: 3)
+                                .offset(x: CGFloat(i * 50 - 60), y: CGFloat(i * 8 - 12))
+                        }
+                    } else {
+                        // Wave pattern for projects
+                        ForEach(0..<4, id: \.self) { i in
+                            ProjectWaveShape(offset: CGFloat(i) * 10, amplitude: 4)
+                                .stroke(Color.white.opacity(0.05), lineWidth: 1)
+                                .offset(y: CGFloat(i) * 8 + 20)
+                        }
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card - 8, style: .continuous))
+            )
+
+            // Mode badge - glassy style
+            HStack(spacing: 6) {
+                Image(systemName: modeIcon)
+                    .font(.system(size: 10, weight: .semibold))
+                Text(project.isMilestoneMode ? "CHECKLIST" : (project.archetype?.uppercased() ?? "PROJECT"))
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(0.5)
+            }
+            .foregroundStyle(.white.opacity(0.95))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(Color.white.opacity(0.2))
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(.white.opacity(0.25), lineWidth: 1)
+            )
+            .padding(10)
+        }
+    }
+
+    /// Gradient colors based on archetype
+    private var gradientColors: [Color] {
+        guard let archetype = project.archetype?.lowercased() else {
+            // Default gray for milestone mode
+            return [
+                Color(red: 0.35, green: 0.38, blue: 0.42),
+                Color(red: 0.45, green: 0.48, blue: 0.52),
+                Color(red: 0.50, green: 0.53, blue: 0.58)
+            ]
+        }
+        switch archetype {
+        case "lab":
+            return [
+                Color(red: 0.25, green: 0.45, blue: 0.65),
+                Color(red: 0.35, green: 0.55, blue: 0.72),
+                Color(red: 0.42, green: 0.62, blue: 0.78)
+            ]
+        case "hunt":
+            return [
+                Color(red: 0.75, green: 0.45, blue: 0.25),
+                Color(red: 0.82, green: 0.55, blue: 0.35),
+                Color(red: 0.88, green: 0.62, blue: 0.42)
+            ]
+        case "spiral":
+            return [
+                Color(red: 0.55, green: 0.35, blue: 0.65),
+                Color(red: 0.62, green: 0.42, blue: 0.72),
+                Color(red: 0.68, green: 0.48, blue: 0.78)
+            ]
+        case "build":
+            return [
+                Color(red: 0.30, green: 0.55, blue: 0.45),
+                Color(red: 0.38, green: 0.62, blue: 0.52),
+                Color(red: 0.45, green: 0.68, blue: 0.58)
+            ]
+        default:
+            return [
+                Color(red: 0.35, green: 0.50, blue: 0.55),
+                Color(red: 0.45, green: 0.58, blue: 0.62),
+                Color(red: 0.50, green: 0.62, blue: 0.68)
+            ]
         }
     }
 
@@ -425,21 +556,6 @@ struct ProjectPreviewCard: View {
         return "\(wholeHours) hours"
     }
 
-    // MARK: - Header
-
-    private var projectHeader: some View {
-        HStack(spacing: DesignSystem.Spacing.sm) {
-            Image(systemName: modeIcon)
-                .font(.title2)
-                .foregroundStyle(archetypeColor)
-
-            Text(project.title)
-                .font(DesignSystem.Typography.headline)
-                .foregroundStyle(DesignSystem.Colors.textPrimary)
-
-            Spacer()
-        }
-    }
 
     // MARK: - Phases Section
 
@@ -720,43 +836,136 @@ struct PendingStoneRow: View {
     let stone: AgentService.PendingStone
 
     var body: some View {
-        HStack(spacing: DesignSystem.Spacing.md) {
-            // Stone icon
-            Image(systemName: stone.isRecurring ? "repeat.circle.fill" : "calendar.circle.fill")
-                .font(.title2)
-                .foregroundStyle(DesignSystem.Colors.accent)
+        VStack(alignment: .leading, spacing: 0) {
+            // Stone gradient header (matching StoneFlowRow style)
+            stoneHeader
 
-            VStack(alignment: .leading, spacing: 2) {
+            // Content
+            VStack(alignment: .leading, spacing: 8) {
                 Text(stone.title)
-                    .font(DesignSystem.Typography.body)
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(DesignSystem.Colors.textPrimary)
 
-                HStack(spacing: DesignSystem.Spacing.xs) {
+                HStack(spacing: 8) {
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.7))
+
                     Text(stone.timeRangeString)
-                        .font(DesignSystem.Typography.caption)
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(DesignSystem.Colors.textSecondary)
 
                     if let date = stone.date {
-                        Text("on \(date)")
-                            .font(DesignSystem.Typography.caption)
+                        Text("·")
+                            .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.5))
+                        Text(formatDate(date))
+                            .font(.system(size: 13))
                             .foregroundStyle(DesignSystem.Colors.textTertiary)
                     }
 
                     if stone.isRecurring, let recurrence = stone.recurrenceType {
-                        Text("(\(recurrence))")
-                            .font(DesignSystem.Typography.caption)
+                        Text("·")
+                            .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.5))
+                        Image(systemName: "repeat")
+                            .font(.system(size: 11))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        Text(recurrence)
+                            .font(.system(size: 13))
                             .foregroundStyle(DesignSystem.Colors.textTertiary)
                     }
                 }
             }
-
-            Spacer()
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
         }
-        .padding(DesignSystem.Spacing.sm)
         .background(
-            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                .fill(DesignSystem.Colors.background)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .fill(DesignSystem.Colors.cardBackground)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    /// Stone gradient header with texture pattern
+    private var stoneHeader: some View {
+        ZStack(alignment: .topLeading) {
+            // Gradient background simulating stone/rock texture
+            LinearGradient(
+                colors: [
+                    Color(red: 0.28, green: 0.30, blue: 0.32),
+                    Color(red: 0.38, green: 0.40, blue: 0.42),
+                    Color(red: 0.45, green: 0.47, blue: 0.50)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .frame(height: 56)
+            .clipShape(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: DesignSystem.CornerRadius.card,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: DesignSystem.CornerRadius.card,
+                    style: .continuous
+                )
+            )
+            .overlay(
+                // Stone texture pattern
+                ZStack {
+                    ForEach(0..<4, id: \.self) { i in
+                        Circle()
+                            .fill(Color.white.opacity(0.03))
+                            .frame(width: CGFloat(20 + i * 12), height: CGFloat(20 + i * 12))
+                            .offset(
+                                x: CGFloat(i * 35 - 40),
+                                y: CGFloat(i * 6 - 10)
+                            )
+                    }
+                }
+                .clipShape(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: DesignSystem.CornerRadius.card,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: DesignSystem.CornerRadius.card,
+                        style: .continuous
+                    )
+                )
+            )
+
+            // STONE badge - glassy style
+            HStack(spacing: 6) {
+                Image(systemName: stone.isRecurring ? "repeat" : "calendar")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(stone.isRecurring ? "RECURRING" : "EVENT")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(0.5)
+            }
+            .foregroundStyle(.white.opacity(0.95))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(Color(red: 0.5, green: 0.52, blue: 0.55).opacity(0.35))
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(.white.opacity(0.2), lineWidth: 1)
+            )
+            .padding(10)
+        }
+    }
+
+    private func formatDate(_ dateStr: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: dateStr) else { return dateStr }
+
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateFormat = "MMM d"
+        return displayFormatter.string(from: date)
     }
 }
 
@@ -767,25 +976,34 @@ struct PendingLogRow: View {
 
     var body: some View {
         HStack(spacing: DesignSystem.Spacing.md) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.title2)
-                .foregroundStyle(.green)
+            // Log icon with green accent circle
+            ZStack {
+                Circle()
+                    .fill(Color.green.opacity(0.15))
+                    .frame(width: 40, height: 40)
 
-            VStack(alignment: .leading, spacing: 2) {
+                Image(systemName: "clock.badge.checkmark")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.green)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
                 if let title = log.projectTitle {
                     Text(title)
-                        .font(DesignSystem.Typography.body)
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(DesignSystem.Colors.textPrimary)
                 }
 
-                HStack(spacing: DesignSystem.Spacing.xs) {
+                HStack(spacing: 8) {
                     Text(formattedDuration)
-                        .font(DesignSystem.Typography.caption)
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(DesignSystem.Colors.textSecondary)
 
-                    if let note = log.note {
-                        Text("- \(note)")
-                            .font(DesignSystem.Typography.caption)
+                    if let note = log.note, !note.isEmpty {
+                        Text("·")
+                            .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.5))
+                        Text(note)
+                            .font(.system(size: 13))
                             .foregroundStyle(DesignSystem.Colors.textTertiary)
                             .lineLimit(1)
                     }
@@ -794,10 +1012,15 @@ struct PendingLogRow: View {
 
             Spacer()
         }
-        .padding(DesignSystem.Spacing.sm)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .background(
-            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                .fill(DesignSystem.Colors.background)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                .fill(DesignSystem.Colors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                .strokeBorder(Color.green.opacity(0.2), lineWidth: 1)
         )
     }
 
@@ -821,6 +1044,31 @@ struct PendingProjectRow: View {
 
     var body: some View {
         ProjectPreviewCard(project: project)
+    }
+}
+
+// MARK: - Project Wave Shape
+
+/// Wave shape for decorative project headers
+struct ProjectWaveShape: Shape {
+    let offset: CGFloat
+    let amplitude: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let width = rect.width
+        let height = rect.height
+        let midY = height / 2
+
+        path.move(to: CGPoint(x: 0, y: midY + offset))
+
+        for x in stride(from: 0, through: width, by: 5) {
+            let relativeX = x / width
+            let y = midY + offset + sin(relativeX * .pi * 3) * amplitude
+            path.addLine(to: CGPoint(x: x, y: y))
+        }
+
+        return path
     }
 }
 
