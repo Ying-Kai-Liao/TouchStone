@@ -26,9 +26,8 @@ struct UnifiedInputView: View {
     @State private var suggestions: [String] = []
     @State private var conversationState: AgentService.ConversationState = .initial
 
-    // Confirmed actions (displayed after commit)
+    // Confirmed actions (displayed after commit, cleared when user types)
     @State private var confirmedActions: [AgentService.PendingAction] = []
-    @State private var confirmedActionsClearTask: DispatchWorkItem?
 
     @SwiftUI.FocusState private var isInputFocused: Bool
 
@@ -270,6 +269,14 @@ struct UnifiedInputView: View {
                             sendMessage(inputText)
                         }
                     }
+                    .onChange(of: inputText) {
+                        // Clear confirmed actions when user starts typing
+                        if !inputText.isEmpty && !confirmedActions.isEmpty {
+                            withAnimation {
+                                confirmedActions = []
+                            }
+                        }
+                    }
 
                 // Voice input button
                 Button {
@@ -352,22 +359,10 @@ struct UnifiedInputView: View {
                     // Commit to local storage
                     await commitActions(response.confirmedActions)
 
-                    // Cancel any pending clear task from previous confirmation
-                    confirmedActionsClearTask?.cancel()
-
-                    // Show confirmed preview
+                    // Show confirmed preview (stays until user types)
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         confirmedActions = response.confirmedActions
                     }
-
-                    // Schedule clear after delay (user can add more)
-                    let clearTask = DispatchWorkItem {
-                        withAnimation {
-                            self.confirmedActions = []
-                        }
-                    }
-                    confirmedActionsClearTask = clearTask
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: clearTask)
                 }
 
                 // Process any legacy actions
@@ -454,22 +449,10 @@ struct UnifiedInputView: View {
                     // Commit to local storage
                     await commitActions(response.confirmedActions)
 
-                    // Cancel any pending clear task from previous confirmation
-                    confirmedActionsClearTask?.cancel()
-
-                    // Show confirmed preview
+                    // Show confirmed preview (stays until user types)
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         confirmedActions = response.confirmedActions
                     }
-
-                    // Schedule clear after delay (user can add more)
-                    let clearTask = DispatchWorkItem {
-                        withAnimation {
-                            self.confirmedActions = []
-                        }
-                    }
-                    confirmedActionsClearTask = clearTask
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: clearTask)
                 }
             } catch {
                 // Rollback on failure: restore the pending actions
@@ -751,7 +734,6 @@ struct UnifiedInputView: View {
         messages = []
         briefing = nil
         pendingActions = []
-        confirmedActionsClearTask?.cancel()
         confirmedActions = []
         suggestions = []
         conversationState = .initial
