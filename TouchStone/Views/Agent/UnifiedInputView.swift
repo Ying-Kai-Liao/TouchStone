@@ -28,6 +28,7 @@ struct UnifiedInputView: View {
 
     // Confirmed actions (displayed after commit)
     @State private var confirmedActions: [AgentService.PendingAction] = []
+    @State private var confirmedActionsClearTask: DispatchWorkItem?
 
     @SwiftUI.FocusState private var isInputFocused: Bool
 
@@ -351,17 +352,22 @@ struct UnifiedInputView: View {
                     // Commit to local storage
                     await commitActions(response.confirmedActions)
 
+                    // Cancel any pending clear task from previous confirmation
+                    confirmedActionsClearTask?.cancel()
+
                     // Show confirmed preview
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         confirmedActions = response.confirmedActions
                     }
 
-                    // Clear confirmed preview after delay (user can add more)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    // Schedule clear after delay (user can add more)
+                    let clearTask = DispatchWorkItem {
                         withAnimation {
-                            confirmedActions = []
+                            self.confirmedActions = []
                         }
                     }
+                    confirmedActionsClearTask = clearTask
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: clearTask)
                 }
 
                 // Process any legacy actions
@@ -448,17 +454,22 @@ struct UnifiedInputView: View {
                     // Commit to local storage
                     await commitActions(response.confirmedActions)
 
+                    // Cancel any pending clear task from previous confirmation
+                    confirmedActionsClearTask?.cancel()
+
                     // Show confirmed preview
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         confirmedActions = response.confirmedActions
                     }
 
-                    // Clear confirmed preview after delay (user can add more)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    // Schedule clear after delay (user can add more)
+                    let clearTask = DispatchWorkItem {
                         withAnimation {
-                            confirmedActions = []
+                            self.confirmedActions = []
                         }
                     }
+                    confirmedActionsClearTask = clearTask
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: clearTask)
                 }
             } catch {
                 // Rollback on failure: restore the pending actions
@@ -740,6 +751,7 @@ struct UnifiedInputView: View {
         messages = []
         briefing = nil
         pendingActions = []
+        confirmedActionsClearTask?.cancel()
         confirmedActions = []
         suggestions = []
         conversationState = .initial
