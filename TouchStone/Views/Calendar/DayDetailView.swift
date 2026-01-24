@@ -28,6 +28,9 @@ struct DayDetailView: View {
     @State private var stoneToDelete: StoneEvent?
     @State private var showDeleteAlert = false
     @State private var stoneToEdit: StoneEvent?
+    @State private var contextToDelete: DayContext?
+    @State private var showDeleteContextAlert = false
+    @State private var contextToEdit: DayContext?
     @State private var dayState: DayState?
     @State private var showTimeAllocation = false
     @State private var showingAddContext = false
@@ -56,90 +59,97 @@ struct DayDetailView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                DesignSystem.Colors.background
-                    .ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: DesignSystem.Spacing.lg) {
-                        // Date header
-                        dateHeader
-
-                        // Context banner (if any active contexts)
-                        if !activeContexts.isEmpty {
-                            contextBanner
-                        }
-
-                        // Schedule section first (stones)
-                        if !stones.isEmpty {
-                            stonesSection
-                        } else {
-                            emptyScheduleHint
-                        }
-
-                        // Suggested work section (respects context work mode)
-                        if !suggestedSessions.isEmpty && !shouldSuppressWork {
-                            suggestedWorkSection
-                        } else if shouldSuppressWork && !activeContexts.isEmpty {
-                            noWorkMessage
-                        }
-
-                        // Fixed task section (if in fixed mode)
-                        if let fixedTask = fixedTaskDescription {
-                            fixedTaskSection(task: fixedTask)
-                        }
-
-                        // Time allocation chart (collapsible)
-                        timeAllocationSection
-                            .padding(.horizontal, DesignSystem.Spacing.xl)
-                    }
-                    .padding(.bottom, 100)
+            mainContent
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { toolbarContent }
+                .toolbarBackground(DesignSystem.Colors.background, for: .navigationBar)
+                .alert("Delete Stone", isPresented: $showDeleteAlert, presenting: stoneToDelete) { stone in
+                    Button("Cancel", role: .cancel) { stoneToDelete = nil }
+                    Button("Delete", role: .destructive) { deleteStone(stone) }
+                } message: { stone in
+                    Text(stone.recurrence.type != .none
+                         ? "This is a recurring event. Deleting it will remove all occurrences of \"\(stone.title)\"."
+                         : "Are you sure you want to delete \"\(stone.title)\"?")
                 }
-                .onAppear {
-                    computeDayState()
+                .alert("Delete Day Plan", isPresented: $showDeleteContextAlert, presenting: contextToDelete) { context in
+                    Button("Cancel", role: .cancel) { contextToDelete = nil }
+                    Button("Delete", role: .destructive) { deleteContext(context) }
+                } message: { context in
+                    Text(context.durationDays > 1
+                         ? "This day plan spans \(context.durationDays) days. Deleting it will remove \"\(context.name)\" from all those days."
+                         : "Are you sure you want to delete \"\(context.name)\"?")
                 }
-                .safeAreaInset(edge: .bottom) {
-                    addStoneButton
+                .sheet(item: $stoneToEdit) { stone in
+                    StoneEditSheet(stone: stone, onSave: {})
                 }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                .sheet(isPresented: $showingAddContext) {
+                    NavigationStack { ContextFormView(context: nil, initialDate: date) }
                 }
-            }
-            .toolbarBackground(DesignSystem.Colors.background, for: .navigationBar)
-            .alert("Delete Stone", isPresented: $showDeleteAlert, presenting: stoneToDelete) { stone in
-                Button("Cancel", role: .cancel) {
-                    stoneToDelete = nil
+                .sheet(item: $contextToEdit) { context in
+                    NavigationStack { ContextFormView(context: context, initialDate: date) }
                 }
-                Button("Delete", role: .destructive) {
-                    deleteStone(stone)
-                }
-            } message: { stone in
-                if stone.recurrence.type != .none {
-                    Text("This is a recurring event. Deleting it will remove all occurrences of \"\(stone.title)\".")
-                } else {
-                    Text("Are you sure you want to delete \"\(stone.title)\"?")
-                }
-            }
-            .sheet(item: $stoneToEdit) { stone in
-                StoneEditSheet(stone: stone, onSave: {})
-            }
-            .sheet(isPresented: $showingAddContext) {
-                NavigationStack {
-                    ContextFormView(context: nil, initialDate: date)
-                }
-            }
         }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button("Close") { dismiss() }
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
+        }
+    }
+
+    private var mainContent: some View {
+        ZStack {
+            DesignSystem.Colors.background
+                .ignoresSafeArea()
+
+            ScrollView {
+                scrollContent
+            }
+            .onAppear { computeDayState() }
+            .safeAreaInset(edge: .bottom) { addStoneButton }
+        }
+    }
+
+    private var scrollContent: some View {
+        VStack(spacing: DesignSystem.Spacing.lg) {
+            dateHeader
+
+            if !activeContexts.isEmpty {
+                contextBanner
+            }
+
+            if !stones.isEmpty {
+                stonesSection
+            } else {
+                emptyScheduleHint
+            }
+
+            if !suggestedSessions.isEmpty && !shouldSuppressWork {
+                suggestedWorkSection
+            } else if shouldSuppressWork && !activeContexts.isEmpty {
+                noWorkMessage
+            }
+
+            if let fixedTask = fixedTaskDescription {
+                fixedTaskSection(task: fixedTask)
+            }
+
+            timeAllocationSection
+                .padding(.horizontal, DesignSystem.Spacing.xl)
+        }
+        .padding(.bottom, 100)
     }
 
     private func deleteStone(_ stone: StoneEvent) {
         modelContext.delete(stone)
         stoneToDelete = nil
+    }
+
+    private func deleteContext(_ context: DayContext) {
+        modelContext.delete(context)
+        contextToDelete = nil
     }
 
     private var dateHeader: some View {
@@ -497,40 +507,18 @@ struct DayDetailView: View {
     private var contextBanner: some View {
         VStack(spacing: DesignSystem.Spacing.sm) {
             ForEach(activeContexts) { context in
-                HStack(spacing: DesignSystem.Spacing.md) {
-                    Image(systemName: context.type.icon)
-                        .font(.system(size: 18))
-                        .foregroundStyle(DesignSystem.Colors.accent)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(context.name)
-                            .font(DesignSystem.Typography.body)
-                            .fontWeight(.medium)
-                            .foregroundStyle(DesignSystem.Colors.textPrimary)
-
-                        Text(context.shortDescription)
-                            .font(DesignSystem.Typography.caption)
-                            .foregroundStyle(DesignSystem.Colors.textSecondary)
+                SwipeToDeleteRow(
+                    onDelete: {
+                        contextToDelete = context
+                        showDeleteContextAlert = true
                     }
-
-                    Spacer()
-
-                    // Work mode indicator
-                    Text(context.workMode.displayName.uppercased())
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(context.workMode.color)
-                        .padding(.horizontal, DesignSystem.Spacing.sm)
-                        .padding(.vertical, DesignSystem.Spacing.xs)
-                        .background(
-                            Capsule()
-                                .fill(context.workMode.color.opacity(0.15))
-                        )
+                ) {
+                    ContextBannerRow(context: context)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            contextToEdit = context
+                        }
                 }
-                .padding(DesignSystem.Spacing.md)
-                .background(
-                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
-                        .fill(DesignSystem.Colors.accent.opacity(0.1))
-                )
             }
         }
         .padding(.horizontal, DesignSystem.Spacing.xl)
@@ -779,6 +767,49 @@ struct SuggestedWorkRow: View {
                     .fill(DesignSystem.Colors.accent.opacity(0.1))
             )
         }
+    }
+}
+
+// MARK: - Context Banner Row
+
+struct ContextBannerRow: View {
+    let context: DayContext
+
+    var body: some View {
+        HStack(spacing: DesignSystem.Spacing.md) {
+            Image(systemName: context.type.icon)
+                .font(.system(size: 18))
+                .foregroundStyle(DesignSystem.Colors.accent)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(context.name)
+                    .font(DesignSystem.Typography.body)
+                    .fontWeight(.medium)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                Text(context.shortDescription)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+            }
+
+            Spacer()
+
+            // Work mode indicator
+            Text(context.workMode.displayName.uppercased())
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(context.workMode.color)
+                .padding(.horizontal, DesignSystem.Spacing.sm)
+                .padding(.vertical, DesignSystem.Spacing.xs)
+                .background(
+                    Capsule()
+                        .fill(context.workMode.color.opacity(0.15))
+                )
+        }
+        .padding(DesignSystem.Spacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                .fill(DesignSystem.Colors.accent.opacity(0.1))
+        )
     }
 }
 
