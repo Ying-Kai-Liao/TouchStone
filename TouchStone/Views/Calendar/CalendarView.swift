@@ -6,12 +6,14 @@ struct CalendarView: View {
     @Query private var stones: [StoneEvent]
     @Query private var touchLogs: [TouchLog]
     @Query(filter: #Predicate<Project> { $0.isActive }) private var activeProjects: [Project]
+    @Query private var dayContexts: [DayContext]
 
     @State private var selectedMonth = Date()
     @State private var selectedDay: SelectedDay?
     @State private var showingAddStone = false
     @State private var addStoneDate: Date?
     @State private var showingWorkloadLegend = false
+    @State private var showDetailedView = false
 
     private let calendar = Calendar.current
     private let daysOfWeek = ["S", "M", "T", "W", "T", "F", "S"]
@@ -75,6 +77,17 @@ struct CalendarView: View {
                 .foregroundStyle(DesignSystem.Colors.textPrimary)
 
             Spacer()
+
+            // Detail view toggle button
+            Button {
+                withAnimation(.spring(response: 0.3)) {
+                    showDetailedView.toggle()
+                }
+            } label: {
+                Image(systemName: showDetailedView ? "list.bullet.rectangle.fill" : "calendar")
+                    .font(.system(size: 18))
+                    .foregroundStyle(showDetailedView ? DesignSystem.Colors.accent : DesignSystem.Colors.textTertiary)
+            }
 
             // Workload legend help button
             Button {
@@ -195,15 +208,19 @@ struct CalendarView: View {
 
     private var calendarGrid: some View {
         let days = generateCalendarDays()
+        let cellHeight: CGFloat = showDetailedView ? 110 : 60
 
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DesignSystem.Spacing.sm), count: 7), spacing: DesignSystem.Spacing.md) {
             ForEach(days) { dayData in
                 DayCell(
                     dayData: dayData,
                     stones: stonesForDay(dayData.date),
+                    contexts: contextsForDay(dayData.date),
                     touchCount: touchCountForDay(dayData.date),
                     dayLoad: loadForDay(dayData.date),
                     hasDeadline: hasDeadlineOnDay(dayData.date),
+                    showDetails: showDetailedView,
+                    cellHeight: cellHeight,
                     onTap: {
                         if dayData.isCurrentMonth {
                             selectedDay = SelectedDay(
@@ -348,8 +365,13 @@ struct CalendarView: View {
         return PressureCalculator.calculateDayLoad(
             for: date,
             projects: Array(activeProjects),
-            stones: Array(stones)
+            stones: Array(stones),
+            contexts: Array(dayContexts)
         )
+    }
+
+    private func contextsForDay(_ date: Date) -> [DayContext] {
+        dayContexts.filter { $0.appliesTo(date: date) }
     }
 
     private func hasDeadlineOnDay(_ date: Date) -> Bool {
@@ -373,72 +395,46 @@ struct DayData: Identifiable {
 struct DayCell: View {
     let dayData: DayData
     let stones: [StoneEvent]
+    let contexts: [DayContext]
     let touchCount: Int
     let dayLoad: Double  // 0.0 = empty, 1.0 = full, >1.0 = overloaded
     let hasDeadline: Bool
+    let showDetails: Bool
+    let cellHeight: CGFloat
     let onTap: () -> Void
 
     private let calendar = Calendar.current
+
+    private var sortedStones: [StoneEvent] {
+        stones.sorted { ($0.startHour * 60 + $0.startMinute) < ($1.startHour * 60 + $1.startMinute) }
+    }
+
+    /// Primary context for display (strictest work mode)
+    private var primaryContext: DayContext? {
+        contexts.min { $0.workMode.priority < $1.workMode.priority }
+    }
+
+    /// Whether this is a no-work day
+    private var isNoWorkDay: Bool {
+        contexts.strictestWorkMode(for: dayData.date) == .none
+    }
 
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 2) {
                 if let day = dayData.day {
-                    Spacer()
-
-                    // Day number
-                    Text("\(day)")
-                        .font(.system(size: 14, weight: isToday ? .bold : .medium))
-                        .foregroundColor(dayData.isCurrentMonth ? DesignSystem.Colors.textPrimary : DesignSystem.Colors.textTertiary.opacity(0.3))
-                        .frame(width: 26, height: 26)
-                        .background(
-                            Circle()
-                                .fill(isToday ? DesignSystem.Colors.accent.opacity(0.2) : Color.clear)
-                        )
-                        .overlay(
-                            Circle()
-                                .strokeBorder(isToday ? DesignSystem.Colors.accent : Color.clear, lineWidth: 1.5)
-                        )
-
-                    Spacer()
-
-                    // Event indicators (stone dots)
-                    HStack(spacing: 3) {
-                        if !stones.isEmpty {
-                            ForEach(stones.prefix(3)) { _ in
-                                Circle()
-                                    .fill(DesignSystem.Colors.textTertiary)
-                                    .frame(width: 4, height: 4)
-                            }
-                        }
-                    }
-                    .frame(height: 6)
-
-                    // DUE tag for deadline days
-                    if hasDeadline {
-                        Text("DUE")
-                            .font(.system(size: 7, weight: .bold))
-                            .foregroundStyle(DesignSystem.Colors.background)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                            .background(
-                                Capsule()
-                                    .fill(loadColor)
-                            )
+                    if showDetails {
+                        detailedContent(day: day)
                     } else {
-                        Color.clear
-                            .frame(height: 14)
+                        compactContent(day: day)
                     }
-
-                    Spacer()
-                        .frame(height: 4)
                 } else {
                     Color.clear
-                        .frame(height: 60)
+                        .frame(height: cellHeight)
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 60)
+            .frame(height: cellHeight)
             .background(
                 RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .fill(cellBackgroundColor)
@@ -447,10 +443,166 @@ struct DayCell: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: - Compact View (Original)
+
+    @ViewBuilder
+    private func compactContent(day: Int) -> some View {
+        Spacer()
+
+        // Context badge overlay in top-right corner
+        ZStack(alignment: .topTrailing) {
+            // Day number
+            Text("\(day)")
+                .font(.system(size: 14, weight: isToday ? .bold : .medium))
+                .foregroundColor(dayData.isCurrentMonth ? DesignSystem.Colors.textPrimary : DesignSystem.Colors.textTertiary.opacity(0.3))
+                .frame(width: 26, height: 26)
+                .background(
+                    Circle()
+                        .fill(isToday ? DesignSystem.Colors.accent.opacity(0.2) : Color.clear)
+                )
+                .overlay(
+                    Circle()
+                        .strokeBorder(isToday ? DesignSystem.Colors.accent : Color.clear, lineWidth: 1.5)
+                )
+
+            // Context type icon
+            if let context = primaryContext {
+                Image(systemName: context.type.icon)
+                    .font(.system(size: 8))
+                    .foregroundStyle(DesignSystem.Colors.background)
+                    .frame(width: 12, height: 12)
+                    .background(
+                        Circle()
+                            .fill(DesignSystem.Colors.accent)
+                    )
+                    .offset(x: 4, y: -4)
+            }
+        }
+
+        Spacer()
+
+        // Event indicators (stone dots)
+        HStack(spacing: 3) {
+            if !stones.isEmpty {
+                ForEach(stones.prefix(3)) { _ in
+                    Circle()
+                        .fill(DesignSystem.Colors.textTertiary)
+                        .frame(width: 4, height: 4)
+                }
+            }
+        }
+        .frame(height: 6)
+
+        // DUE tag or context label for deadline days
+        if hasDeadline {
+            Text("DUE")
+                .font(.system(size: 7, weight: .bold))
+                .foregroundStyle(DesignSystem.Colors.background)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(loadColor)
+                )
+        } else if isNoWorkDay {
+            Text("OFF")
+                .font(.system(size: 7, weight: .bold))
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(DesignSystem.Colors.cardBackground)
+                )
+        } else {
+            Color.clear
+                .frame(height: 14)
+        }
+
+        Spacer()
+            .frame(height: 4)
+    }
+
+    // MARK: - Detailed View
+
+    @ViewBuilder
+    private func detailedContent(day: Int) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            // Day number row
+            HStack {
+                Text("\(day)")
+                    .font(.system(size: 12, weight: isToday ? .bold : .medium))
+                    .foregroundColor(dayData.isCurrentMonth ? DesignSystem.Colors.textPrimary : DesignSystem.Colors.textTertiary.opacity(0.3))
+                    .frame(width: 20, height: 20)
+                    .background(
+                        Circle()
+                            .fill(isToday ? DesignSystem.Colors.accent.opacity(0.2) : Color.clear)
+                    )
+                    .overlay(
+                        Circle()
+                            .strokeBorder(isToday ? DesignSystem.Colors.accent : Color.clear, lineWidth: 1)
+                    )
+
+                Spacer()
+
+                // DUE tag
+                if hasDeadline {
+                    Text("DUE")
+                        .font(.system(size: 6, weight: .bold))
+                        .foregroundStyle(DesignSystem.Colors.background)
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, 1)
+                        .background(
+                            Capsule()
+                                .fill(loadColor)
+                        )
+                }
+            }
+            .padding(.horizontal, 4)
+            .padding(.top, 4)
+
+            // Event list
+            if stones.isEmpty {
+                Spacer()
+            } else {
+                VStack(alignment: .leading, spacing: 1) {
+                    ForEach(sortedStones.prefix(3)) { stone in
+                        HStack(spacing: 2) {
+                            Text(stone.startTimeString)
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                                .frame(width: 28, alignment: .leading)
+
+                            Text(stone.title)
+                                .font(.system(size: 8, weight: .regular))
+                                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                .lineLimit(1)
+                        }
+                    }
+
+                    if stones.count > 3 {
+                        Text("+\(stones.count - 3) more")
+                            .font(.system(size: 7, weight: .medium))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    }
+                }
+                .padding(.horizontal, 4)
+
+                Spacer()
+            }
+        }
+    }
+
     /// Color based on workload - smooth accent gradient
+    /// No-work days get a special muted background
     private var cellBackgroundColor: Color {
         if !dayData.isCurrentMonth {
             return Color.clear
+        }
+
+        // No-work days (none mode) get a special background
+        if isNoWorkDay {
+            return DesignSystem.Colors.textTertiary.opacity(0.15)
         }
 
         // Use smooth gradient color based on exact load percentage
@@ -475,5 +627,5 @@ struct DayCell: View {
 
 #Preview {
     CalendarView()
-        .modelContainer(for: [StoneEvent.self, TouchLog.self, Project.self], inMemory: true)
+        .modelContainer(for: [StoneEvent.self, TouchLog.self, Project.self, DayContext.self], inMemory: true)
 }

@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		WIDGET001122334455EE0031 /* TouchStoneWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = WIDGET001122334455EE0002 /* TouchStoneWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		AABB001122334455EEFF0010 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -42,11 +46,6 @@
 		AABB001122334455EEFF0001 /* TouchStoneUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TouchStoneUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		WIDGET001122334455EE0002 /* TouchStoneWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TouchStoneWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
-
-/* Begin PBXBuildFile section */
-		757E36BEB791985A085C7AF8 /* ProjectAskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD31EBD0627BBBE95C231557 /* ProjectAskSheet.swift */; };
-		WIDGET001122334455EE0031 /* TouchStoneWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = WIDGET001122334455EE0002 /* TouchStoneWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-/* End PBXBuildFile section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		6D31B5C92F135002001FC9D3 /* Exceptions for "TouchStone" folder in "TouchStone" target */ = {

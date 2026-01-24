@@ -6,6 +6,7 @@ import SwiftData
 /// DayState computes the current state of the day based on stones (fixed events)
 /// and water (projects that flow around them).
 /// Uses a "liquid scheduler" algorithm to suggest work sessions.
+/// Respects day contexts (holidays, vacations) that affect capacity.
 @Observable
 class DayState {
     let date: Date
@@ -20,6 +21,7 @@ class DayState {
     private(set) var dayMessage: String = ""
     private(set) var minutesTouchedToday: Int = 0
     private(set) var activeRules: [Rule] = []  // Store active rules for meal display
+    private(set) var activeContexts: [DayContext] = []  // Store active day contexts
 
     init(date: Date = Date()) {
         self.date = calendar.startOfDay(for: date)
@@ -32,9 +34,16 @@ class DayState {
         stoneInstances.reduce(0) { $0 + $1.event.durationMinutes }
     }
 
-    /// Available minutes for project work (capacity - stones)
+    /// Base capacity after context adjustments (before stone deduction)
+    var contextAdjustedCapacity: Int {
+        let baseCapacity = prefs.dailyProductiveMinutes
+        let multiplier = activeContexts.effectiveCapacity(for: date)
+        return Int(Double(baseCapacity) * multiplier)
+    }
+
+    /// Available minutes for project work (capacity - stones - context adjustments)
     var availableMinutes: Int {
-        max(0, prefs.dailyProductiveMinutes - stoneMinutesToday)
+        max(0, contextAdjustedCapacity - stoneMinutesToday)
     }
 
     /// Whether user has reached their daily productive capacity
@@ -42,9 +51,25 @@ class DayState {
         minutesTouchedToday >= availableMinutes && availableMinutes > 0
     }
 
+    /// The strictest work mode from active contexts
+    var effectiveWorkMode: DayContextWorkMode {
+        activeContexts.strictestWorkMode(for: date)
+    }
+
+    /// Fixed task description if in fixed mode
+    var fixedTaskDescription: String? {
+        activeContexts.fixedTask(for: date)
+    }
+
+    /// Whether sessions should be suppressed (no work or fixed mode)
+    var shouldSuppressSessions: Bool {
+        let mode = effectiveWorkMode
+        return mode == .none || mode == .fixed
+    }
+
     // MARK: - Compute Day State
 
-    func compute(stones: [StoneEvent], projects: [Project], rules: [Rule] = []) {
+    func compute(stones: [StoneEvent], projects: [Project], rules: [Rule] = [], contexts: [DayContext] = []) {
         // 1. Get today's stone instances
         stoneInstances = stones
             .filter { $0.occursOn(date: date) }
@@ -54,22 +79,30 @@ class DayState {
         // 2. Store active rules that apply to this date for meal display
         activeRules = rules.filter { $0.appliesTo(date: date) }
 
-        // 3. Calculate free time slots (considering rules)
+        // 3. Store active contexts that apply to this date
+        activeContexts = contexts.active(for: date)
+
+        // 4. Calculate free time slots (considering rules)
         freeSlots = calculateFreeSlots(rules: rules)
 
-        // 4. Calculate total minutes touched for the computed date
+        // 5. Calculate total minutes touched for the computed date
         // Use self.date (already start of day) to ensure future days show full schedule
         minutesTouchedToday = projects.flatMap { $0.touchLogs }
             .filter { calendar.startOfDay(for: $0.timestamp) == date }
             .reduce(0) { $0 + $1.durationMinutes }
 
-        // 5. Generate suggested sessions (pour water into slots)
-        suggestedSessions = generateSuggestedSessions(projects: projects)
+        // 6. Generate suggested sessions (pour water into slots)
+        // Skip if work mode is "none" or "fixed"
+        if shouldSuppressSessions {
+            suggestedSessions = []
+        } else {
+            suggestedSessions = generateSuggestedSessions(projects: projects)
+        }
 
-        // 6. Generate unified workflow items (merge stones, waters, and meals)
+        // 7. Generate unified workflow items (merge stones, waters, meals, and contexts)
         workflowItems = generateWorkflowItems(projects: projects)
 
-        // 7. Generate day message based on load and capacity
+        // 8. Generate day message based on load, capacity, and contexts
         dayMessage = generateDayMessage()
     }
 
@@ -650,6 +683,11 @@ class DayState {
     // MARK: - Day Message Generation
 
     private func generateDayMessage() -> String {
+        // Check for active day contexts first
+        if !activeContexts.isEmpty {
+            return contextMessage()
+        }
+
         // Check if user has done enough for today
         if hasReachedCapacity {
             return capacityReachedMessage()
@@ -666,6 +704,26 @@ class DayState {
             return "A balanced day ahead."
         } else {
             return "A full day. Be kind to yourself."
+        }
+    }
+
+    private func contextMessage() -> String {
+        guard let primaryContext = activeContexts.min(by: { $0.workMode.priority < $1.workMode.priority }) else {
+            return "A balanced day ahead."
+        }
+
+        switch primaryContext.workMode {
+        case .none:
+            return "\(primaryContext.name) - Take the day off. Your stones are shown above."
+        case .reduced:
+            return "\(primaryContext.name) - Working at \(primaryContext.capacityPercent)% capacity today."
+        case .fixed:
+            if let task = primaryContext.fixedTaskDescription {
+                return "\(primaryContext.name) - Focus on: \(task)"
+            }
+            return "\(primaryContext.name) - Working on a fixed task today."
+        case .normal:
+            return "\(primaryContext.name) - Full capacity with a gentle reminder."
         }
     }
 
