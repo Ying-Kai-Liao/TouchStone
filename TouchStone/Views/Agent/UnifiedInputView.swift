@@ -23,6 +23,8 @@ struct UnifiedInputView: View {
 
     @Query private var allStones: [StoneEvent]
 
+    @Query private var dayContexts: [DayContext]
+
     // MARK: - State
 
     @State private var inputText = ""
@@ -548,7 +550,8 @@ struct UnifiedInputView: View {
             stonesForToday: stonesForToday,
             freeHours: freeHours,
             documents: documentContexts,
-            focusedProject: focusedProject
+            focusedProject: focusedProject,
+            dayContexts: Array(dayContexts)
         )
     }
 

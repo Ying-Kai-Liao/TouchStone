@@ -20,6 +20,8 @@ struct TodayFlowView: View {
 
     @Query private var allTouchLogs: [TouchLog]
 
+    @Query private var dayContexts: [DayContext]
+
     @State private var dayState: DayState = DayState()
     @State private var selectedDate = Date()
     @State private var focusProject: Project?
@@ -280,8 +282,13 @@ struct TodayFlowView: View {
             // Rest day - only show stones (no work suggestions)
             dayState.computeStonesOnly(stones: Array(allStones))
         } else {
-            // Compute suggestions dynamically based on stones, projects, and rules
-            dayState.compute(stones: Array(allStones), projects: Array(activeProjects), rules: Array(activeRules))
+            // Compute suggestions dynamically based on stones, projects, rules, and day contexts
+            dayState.compute(
+                stones: Array(allStones),
+                projects: Array(activeProjects),
+                rules: Array(activeRules),
+                contexts: Array(dayContexts)
+            )
         }
     }
 
