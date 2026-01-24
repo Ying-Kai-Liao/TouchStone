@@ -345,8 +345,8 @@ struct ProjectPreviewCard: View {
                     Spacer()
                 }
 
-                // Time slider (only for phase mode projects with time budgets)
-                if project.isPhaseMode && project.totalPlannedMinutes > 0 {
+                // Time slider (for projects with time budgets)
+                if project.totalPlannedMinutes > 0 {
                     timeSlider
                 }
 
@@ -794,7 +794,7 @@ struct DeadlineBadge: View {
 
 // MARK: - Pending Milestone Row
 
-/// Row for displaying a pending milestone item in preview (pure todo list style - no time)
+/// Row for displaying a pending milestone item in preview (pure todo list style)
 struct PendingMilestoneRow: View {
     let milestone: AgentService.PendingMilestone
     let index: Int

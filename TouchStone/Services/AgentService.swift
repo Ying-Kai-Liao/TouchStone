@@ -55,6 +55,7 @@ class AgentService: ObservableObject {
         let projects: [ProjectSummary]
         let stonesToday: [StoneSummary]
         let freeHoursToday: Double
+        let documentContexts: [DocumentContext]
 
         enum CodingKeys: String, CodingKey {
             case today
@@ -62,6 +63,23 @@ class AgentService: ObservableObject {
             case projects
             case stonesToday = "stones_today"
             case freeHoursToday = "free_hours_today"
+            case documentContexts = "document_contexts"
+        }
+
+        init(
+            today: String,
+            currentTime: String?,
+            projects: [ProjectSummary],
+            stonesToday: [StoneSummary],
+            freeHoursToday: Double,
+            documentContexts: [DocumentContext] = []
+        ) {
+            self.today = today
+            self.currentTime = currentTime
+            self.projects = projects
+            self.stonesToday = stonesToday
+            self.freeHoursToday = freeHoursToday
+            self.documentContexts = documentContexts
         }
     }
 
@@ -86,6 +104,16 @@ class AgentService: ObservableObject {
             case startMinute = "start_minute"
             case endHour = "end_hour"
             case endMinute = "end_minute"
+        }
+    }
+
+    struct DocumentContext: Codable {
+        let filename: String
+        let extractedText: String
+
+        enum CodingKeys: String, CodingKey {
+            case filename
+            case extractedText = "extracted_text"
         }
     }
 
@@ -712,10 +740,18 @@ extension AgentService {
 
     /// Build context from SwiftData models.
     /// Call this from views that have access to the model context.
+    /// - Parameters:
+    ///   - projects: Active projects to include in context
+    ///   - stonesForToday: Today's stone events
+    ///   - freeHours: Available hours today
+    ///   - documents: Documents attached to the current message
+    ///   - focusedProject: Optional project being discussed - its documents will be included
     static func buildContext(
         projects: [Project],
         stonesForToday: [StoneEvent],
-        freeHours: Double
+        freeHours: Double,
+        documents: [DocumentContext] = [],
+        focusedProject: Project? = nil
     ) -> UserContext {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -743,12 +779,29 @@ extension AgentService {
             )
         }
 
+        // Combine attached documents with focused project documents
+        var allDocuments = documents
+
+        // Add documents from focused project if available
+        if let focused = focusedProject {
+            for projectDoc in focused.documents {
+                if let text = projectDoc.extractedText, !text.isEmpty {
+                    let docContext = DocumentContext(
+                        filename: "[Project: \(focused.title)] \(projectDoc.filename)",
+                        extractedText: String(text.prefix(15000))
+                    )
+                    allDocuments.append(docContext)
+                }
+            }
+        }
+
         return UserContext(
             today: dateFormatter.string(from: Date()),
             currentTime: timeFormatter.string(from: Date()),
             projects: Array(projectSummaries),
             stonesToday: stoneSummaries,
-            freeHoursToday: freeHours
+            freeHoursToday: freeHours,
+            documentContexts: allDocuments
         )
     }
 }

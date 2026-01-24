@@ -1,5 +1,16 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
+
+/// A document pending attachment to a chat message
+struct PendingDocument: Identifiable {
+    let id = UUID()
+    let filename: String
+    let url: URL
+    var extractedText: String?
+    var isExtracting: Bool = false
+    var extractionError: String?
+}
 
 /// Unified conversational input view for AI-powered productivity assistance.
 /// Users can type or speak naturally, and the AI routes to appropriate actions.
@@ -18,7 +29,6 @@ struct UnifiedInputView: View {
     @State private var messages: [AgentChatMessage] = []
     @State private var showingSpeechInput = false
     @State private var isBackendAvailable = false
-    @State private var briefing: AgentService.DailyBriefing?
     @State private var errorMessage: String?
 
     // Phase 2: Pending actions state
@@ -29,6 +39,16 @@ struct UnifiedInputView: View {
 
     // Confirmed actions (displayed after commit, cleared when user types)
     @State private var confirmedActions: [AgentService.PendingAction] = []
+
+    // Document attachment state
+    @State private var pendingDocuments: [PendingDocument] = []
+    @State private var showingDocumentPicker = false
+    @State private var documentsForProject: [PendingDocument] = []  // Documents to attach when project is created
+    private let documentExtractor = DocumentTextExtractor()
+
+    // Project focus state - when set, project's documents are included in AI context
+    @State private var focusedProject: Project?
+    @State private var showingProjectPicker = false
 
     @SwiftUI.FocusState private var isInputFocused: Bool
 
@@ -60,7 +80,7 @@ struct UnifiedInputView: View {
                 }
             }
             .task {
-                await checkBackendAndLoadBriefing()
+                await checkBackendAvailability()
             }
             .alert("Error", isPresented: .constant(errorMessage != nil)) {
                 Button("OK") { errorMessage = nil }
@@ -76,15 +96,8 @@ struct UnifiedInputView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: DesignSystem.Spacing.md) {
-                    // Briefing card if available
-                    if let briefing = briefing, messages.isEmpty {
-                        BriefingCard(briefing: briefing)
-                            .padding(.horizontal)
-                            .padding(.top)
-                    }
-
-                    // Placeholder when no messages
-                    if messages.isEmpty && briefing == nil {
+                    // Guide text with suggestions - shown until user sends first message
+                    if messages.isEmpty {
                         emptyStateView
                     }
 
@@ -257,7 +270,31 @@ struct UnifiedInputView: View {
         VStack(spacing: 0) {
             Divider()
 
+            // Focused project indicator
+            if focusedProject != nil || projectsWithDocuments.count > 0 {
+                focusedProjectIndicator
+            }
+
+            // Pending documents indicator
+            if !pendingDocuments.isEmpty {
+                pendingDocumentsView
+            }
+
             HStack(spacing: DesignSystem.Spacing.md) {
+                // Document picker button
+                Button {
+                    showingDocumentPicker = true
+                } label: {
+                    Image(systemName: pendingDocuments.isEmpty ? "paperclip" : "paperclip.badge.ellipsis")
+                        .font(.title3)
+                        .foregroundStyle(pendingDocuments.isEmpty ? DesignSystem.Colors.textSecondary : DesignSystem.Colors.accent)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            Circle()
+                                .fill(DesignSystem.Colors.cardBackground)
+                        )
+                }
+
                 // Text field
                 TextField("What's on your mind?", text: $inputText, axis: .vertical)
                     .lineLimit(1...5)
@@ -270,7 +307,7 @@ struct UnifiedInputView: View {
                     )
                     .focused($isInputFocused)
                     .onSubmit {
-                        if !inputText.isEmpty {
+                        if !inputText.isEmpty || !pendingDocuments.isEmpty {
                             sendMessage(inputText)
                         }
                     }
@@ -303,9 +340,9 @@ struct UnifiedInputView: View {
                 } label: {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.title)
-                        .foregroundStyle(inputText.isEmpty ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.accent)
+                        .foregroundStyle((inputText.isEmpty && pendingDocuments.isEmpty) ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.accent)
                 }
-                .disabled(inputText.isEmpty || agentService.isLoading)
+                .disabled((inputText.isEmpty && pendingDocuments.isEmpty) || agentService.isLoading)
             }
             .padding(.horizontal)
             .padding(.vertical, DesignSystem.Spacing.md)
@@ -317,38 +354,144 @@ struct UnifiedInputView: View {
                 sendMessage(transcribedText)
             }
         }
+        .fileImporter(
+            isPresented: $showingDocumentPicker,
+            allowedContentTypes: [
+                .pdf,
+                .plainText,
+                .rtf,
+                .text,
+                UTType("org.openxmlformats.wordprocessingml.document") ?? .data, // .docx
+                .png,
+                .jpeg,
+                .heic
+            ],
+            allowsMultipleSelection: true
+        ) { result in
+            handleDocumentSelection(result)
+        }
+    }
+
+    /// Projects that have attached documents
+    private var projectsWithDocuments: [Project] {
+        activeProjects.filter { !$0.documents.isEmpty }
+    }
+
+    /// View showing focused project indicator
+    private var focusedProjectIndicator: some View {
+        HStack(spacing: DesignSystem.Spacing.sm) {
+            if let project = focusedProject {
+                HStack(spacing: 6) {
+                    Image(systemName: "folder.fill")
+                        .font(.caption)
+                        .foregroundStyle(DesignSystem.Colors.accent)
+
+                    Text("Discussing: \(project.title)")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+                        .lineLimit(1)
+
+                    Button {
+                        focusedProject = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(DesignSystem.Colors.accent.opacity(0.1))
+                )
+            }
+
+            if !projectsWithDocuments.isEmpty {
+                Menu {
+                    Button("None (General Chat)") {
+                        focusedProject = nil
+                    }
+                    Divider()
+                    ForEach(projectsWithDocuments) { project in
+                        Button {
+                            focusedProject = project
+                        } label: {
+                            Label(project.title, systemImage: "folder.fill")
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder.badge.questionmark")
+                            .font(.caption)
+                        Text(focusedProject == nil ? "Focus on project..." : "Change")
+                            .font(DesignSystem.Typography.caption)
+                    }
+                    .foregroundStyle(DesignSystem.Colors.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .strokeBorder(DesignSystem.Colors.accent.opacity(0.3), lineWidth: 1)
+                    )
+                }
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, DesignSystem.Spacing.sm)
+    }
+
+    /// View showing pending document attachments
+    private var pendingDocumentsView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: DesignSystem.Spacing.md) {
+                ForEach(pendingDocuments) { doc in
+                    DocumentCard(document: doc) {
+                        removePendingDocument(doc)
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, DesignSystem.Spacing.sm)
+        }
     }
 
     // MARK: - Actions
 
-    private func checkBackendAndLoadBriefing() async {
+    private func checkBackendAvailability() async {
         isBackendAvailable = await agentService.healthCheck()
-
-        if isBackendAvailable {
-            do {
-                briefing = try await agentService.getDailyBriefing()
-            } catch {
-                // Briefing is optional, don't show error
-                print("Failed to load briefing: \(error)")
-            }
-        }
     }
 
     private func sendMessage(_ text: String) {
-        guard !text.isEmpty else { return }
+        // Allow sending with just documents attached
+        guard !text.isEmpty || !pendingDocuments.isEmpty else { return }
 
-        let userMessage = AgentChatMessage(role: .user, content: text)
+        // Build message content including document info
+        let messageText = text.isEmpty ? "I've attached some documents for you to analyze." : text
+        let docNames = pendingDocuments.map { $0.filename }
+        let displayText = docNames.isEmpty ? messageText : "\(messageText)\n📎 \(docNames.joined(separator: ", "))"
+
+        let userMessage = AgentChatMessage(role: .user, content: displayText)
         messages.append(userMessage)
         inputText = ""
         isInputFocused = false
 
         Task {
             do {
-                // Build context from current data
+                // Build context from current data (includes pending documents)
                 let context = buildContext()
 
+                // Move documents to project queue (will be attached if a project is created)
+                // Clear pending documents after building context
+                await MainActor.run {
+                    if !pendingDocuments.isEmpty {
+                        documentsForProject = pendingDocuments
+                    }
+                    pendingDocuments = []
+                }
+
                 // Send to backend
-                let response = try await agentService.chat(message: text, context: context)
+                let response = try await agentService.chat(message: messageText, context: context)
 
                 // Add assistant response
                 let assistantMessage = AgentChatMessage(role: .assistant, content: response.message)
@@ -391,11 +534,76 @@ struct UnifiedInputView: View {
         }
         let freeHours = max(0, 8.0 - Double(stoneMinutes) / 60.0)
 
+        // Build document contexts from pending documents
+        let documentContexts = pendingDocuments.compactMap { doc -> AgentService.DocumentContext? in
+            guard let text = doc.extractedText, !text.isEmpty else { return nil }
+            return AgentService.DocumentContext(
+                filename: doc.filename,
+                extractedText: String(text.prefix(15000)) // Truncate for API limits
+            )
+        }
+
         return AgentService.buildContext(
             projects: Array(activeProjects),
             stonesForToday: stonesForToday,
-            freeHours: freeHours
+            freeHours: freeHours,
+            documents: documentContexts,
+            focusedProject: focusedProject
         )
+    }
+
+    // MARK: - Document Handling
+
+    /// Handle document picker selection result
+    private func handleDocumentSelection(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            for url in urls {
+                addPendingDocument(url: url)
+            }
+        case .failure(let error):
+            errorMessage = "Failed to select document: \(error.localizedDescription)"
+        }
+    }
+
+    /// Add a document to pending attachments and extract its text
+    private func addPendingDocument(url: URL) {
+        let filename = url.lastPathComponent
+        let doc = PendingDocument(filename: filename, url: url, isExtracting: true)
+
+        // Check for duplicate
+        if pendingDocuments.contains(where: { $0.filename == filename }) {
+            return
+        }
+
+        pendingDocuments.append(doc)
+
+        // Extract text asynchronously
+        Task {
+            do {
+                let text = try await documentExtractor.extractText(from: url)
+                let truncatedText = await documentExtractor.truncateForContext(text, maxCharacters: 15000)
+
+                // Update the document with extracted text
+                if let index = pendingDocuments.firstIndex(where: { $0.id == doc.id }) {
+                    pendingDocuments[index].extractedText = truncatedText
+                    pendingDocuments[index].isExtracting = false
+                }
+            } catch {
+                // Update with error
+                if let index = pendingDocuments.firstIndex(where: { $0.id == doc.id }) {
+                    pendingDocuments[index].extractionError = error.localizedDescription
+                    pendingDocuments[index].isExtracting = false
+                }
+            }
+        }
+    }
+
+    /// Remove a pending document
+    private func removePendingDocument(_ doc: PendingDocument) {
+        withAnimation {
+            pendingDocuments.removeAll { $0.id == doc.id }
+        }
     }
 
     private func processActions(_ actions: [AgentService.AgentAction]) async {
@@ -699,6 +907,25 @@ struct UnifiedInputView: View {
 
         modelContext.insert(project)
 
+        // Attach documents that were sent with this project
+        for pendingDoc in documentsForProject {
+            if let extractedText = pendingDoc.extractedText {
+                let fileType = UTType(filenameExtension: pendingDoc.url.pathExtension)?.identifier ?? "public.data"
+                let bookmarkData = ProjectDocument.createBookmark(from: pendingDoc.url)
+
+                let projectDoc = ProjectDocument(
+                    filename: pendingDoc.filename,
+                    fileType: fileType,
+                    bookmarkData: bookmarkData,
+                    extractedText: extractedText
+                )
+                projectDoc.project = project
+                modelContext.insert(projectDoc)
+            }
+        }
+        // Clear documents after attaching
+        documentsForProject = []
+
         // Create phases (for phase mode)
         if pending.isPhaseMode {
             for (phaseIndex, pendingPhase) in pending.phases.enumerated() {
@@ -767,15 +994,17 @@ struct UnifiedInputView: View {
     private func startNewSession() {
         agentService.startNewSession()
         messages = []
-        briefing = nil
         pendingActions = []
         confirmedActions = []
         suggestions = []
         conversationState = .initial
         hasUserEdits = false
+        pendingDocuments = []
+        documentsForProject = []
+        focusedProject = nil
 
         Task {
-            await checkBackendAndLoadBriefing()
+            await checkBackendAvailability()
         }
     }
 }
@@ -854,42 +1083,156 @@ struct AgentMessageBubble: View {
     }
 }
 
-// MARK: - Briefing Card
+// MARK: - Document Card
 
-struct BriefingCard: View {
-    let briefing: AgentService.DailyBriefing
+/// Document shape with folded corner like macOS file icons
+struct FoldedDocumentShape: Shape {
+    let cornerRadius: CGFloat
+    let foldSize: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+
+        // Start at bottom-left, go clockwise
+        path.move(to: CGPoint(x: rect.minX + cornerRadius, y: rect.maxY))
+
+        // Bottom edge
+        path.addLine(to: CGPoint(x: rect.maxX - cornerRadius, y: rect.maxY))
+
+        // Bottom-right corner
+        path.addArc(
+            center: CGPoint(x: rect.maxX - cornerRadius, y: rect.maxY - cornerRadius),
+            radius: cornerRadius,
+            startAngle: .degrees(90),
+            endAngle: .degrees(0),
+            clockwise: true
+        )
+
+        // Right edge up to fold
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + foldSize))
+
+        // Fold diagonal
+        path.addLine(to: CGPoint(x: rect.maxX - foldSize, y: rect.minY))
+
+        // Top edge
+        path.addLine(to: CGPoint(x: rect.minX + cornerRadius, y: rect.minY))
+
+        // Top-left corner
+        path.addArc(
+            center: CGPoint(x: rect.minX + cornerRadius, y: rect.minY + cornerRadius),
+            radius: cornerRadius,
+            startAngle: .degrees(270),
+            endAngle: .degrees(180),
+            clockwise: true
+        )
+
+        // Left edge
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - cornerRadius))
+
+        // Bottom-left corner
+        path.addArc(
+            center: CGPoint(x: rect.minX + cornerRadius, y: rect.maxY - cornerRadius),
+            radius: cornerRadius,
+            startAngle: .degrees(180),
+            endAngle: .degrees(90),
+            clockwise: true
+        )
+
+        return path
+    }
+}
+
+struct DocumentCard: View {
+    let document: PendingDocument
+    let onRemove: () -> Void
+
+    private var fileExtension: String {
+        document.url.pathExtension.uppercased()
+    }
+
+    private var iconName: String {
+        let ext = document.url.pathExtension.lowercased()
+        switch ext {
+        case "pdf":
+            return "doc.richtext"
+        case "txt", "text", "md", "markdown":
+            return "doc.text"
+        case "rtf", "rtfd":
+            return "doc.richtext"
+        case "docx":
+            return "doc.text"
+        case "png", "jpg", "jpeg", "heic", "heif":
+            return "photo"
+        default:
+            return "doc"
+        }
+    }
+
+    private let cardWidth: CGFloat = 64
+    private let cardHeight: CGFloat = 80
+    private let foldSize: CGFloat = 14
+    private let cornerRadius: CGFloat = 6
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-            Text(briefing.greeting)
-                .font(DesignSystem.Typography.title)
-                .foregroundStyle(DesignSystem.Colors.textPrimary)
+        ZStack(alignment: .topTrailing) {
+            ZStack {
+                // Card background with folded corner
+                FoldedDocumentShape(cornerRadius: cornerRadius, foldSize: foldSize)
+                    .fill(DesignSystem.Colors.cardBackground)
+                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
 
-            if let suggestedFocus = briefing.suggestedFocus {
-                VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
-                    Label("Suggested Focus", systemImage: "lightbulb")
-                        .font(DesignSystem.Typography.captionBold)
+                // Fold triangle overlay (darker shade)
+                Path { path in
+                    path.move(to: CGPoint(x: cardWidth - foldSize, y: 0))
+                    path.addLine(to: CGPoint(x: cardWidth, y: foldSize))
+                    path.addLine(to: CGPoint(x: cardWidth - foldSize, y: foldSize))
+                    path.closeSubpath()
+                }
+                .fill(DesignSystem.Colors.textTertiary.opacity(0.2))
+
+                // Content
+                VStack(spacing: DesignSystem.Spacing.sm) {
+                    Spacer()
+
+                    if document.isExtracting {
+                        ProgressView()
+                            .frame(width: 32, height: 32)
+                    } else if document.extractionError != nil {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.orange)
+                    } else {
+                        Image(systemName: iconName)
+                            .font(.system(size: 28))
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    }
+
+                    Text(fileExtension)
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(DesignSystem.Colors.textSecondary)
 
-                    Text(suggestedFocus)
-                        .font(DesignSystem.Typography.body)
-                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    Spacer()
                 }
+                .padding(.top, foldSize / 2)
             }
+            .frame(width: cardWidth, height: cardHeight)
+            .overlay(
+                FoldedDocumentShape(cornerRadius: cornerRadius, foldSize: foldSize)
+                    .stroke(
+                        document.extractionError != nil ? Color.orange.opacity(0.5) : DesignSystem.Colors.textTertiary.opacity(0.3),
+                        lineWidth: 1
+                    )
+            )
 
-            if let nudge = briefing.nudge {
-                Text(nudge)
-                    .font(DesignSystem.Typography.caption)
-                    .foregroundStyle(DesignSystem.Colors.textSecondary)
-                    .italic()
+            // Remove button
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    .background(Circle().fill(DesignSystem.Colors.background))
             }
+            .offset(x: 6, y: -6)
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
-                .fill(DesignSystem.Colors.cardBackground)
-        )
     }
 }
 
@@ -953,6 +1296,66 @@ struct CompactSuggestionChip: View {
     }
 }
 
+// MARK: - Audio Waveform View
+
+struct AudioWaveformView: View {
+    let isAnimating: Bool
+    let barCount = 5
+
+    @State private var animationPhases: [Double] = []
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<barCount, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(isAnimating ? DesignSystem.Colors.accent : DesignSystem.Colors.textSecondary)
+                    .frame(width: 6)
+                    .scaleEffect(y: isAnimating ? animationPhases.indices.contains(index) ? animationPhases[index] : 0.3 : staticHeight(for: index), anchor: .center)
+                    .animation(
+                        isAnimating ? .easeInOut(duration: 0.4 + Double(index) * 0.1).repeatForever(autoreverses: true) : .default,
+                        value: isAnimating
+                    )
+            }
+        }
+        .onAppear {
+            // Initialize with random phases for more organic animation
+            animationPhases = (0..<barCount).map { _ in Double.random(in: 0.3...1.0) }
+            if isAnimating {
+                startAnimating()
+            }
+        }
+        .onChange(of: isAnimating) { _, newValue in
+            if newValue {
+                startAnimating()
+            }
+        }
+    }
+
+    private func staticHeight(for index: Int) -> CGFloat {
+        // Create a static waveform pattern when not recording
+        let heights: [CGFloat] = [0.4, 0.6, 0.8, 0.6, 0.4]
+        return heights[index % heights.count]
+    }
+
+    private func startAnimating() {
+        // Randomize animation phases for organic look
+        withAnimation {
+            animationPhases = (0..<barCount).map { _ in Double.random(in: 0.3...1.0) }
+        }
+
+        // Continuously update phases while animating
+        Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { timer in
+            if !isAnimating {
+                timer.invalidate()
+                return
+            }
+            withAnimation(.easeInOut(duration: 0.3)) {
+                animationPhases = (0..<barCount).map { _ in Double.random(in: 0.3...1.0) }
+            }
+        }
+    }
+}
+
 // MARK: - Speech Input Sheet
 
 struct SpeechInputSheet: View {
@@ -970,19 +1373,42 @@ struct SpeechInputSheet: View {
             VStack(spacing: DesignSystem.Spacing.xl) {
                 Spacer()
 
-                // Listening indicator - tappable to stop recording
-                ZStack {
-                    Circle()
-                        .fill(DesignSystem.Colors.accent.opacity(isRecording ? 0.3 : 0.1))
-                        .frame(width: 150, height: 150)
-                        .scaleEffect(isRecording ? 1.2 : 1.0)
-                        .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: isRecording)
+                // Listening indicator + text - entire area is tappable
+                VStack(spacing: DesignSystem.Spacing.lg) {
+                    ZStack {
+                        Circle()
+                            .fill(DesignSystem.Colors.accent.opacity(isRecording ? 0.3 : 0.1))
+                            .frame(width: 150, height: 150)
+                            .scaleEffect(isRecording ? 1.2 : 1.0)
+                            .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: isRecording)
 
-                    Image(systemName: isRecording ? "stop.fill" : "mic.fill")
-                        .font(.system(size: 50))
-                        .foregroundStyle(isRecording ? DesignSystem.Colors.accent : DesignSystem.Colors.textSecondary)
+                        if isRecording {
+                            // Animated waveform lines when recording
+                            AudioWaveformView(isAnimating: true)
+                                .frame(width: 60, height: 40)
+                        } else {
+                            // Static waveform lines when idle
+                            AudioWaveformView(isAnimating: false)
+                                .frame(width: 60, height: 40)
+                        }
+                    }
+
+                    // Transcribed text or prompt
+                    if !speechRecognizer.transcript.isEmpty {
+                        Text(speechRecognizer.transcript)
+                            .font(DesignSystem.Typography.body)
+                            .foregroundStyle(DesignSystem.Colors.textPrimary)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(4)
+                            .truncationMode(.tail)
+                            .padding(.horizontal)
+                    } else {
+                        Text(isRecording ? "Tap to stop" : "Tap to start")
+                            .font(DesignSystem.Typography.body)
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    }
                 }
-                .contentShape(Circle())
+                .contentShape(Rectangle())
                 .onTapGesture {
                     if isRecording {
                         speechRecognizer.stopRecording()
@@ -995,19 +1421,6 @@ struct SpeechInputSheet: View {
                     } else {
                         try? speechRecognizer.startRecording()
                     }
-                }
-
-                // Transcribed text
-                if !speechRecognizer.transcript.isEmpty {
-                    Text(speechRecognizer.transcript)
-                        .font(DesignSystem.Typography.body)
-                        .foregroundStyle(DesignSystem.Colors.textPrimary)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                } else {
-                    Text(isRecording ? "Tap to stop" : "Tap to start")
-                        .font(DesignSystem.Typography.body)
-                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
 
                 Spacer()
