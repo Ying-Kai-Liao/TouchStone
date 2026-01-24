@@ -223,6 +223,8 @@ class UserPreferences {
         static let maxProjectsPerDay = "maxProjectsPerDay"
         static let crunchThresholdDays = "crunchThresholdDays"
         static let dueThisWeekPriorityBoost = "dueThisWeekPriorityBoost"
+        // Calendar view settings
+        static let calendarDetailMode = "calendarDetailMode"
     }
 
     // MARK: - Productive Hours
@@ -307,6 +309,13 @@ class UserPreferences {
         didSet { defaults.set(dueThisWeekPriorityBoost, forKey: Keys.dueThisWeekPriorityBoost) }
     }
 
+    // MARK: - Calendar View
+
+    /// Whether to show detailed calendar view with events inline (default: false for simplified mode)
+    var calendarDetailMode: Bool {
+        didSet { defaults.set(calendarDetailMode, forKey: Keys.calendarDetailMode) }
+    }
+
     // MARK: - Language
 
     /// App language setting (default: follow system)
@@ -385,6 +394,8 @@ class UserPreferences {
         self.maxProjectsPerDay = defaults.object(forKey: Keys.maxProjectsPerDay) as? Int ?? 3
         self.crunchThresholdDays = defaults.object(forKey: Keys.crunchThresholdDays) as? Int ?? 2
         self.dueThisWeekPriorityBoost = defaults.object(forKey: Keys.dueThisWeekPriorityBoost) as? Bool ?? true
+        // Calendar view settings
+        self.calendarDetailMode = defaults.object(forKey: Keys.calendarDetailMode) as? Bool ?? false
 
         // Load language option
         if let langString = defaults.string(forKey: Keys.appLanguage),

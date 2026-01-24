@@ -8,12 +8,13 @@ struct CalendarView: View {
     @Query(filter: #Predicate<Project> { $0.isActive }) private var activeProjects: [Project]
     @Query private var dayContexts: [DayContext]
 
+    private var prefs: UserPreferences { UserPreferences.shared }
+
     @State private var selectedMonth = Date()
     @State private var selectedDay: SelectedDay?
     @State private var showingAddStone = false
     @State private var addStoneDate: Date?
     @State private var showingWorkloadLegend = false
-    @State private var showDetailedView = false
 
     // Swipe navigation state
     @State private var dragOffset: CGFloat = 0
@@ -88,17 +89,6 @@ struct CalendarView: View {
 
             Spacer()
 
-            // Detail view toggle button
-            Button {
-                withAnimation(.spring(response: 0.3)) {
-                    showDetailedView.toggle()
-                }
-            } label: {
-                Image(systemName: showDetailedView ? "list.bullet.rectangle.fill" : "calendar")
-                    .font(.system(size: 18))
-                    .foregroundStyle(showDetailedView ? DesignSystem.Colors.accent : DesignSystem.Colors.textTertiary)
-            }
-
             // Workload legend help button
             Button {
                 showingWorkloadLegend = true
@@ -109,6 +99,17 @@ struct CalendarView: View {
             }
             .popover(isPresented: $showingWorkloadLegend, arrowEdge: .top) {
                 workloadLegendPopover
+            }
+
+            // Calendar detail mode toggle
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    prefs.calendarDetailMode.toggle()
+                }
+            } label: {
+                Image(systemName: prefs.calendarDetailMode ? "list.bullet.rectangle" : "square.grid.2x2")
+                    .font(.system(size: 18))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
             }
 
             Button {
@@ -218,9 +219,10 @@ struct CalendarView: View {
 
     private var calendarGrid: some View {
         let days = generateCalendarDays()
-        let cellHeight: CGFloat = showDetailedView ? 110 : 60
+        let cellSpacing = prefs.calendarDetailMode ? DesignSystem.Spacing.sm : DesignSystem.Spacing.md
+        let cellHeight: CGFloat = prefs.calendarDetailMode ? 110 : 60
 
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DesignSystem.Spacing.sm), count: 7), spacing: DesignSystem.Spacing.md) {
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DesignSystem.Spacing.sm), count: 7), spacing: cellSpacing) {
             ForEach(days) { dayData in
                 DayCell(
                     dayData: dayData,
@@ -229,7 +231,7 @@ struct CalendarView: View {
                     touchCount: touchCountForDay(dayData.date),
                     dayLoad: loadForDay(dayData.date),
                     hasDeadline: hasDeadlineOnDay(dayData.date),
-                    showDetails: showDetailedView,
+                    showDetails: prefs.calendarDetailMode,
                     cellHeight: cellHeight,
                     onTap: {
                         if dayData.isCurrentMonth {
@@ -244,6 +246,7 @@ struct CalendarView: View {
         }
         .padding(.horizontal, DesignSystem.Spacing.xl)
         .padding(.bottom, DesignSystem.Spacing.lg)
+        .animation(.easeInOut(duration: 0.2), value: prefs.calendarDetailMode)
     }
 
     // MARK: - Swipe Gesture
