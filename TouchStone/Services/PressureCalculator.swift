@@ -7,7 +7,28 @@ import SwiftUI
 /// Based on the liquid scheduling model:
 /// - Pressure = (Required Work × 1.25 buffer) / Available Capacity
 /// - Available Capacity = Daily Hours - Stone (fixed event) Hours
+/// - Contexts can reduce capacity (vacation, holiday, etc.)
 struct PressureCalculator {
+
+    // MARK: - Context-Aware Capacity
+
+    /// Calculate effective daily capacity considering day contexts
+    /// - Parameters:
+    ///   - date: The date to calculate capacity for
+    ///   - baseCapacityMinutes: Base daily capacity in minutes
+    ///   - contexts: Active day contexts to consider
+    /// - Returns: Effective capacity in minutes after applying context restrictions
+    static func effectiveDailyCapacityMinutes(
+        for date: Date,
+        baseCapacityMinutes: Int,
+        contexts: [DayContext]
+    ) -> Int {
+        let activeContexts = contexts.active(for: date)
+        guard !activeContexts.isEmpty else { return baseCapacityMinutes }
+
+        let multiplier = contexts.effectiveCapacity(for: date)
+        return Int(Double(baseCapacityMinutes) * multiplier)
+    }
 
     /// Detailed pressure calculation result for a single project
     struct ProjectPressure {
@@ -175,14 +196,16 @@ struct PressureCalculator {
     /// Algorithm:
     /// 1. Reserve buffer days (% of total) before each deadline
     /// 2. Account for stones reducing daily capacity
-    /// 3. Distribute work proportionally to available capacity across work days
-    /// 4. Auto-use buffer days when work exceeds 100% capacity
-    /// 5. Prioritize projects by deadline (earlier deadlines first)
+    /// 3. Apply day context capacity restrictions (vacation, holiday, etc.)
+    /// 4. Distribute work proportionally to available capacity across work days
+    /// 5. Auto-use buffer days when work exceeds 100% capacity
+    /// 6. Prioritize projects by deadline (earlier deadlines first)
     /// Returns a value from 0.0 (empty) to 1.0+ (overloaded).
     static func calculateDayLoad(
         for date: Date,
         projects: [Project],
         stones: [StoneEvent] = [],
+        contexts: [DayContext] = [],
         dailyCapacityMinutes: Int = UserPreferences.shared.dailyProductiveHours * 60,
         bufferPercent: Int = UserPreferences.shared.deadlineBufferPercent
     ) -> Double {
@@ -190,6 +213,7 @@ struct PressureCalculator {
             for: date,
             projects: projects,
             stones: stones,
+            contexts: contexts,
             dailyCapacityMinutes: dailyCapacityMinutes,
             bufferPercent: bufferPercent
         ).load
@@ -201,6 +225,7 @@ struct PressureCalculator {
         for date: Date,
         projects: [Project],
         stones: [StoneEvent] = [],
+        contexts: [DayContext] = [],
         dailyCapacityMinutes: Int = UserPreferences.shared.dailyProductiveHours * 60,
         bufferPercent: Int = UserPreferences.shared.deadlineBufferPercent
     ) -> DayLoadResult {
@@ -208,13 +233,20 @@ struct PressureCalculator {
         let dayStart = calendar.startOfDay(for: date)
         let today = calendar.startOfDay(for: Date())
 
+        // Apply context capacity reduction
+        let contextAdjustedCapacity = effectiveDailyCapacityMinutes(
+            for: date,
+            baseCapacityMinutes: dailyCapacityMinutes,
+            contexts: contexts
+        )
+
         // Only calculate for today and future days
         guard dayStart >= today else {
             return DayLoadResult(
                 load: 0,
                 isBufferDay: false,
                 allocatedMinutes: 0,
-                availableMinutes: dailyCapacityMinutes,
+                availableMinutes: contextAdjustedCapacity,
                 projectAllocations: [],
                 usedBufferDays: false
             )
@@ -222,7 +254,7 @@ struct PressureCalculator {
 
         // Calculate stone minutes for THIS day
         let stoneMinutes = calculateStoneMinutes(for: date, stones: stones)
-        let availableMinutes = max(0, dailyCapacityMinutes - stoneMinutes)
+        let availableMinutes = max(0, contextAdjustedCapacity - stoneMinutes)
         let dayIndex = calendar.dateComponents([.day], from: today, to: dayStart).day ?? 0
 
         // Filter and sort projects by deadline (earlier first for priority)

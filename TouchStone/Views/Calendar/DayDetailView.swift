@@ -16,14 +16,21 @@ struct DayDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<Project> { $0.isActive }) private var activeProjects: [Project]
     @Query private var allStones: [StoneEvent]
+    @Query private var allContexts: [DayContext]
 
     private var prefs: UserPreferences { UserPreferences.shared }
+
+    // Contexts active for this specific date
+    private var activeContexts: [DayContext] {
+        allContexts.filter { $0.appliesTo(date: date) }
+    }
 
     @State private var stoneToDelete: StoneEvent?
     @State private var showDeleteAlert = false
     @State private var stoneToEdit: StoneEvent?
     @State private var dayState: DayState?
     @State private var showTimeAllocation = false
+    @State private var showingAddContext = false
 
     let date: Date
     let stones: [StoneEvent]
@@ -34,6 +41,17 @@ struct DayDetailView: View {
     // Computed suggested sessions for this day
     private var suggestedSessions: [SuggestedSession] {
         dayState?.suggestedSessions ?? []
+    }
+
+    // Context-aware work suppression
+    private var shouldSuppressWork: Bool {
+        let mode = activeContexts.strictestWorkMode(for: date)
+        return mode == .none || mode == .fixed
+    }
+
+    // Fixed task description if in fixed mode
+    private var fixedTaskDescription: String? {
+        activeContexts.fixedTask(for: date)
     }
 
     var body: some View {
@@ -47,6 +65,11 @@ struct DayDetailView: View {
                         // Date header
                         dateHeader
 
+                        // Context banner (if any active contexts)
+                        if !activeContexts.isEmpty {
+                            contextBanner
+                        }
+
                         // Schedule section first (stones)
                         if !stones.isEmpty {
                             stonesSection
@@ -54,9 +77,16 @@ struct DayDetailView: View {
                             emptyScheduleHint
                         }
 
-                        // Suggested work section
-                        if !suggestedSessions.isEmpty {
+                        // Suggested work section (respects context work mode)
+                        if !suggestedSessions.isEmpty && !shouldSuppressWork {
                             suggestedWorkSection
+                        } else if shouldSuppressWork && !activeContexts.isEmpty {
+                            noWorkMessage
+                        }
+
+                        // Fixed task section (if in fixed mode)
+                        if let fixedTask = fixedTaskDescription {
+                            fixedTaskSection(task: fixedTask)
                         }
 
                         // Time allocation chart (collapsible)
@@ -99,6 +129,11 @@ struct DayDetailView: View {
             .sheet(item: $stoneToEdit) { stone in
                 StoneEditSheet(stone: stone, onSave: {})
             }
+            .sheet(isPresented: $showingAddContext) {
+                NavigationStack {
+                    ContextFormView(context: nil, initialDate: date)
+                }
+            }
         }
     }
 
@@ -136,7 +171,11 @@ struct DayDetailView: View {
 
     private func computeDayState() {
         let state = DayState(date: date)
-        state.compute(stones: Array(allStones), projects: Array(activeProjects))
+        state.compute(
+            stones: Array(allStones),
+            projects: Array(activeProjects),
+            contexts: Array(allContexts)
+        )
         dayState = state
     }
 
@@ -203,7 +242,8 @@ struct DayDetailView: View {
         let loadResult = PressureCalculator.calculateDayLoadDetailed(
             for: date,
             projects: Array(activeProjects),
-            stones: Array(allStones)
+            stones: Array(allStones),
+            contexts: Array(allContexts)
         )
 
         let stoneMinutes = dailyCapacityMinutes - loadResult.availableMinutes
@@ -409,25 +449,143 @@ struct DayDetailView: View {
     }
 
     private var addStoneButton: some View {
-        Button {
-            onAddStone()
-        } label: {
-            HStack(spacing: DesignSystem.Spacing.md) {
-                Image(systemName: "mic.fill")
-                    .font(.system(size: 20))
-                Text("Add Stone")
-                    .font(DesignSystem.Typography.headline)
+        HStack(spacing: DesignSystem.Spacing.md) {
+            // Add Event button
+            Button {
+                onAddStone()
+            } label: {
+                HStack(spacing: DesignSystem.Spacing.sm) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 18))
+                    Text("Add Event")
+                        .font(DesignSystem.Typography.headline)
+                }
+                .foregroundStyle(DesignSystem.Colors.background)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, DesignSystem.Spacing.lg)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                        .fill(DesignSystem.Colors.accent)
+                )
             }
-            .foregroundStyle(DesignSystem.Colors.background)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, DesignSystem.Spacing.lg)
-            .background(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
-                    .fill(DesignSystem.Colors.accent)
-            )
+
+            // Day Plan button
+            Button {
+                showingAddContext = true
+            } label: {
+                HStack(spacing: DesignSystem.Spacing.sm) {
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 18))
+                    Text("Day Plan")
+                        .font(DesignSystem.Typography.headline)
+                }
+                .foregroundStyle(DesignSystem.Colors.accent)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, DesignSystem.Spacing.lg)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                        .strokeBorder(DesignSystem.Colors.accent, lineWidth: 2)
+                )
+            }
         }
         .padding(DesignSystem.Spacing.lg)
         .background(DesignSystem.Colors.background)
+    }
+
+    // MARK: - Context Banner
+
+    private var contextBanner: some View {
+        VStack(spacing: DesignSystem.Spacing.sm) {
+            ForEach(activeContexts) { context in
+                HStack(spacing: DesignSystem.Spacing.md) {
+                    Image(systemName: context.type.icon)
+                        .font(.system(size: 18))
+                        .foregroundStyle(DesignSystem.Colors.accent)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(context.name)
+                            .font(DesignSystem.Typography.body)
+                            .fontWeight(.medium)
+                            .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                        Text(context.shortDescription)
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    }
+
+                    Spacer()
+
+                    // Work mode indicator
+                    Text(context.workMode.displayName.uppercased())
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(context.workMode.color)
+                        .padding(.horizontal, DesignSystem.Spacing.sm)
+                        .padding(.vertical, DesignSystem.Spacing.xs)
+                        .background(
+                            Capsule()
+                                .fill(context.workMode.color.opacity(0.15))
+                        )
+                }
+                .padding(DesignSystem.Spacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                        .fill(DesignSystem.Colors.accent.opacity(0.1))
+                )
+            }
+        }
+        .padding(.horizontal, DesignSystem.Spacing.xl)
+    }
+
+    // MARK: - No Work Message
+
+    private var noWorkMessage: some View {
+        VStack(spacing: DesignSystem.Spacing.md) {
+            Image(systemName: "moon.zzz")
+                .font(.system(size: 32))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+
+            Text("Day Off")
+                .font(DesignSystem.Typography.headline)
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+            Text("No work sessions scheduled for this day.")
+                .font(DesignSystem.Typography.caption)
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(DesignSystem.Spacing.xl)
+    }
+
+    // MARK: - Fixed Task Section
+
+    private func fixedTaskSection(task: String) -> some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            Text("TODAY'S FOCUS")
+                .font(DesignSystem.Typography.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .tracking(1)
+
+            HStack(spacing: DesignSystem.Spacing.md) {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(DesignSystem.Colors.accent)
+
+                Text(task)
+                    .font(DesignSystem.Typography.body)
+                    .fontWeight(.medium)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                Spacer()
+            }
+            .padding(DesignSystem.Spacing.lg)
+            .background(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                    .fill(DesignSystem.Colors.accent.opacity(0.1))
+            )
+        }
+        .padding(.horizontal, DesignSystem.Spacing.xl)
     }
 
     private var formattedDate: String {
@@ -632,5 +790,5 @@ struct SuggestedWorkRow: View {
         stones: stones,
         onAddStone: {}
     )
-    .modelContainer(for: [StoneEvent.self, Project.self], inMemory: true)
+    .modelContainer(for: [StoneEvent.self, Project.self, DayContext.self], inMemory: true)
 }

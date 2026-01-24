@@ -118,6 +118,31 @@ class AgentService: ObservableObject {
             String(format: "%d:%02d - %d:%02d", startHour, startMinute, endHour, endMinute)
         }
 
+        // Memberwise initializer
+        init(
+            tempId: String,
+            title: String,
+            startHour: Int,
+            startMinute: Int,
+            endHour: Int,
+            endMinute: Int,
+            date: String? = nil,
+            isRecurring: Bool = false,
+            recurrenceType: String? = nil,
+            customDays: [Int]? = nil
+        ) {
+            self.tempId = tempId
+            self.title = title
+            self.startHour = startHour
+            self.startMinute = startMinute
+            self.endHour = endHour
+            self.endMinute = endMinute
+            self.date = date
+            self.isRecurring = isRecurring
+            self.recurrenceType = recurrenceType
+            self.customDays = customDays
+        }
+
         enum CodingKeys: String, CodingKey {
             case tempId = "temp_id"
             case title
@@ -253,6 +278,21 @@ class AgentService: ObservableObject {
 
         var id: String { tempId }
 
+        // Memberwise initializer
+        init(
+            tempId: String,
+            projectId: String? = nil,
+            projectTitle: String? = nil,
+            durationMinutes: Int,
+            note: String? = nil
+        ) {
+            self.tempId = tempId
+            self.projectId = projectId
+            self.projectTitle = projectTitle
+            self.durationMinutes = durationMinutes
+            self.note = note
+        }
+
         enum CodingKeys: String, CodingKey {
             case tempId = "temp_id"
             case projectId = "project_id"
@@ -272,6 +312,19 @@ class AgentService: ObservableObject {
             stone?.id ?? project?.id ?? touchLog?.id ?? UUID().uuidString
         }
 
+        // Memberwise initializer
+        init(
+            actionType: String,
+            stone: PendingStone? = nil,
+            project: PendingProject? = nil,
+            touchLog: PendingTouchLog? = nil
+        ) {
+            self.actionType = actionType
+            self.stone = stone
+            self.project = project
+            self.touchLog = touchLog
+        }
+
         enum CodingKeys: String, CodingKey {
             case actionType = "action_type"
             case stone
@@ -286,6 +339,7 @@ class AgentService: ObservableObject {
 
         // Phase 2: Pending actions for GenUI preview
         let pendingActions: [PendingAction]
+        let confirmedActions: [PendingAction]  // Actions just confirmed (for multi-task flow)
         let confirmationRequired: Bool
         let conversationState: ConversationState
 
@@ -300,6 +354,7 @@ class AgentService: ObservableObject {
             case message
             case sessionId = "session_id"
             case pendingActions = "pending_actions"
+            case confirmedActions = "confirmed_actions"
             case confirmationRequired = "confirmation_required"
             case conversationState = "conversation_state"
             case suggestions
@@ -313,6 +368,7 @@ class AgentService: ObservableObject {
             message = try container.decode(String.self, forKey: .message)
             sessionId = try container.decode(String.self, forKey: .sessionId)
             pendingActions = try container.decodeIfPresent([PendingAction].self, forKey: .pendingActions) ?? []
+            confirmedActions = try container.decodeIfPresent([PendingAction].self, forKey: .confirmedActions) ?? []
             confirmationRequired = try container.decodeIfPresent(Bool.self, forKey: .confirmationRequired) ?? false
             conversationState = try container.decodeIfPresent(ConversationState.self, forKey: .conversationState) ?? .initial
             suggestions = try container.decodeIfPresent([String].self, forKey: .suggestions) ?? []
