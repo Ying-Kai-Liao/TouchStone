@@ -7,6 +7,8 @@ struct CalendarView: View {
     @Query private var touchLogs: [TouchLog]
     @Query(filter: #Predicate<Project> { $0.isActive }) private var activeProjects: [Project]
 
+    private var prefs: UserPreferences { UserPreferences.shared }
+
     @State private var selectedMonth = Date()
     @State private var selectedDay: SelectedDay?
     @State private var showingAddStone = false
@@ -86,6 +88,17 @@ struct CalendarView: View {
             }
             .popover(isPresented: $showingWorkloadLegend, arrowEdge: .top) {
                 workloadLegendPopover
+            }
+
+            // Calendar detail mode toggle
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    prefs.calendarDetailMode.toggle()
+                }
+            } label: {
+                Image(systemName: prefs.calendarDetailMode ? "list.bullet.rectangle" : "square.grid.2x2")
+                    .font(.system(size: 18))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
             }
 
             Button {
@@ -195,28 +208,47 @@ struct CalendarView: View {
 
     private var calendarGrid: some View {
         let days = generateCalendarDays()
+        let cellSpacing = prefs.calendarDetailMode ? DesignSystem.Spacing.sm : DesignSystem.Spacing.md
 
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DesignSystem.Spacing.sm), count: 7), spacing: DesignSystem.Spacing.md) {
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DesignSystem.Spacing.sm), count: 7), spacing: cellSpacing) {
             ForEach(days) { dayData in
-                DayCell(
-                    dayData: dayData,
-                    stones: stonesForDay(dayData.date),
-                    touchCount: touchCountForDay(dayData.date),
-                    dayLoad: loadForDay(dayData.date),
-                    hasDeadline: hasDeadlineOnDay(dayData.date),
-                    onTap: {
-                        if dayData.isCurrentMonth {
-                            selectedDay = SelectedDay(
-                                date: dayData.date,
-                                stones: stonesForDay(dayData.date)
-                            )
+                if prefs.calendarDetailMode {
+                    DetailedDayCell(
+                        dayData: dayData,
+                        stones: stonesForDay(dayData.date),
+                        suggestedSessions: suggestedSessionsForDay(dayData.date),
+                        hasDeadline: hasDeadlineOnDay(dayData.date),
+                        onTap: {
+                            if dayData.isCurrentMonth {
+                                selectedDay = SelectedDay(
+                                    date: dayData.date,
+                                    stones: stonesForDay(dayData.date)
+                                )
+                            }
                         }
-                    }
-                )
+                    )
+                } else {
+                    DayCell(
+                        dayData: dayData,
+                        stones: stonesForDay(dayData.date),
+                        touchCount: touchCountForDay(dayData.date),
+                        dayLoad: loadForDay(dayData.date),
+                        hasDeadline: hasDeadlineOnDay(dayData.date),
+                        onTap: {
+                            if dayData.isCurrentMonth {
+                                selectedDay = SelectedDay(
+                                    date: dayData.date,
+                                    stones: stonesForDay(dayData.date)
+                                )
+                            }
+                        }
+                    )
+                }
             }
         }
         .padding(.horizontal, DesignSystem.Spacing.xl)
         .padding(.bottom, DesignSystem.Spacing.lg)
+        .animation(.easeInOut(duration: 0.2), value: prefs.calendarDetailMode)
     }
 
     // MARK: - Workload Legend
@@ -354,6 +386,26 @@ struct CalendarView: View {
 
     private func hasDeadlineOnDay(_ date: Date) -> Bool {
         return PressureCalculator.hasDeadline(on: date, projects: Array(activeProjects))
+    }
+
+    /// Compute suggested sessions for a day (used in detailed mode).
+    /// Uses DayState to calculate which projects should be worked on.
+    private func suggestedSessionsForDay(_ date: Date) -> [SuggestedSession] {
+        // Only compute for current month days to optimize performance
+        guard calendar.isDate(date, equalTo: selectedMonth, toGranularity: .month) else {
+            return []
+        }
+
+        // Only compute for today and future days
+        let today = calendar.startOfDay(for: Date())
+        let dayStart = calendar.startOfDay(for: date)
+        guard dayStart >= today else {
+            return []
+        }
+
+        let dayState = DayState(date: date)
+        dayState.compute(stones: Array(stones), projects: Array(activeProjects))
+        return dayState.suggestedSessions
     }
 
     private var monthYearFormatter: DateFormatter {
