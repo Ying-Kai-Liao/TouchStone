@@ -13,6 +13,14 @@ struct CalendarView: View {
     @State private var addStoneDate: Date?
     @State private var showingWorkloadLegend = false
 
+    // Swipe navigation state
+    @State private var dragOffset: CGFloat = 0
+    @State private var swipeDirection: SwipeDirection = .none
+
+    private enum SwipeDirection {
+        case none, left, right
+    }
+
     private let calendar = Calendar.current
     private let daysOfWeek = ["S", "M", "T", "W", "T", "F", "S"]
 
@@ -39,6 +47,8 @@ struct CalendarView: View {
                             monthNavigationHeader
                             weekdayHeader
                             calendarGrid
+                                .offset(x: dragOffset)
+                                .gesture(monthSwipeGesture)
                         }
                         .padding(.vertical, DesignSystem.Spacing.sm)
                     }
@@ -217,6 +227,68 @@ struct CalendarView: View {
         }
         .padding(.horizontal, DesignSystem.Spacing.xl)
         .padding(.bottom, DesignSystem.Spacing.lg)
+    }
+
+    // MARK: - Swipe Gesture
+
+    private var monthSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 30)
+            .onChanged { value in
+                // Only track horizontal swipes
+                let horizontalAmount = abs(value.translation.width)
+                let verticalAmount = abs(value.translation.height)
+
+                if horizontalAmount > verticalAmount {
+                    // Limit drag offset for visual feedback
+                    dragOffset = value.translation.width * 0.3
+                }
+            }
+            .onEnded { value in
+                let horizontalAmount = abs(value.translation.width)
+                let verticalAmount = abs(value.translation.height)
+                let swipeThreshold: CGFloat = 50
+
+                // Only process horizontal swipes
+                guard horizontalAmount > verticalAmount else {
+                    withAnimation(.spring(response: 0.3)) {
+                        dragOffset = 0
+                    }
+                    return
+                }
+
+                if value.translation.width < -swipeThreshold {
+                    // Swiped left - go to next month
+                    swipeDirection = .left
+                    withAnimation(.spring(response: 0.3)) {
+                        dragOffset = -UIScreen.main.bounds.width * 0.3
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        selectedMonth = calendar.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
+                        dragOffset = UIScreen.main.bounds.width * 0.3
+                        withAnimation(.spring(response: 0.3)) {
+                            dragOffset = 0
+                        }
+                    }
+                } else if value.translation.width > swipeThreshold {
+                    // Swiped right - go to previous month
+                    swipeDirection = .right
+                    withAnimation(.spring(response: 0.3)) {
+                        dragOffset = UIScreen.main.bounds.width * 0.3
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        selectedMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
+                        dragOffset = -UIScreen.main.bounds.width * 0.3
+                        withAnimation(.spring(response: 0.3)) {
+                            dragOffset = 0
+                        }
+                    }
+                } else {
+                    // Swipe wasn't significant enough
+                    withAnimation(.spring(response: 0.3)) {
+                        dragOffset = 0
+                    }
+                }
+            }
     }
 
     // MARK: - Workload Legend
