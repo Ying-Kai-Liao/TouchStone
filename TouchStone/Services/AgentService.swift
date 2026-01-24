@@ -56,6 +56,7 @@ class AgentService: ObservableObject {
         let stonesToday: [StoneSummary]
         let freeHoursToday: Double
         let documentContexts: [DocumentContext]
+        let dayContexts: [DayContextSummary]
 
         enum CodingKeys: String, CodingKey {
             case today
@@ -64,6 +65,7 @@ class AgentService: ObservableObject {
             case stonesToday = "stones_today"
             case freeHoursToday = "free_hours_today"
             case documentContexts = "document_contexts"
+            case dayContexts = "day_contexts"
         }
 
         init(
@@ -72,7 +74,8 @@ class AgentService: ObservableObject {
             projects: [ProjectSummary],
             stonesToday: [StoneSummary],
             freeHoursToday: Double,
-            documentContexts: [DocumentContext] = []
+            documentContexts: [DocumentContext] = [],
+            dayContexts: [DayContextSummary] = []
         ) {
             self.today = today
             self.currentTime = currentTime
@@ -80,6 +83,7 @@ class AgentService: ObservableObject {
             self.stonesToday = stonesToday
             self.freeHoursToday = freeHoursToday
             self.documentContexts = documentContexts
+            self.dayContexts = dayContexts
         }
     }
 
@@ -114,6 +118,21 @@ class AgentService: ObservableObject {
         enum CodingKeys: String, CodingKey {
             case filename
             case extractedText = "extracted_text"
+        }
+    }
+
+    struct DayContextSummary: Codable {
+        let name: String
+        let type: String           // holiday, vacation, travel, event, personal, custom
+        let workMode: String       // none, reduced, fixed, normal
+        let capacityPercent: Int   // 0-100
+        let fixedTaskDescription: String?
+
+        enum CodingKeys: String, CodingKey {
+            case name, type
+            case workMode = "work_mode"
+            case capacityPercent = "capacity_percent"
+            case fixedTaskDescription = "fixed_task_description"
         }
     }
 
@@ -746,12 +765,14 @@ extension AgentService {
     ///   - freeHours: Available hours today
     ///   - documents: Documents attached to the current message
     ///   - focusedProject: Optional project being discussed - its documents will be included
+    ///   - dayContexts: Day contexts (holidays, vacations, etc.) affecting today's scheduling
     static func buildContext(
         projects: [Project],
         stonesForToday: [StoneEvent],
         freeHours: Double,
         documents: [DocumentContext] = [],
-        focusedProject: Project? = nil
+        focusedProject: Project? = nil,
+        dayContexts: [DayContext] = []
     ) -> UserContext {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -795,13 +816,28 @@ extension AgentService {
             }
         }
 
+        // Convert DayContext models to summaries for today
+        let today = Date()
+        let dayContextSummaries = dayContexts
+            .filter { $0.appliesTo(date: today) }
+            .map { context in
+                DayContextSummary(
+                    name: context.name,
+                    type: context.type.rawValue,
+                    workMode: context.workMode.rawValue,
+                    capacityPercent: context.capacityPercent,
+                    fixedTaskDescription: context.fixedTaskDescription
+                )
+            }
+
         return UserContext(
             today: dateFormatter.string(from: Date()),
             currentTime: timeFormatter.string(from: Date()),
             projects: Array(projectSummaries),
             stonesToday: stoneSummaries,
             freeHoursToday: freeHours,
-            documentContexts: allDocuments
+            documentContexts: allDocuments,
+            dayContexts: dayContextSummaries
         )
     }
 }

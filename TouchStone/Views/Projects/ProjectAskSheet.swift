@@ -13,6 +13,8 @@ struct ProjectAskSheet: View {
 
     @Query private var allStones: [StoneEvent]
 
+    @Query private var dayContexts: [DayContext]
+
     @State private var inputText = ""
     @State private var messages: [AgentChatMessage] = []
     @State private var showingSpeechInput = false
@@ -313,7 +315,8 @@ struct ProjectAskSheet: View {
         return AgentService.buildContext(
             projects: Array(activeProjects),
             stonesForToday: stonesForToday,
-            freeHours: freeHours
+            freeHours: freeHours,
+            dayContexts: Array(dayContexts)
         )
     }
 
