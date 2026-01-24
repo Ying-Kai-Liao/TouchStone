@@ -1,5 +1,16 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
+
+/// A document pending attachment to a chat message
+struct PendingDocument: Identifiable {
+    let id = UUID()
+    let filename: String
+    let url: URL
+    var extractedText: String?
+    var isExtracting: Bool = false
+    var extractionError: String?
+}
 
 /// Unified conversational input view for AI-powered productivity assistance.
 /// Users can type or speak naturally, and the AI routes to appropriate actions.
@@ -29,6 +40,16 @@ struct UnifiedInputView: View {
 
     // Confirmed actions (displayed after commit, cleared when user types)
     @State private var confirmedActions: [AgentService.PendingAction] = []
+
+    // Document attachment state
+    @State private var pendingDocuments: [PendingDocument] = []
+    @State private var showingDocumentPicker = false
+    @State private var documentsForProject: [PendingDocument] = []  // Documents to attach when project is created
+    private let documentExtractor = DocumentTextExtractor()
+
+    // Project focus state - when set, project's documents are included in AI context
+    @State private var focusedProject: Project?
+    @State private var showingProjectPicker = false
 
     @SwiftUI.FocusState private var isInputFocused: Bool
 
@@ -83,8 +104,8 @@ struct UnifiedInputView: View {
                             .padding(.top)
                     }
 
-                    // Placeholder when no messages
-                    if messages.isEmpty && briefing == nil {
+                    // Guide text with suggestions - shown until user sends first message
+                    if messages.isEmpty {
                         emptyStateView
                     }
 
@@ -257,7 +278,31 @@ struct UnifiedInputView: View {
         VStack(spacing: 0) {
             Divider()
 
+            // Focused project indicator
+            if focusedProject != nil || projectsWithDocuments.count > 0 {
+                focusedProjectIndicator
+            }
+
+            // Pending documents indicator
+            if !pendingDocuments.isEmpty {
+                pendingDocumentsView
+            }
+
             HStack(spacing: DesignSystem.Spacing.md) {
+                // Document picker button
+                Button {
+                    showingDocumentPicker = true
+                } label: {
+                    Image(systemName: pendingDocuments.isEmpty ? "paperclip" : "paperclip.badge.ellipsis")
+                        .font(.title3)
+                        .foregroundStyle(pendingDocuments.isEmpty ? DesignSystem.Colors.textSecondary : DesignSystem.Colors.accent)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            Circle()
+                                .fill(DesignSystem.Colors.cardBackground)
+                        )
+                }
+
                 // Text field
                 TextField("What's on your mind?", text: $inputText, axis: .vertical)
                     .lineLimit(1...5)
@@ -270,7 +315,7 @@ struct UnifiedInputView: View {
                     )
                     .focused($isInputFocused)
                     .onSubmit {
-                        if !inputText.isEmpty {
+                        if !inputText.isEmpty || !pendingDocuments.isEmpty {
                             sendMessage(inputText)
                         }
                     }
@@ -303,9 +348,9 @@ struct UnifiedInputView: View {
                 } label: {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.title)
-                        .foregroundStyle(inputText.isEmpty ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.accent)
+                        .foregroundStyle((inputText.isEmpty && pendingDocuments.isEmpty) ? DesignSystem.Colors.textTertiary : DesignSystem.Colors.accent)
                 }
-                .disabled(inputText.isEmpty || agentService.isLoading)
+                .disabled((inputText.isEmpty && pendingDocuments.isEmpty) || agentService.isLoading)
             }
             .padding(.horizontal)
             .padding(.vertical, DesignSystem.Spacing.md)
@@ -316,6 +361,142 @@ struct UnifiedInputView: View {
                 inputText = transcribedText
                 sendMessage(transcribedText)
             }
+        }
+        .fileImporter(
+            isPresented: $showingDocumentPicker,
+            allowedContentTypes: [
+                .pdf,
+                .plainText,
+                .rtf,
+                .text,
+                UTType("org.openxmlformats.wordprocessingml.document") ?? .data, // .docx
+                .png,
+                .jpeg,
+                .heic
+            ],
+            allowsMultipleSelection: true
+        ) { result in
+            handleDocumentSelection(result)
+        }
+    }
+
+    /// Projects that have attached documents
+    private var projectsWithDocuments: [Project] {
+        activeProjects.filter { !$0.documents.isEmpty }
+    }
+
+    /// View showing focused project indicator
+    private var focusedProjectIndicator: some View {
+        HStack(spacing: DesignSystem.Spacing.sm) {
+            if let project = focusedProject {
+                HStack(spacing: 6) {
+                    Image(systemName: "folder.fill")
+                        .font(.caption)
+                        .foregroundStyle(DesignSystem.Colors.accent)
+
+                    Text("Discussing: \(project.title)")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+                        .lineLimit(1)
+
+                    Button {
+                        focusedProject = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(DesignSystem.Colors.accent.opacity(0.1))
+                )
+            }
+
+            if !projectsWithDocuments.isEmpty {
+                Menu {
+                    Button("None (General Chat)") {
+                        focusedProject = nil
+                    }
+                    Divider()
+                    ForEach(projectsWithDocuments) { project in
+                        Button {
+                            focusedProject = project
+                        } label: {
+                            Label(project.title, systemImage: "folder.fill")
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder.badge.questionmark")
+                            .font(.caption)
+                        Text(focusedProject == nil ? "Focus on project..." : "Change")
+                            .font(DesignSystem.Typography.caption)
+                    }
+                    .foregroundStyle(DesignSystem.Colors.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .strokeBorder(DesignSystem.Colors.accent.opacity(0.3), lineWidth: 1)
+                    )
+                }
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, DesignSystem.Spacing.sm)
+    }
+
+    /// View showing pending document attachments
+    private var pendingDocumentsView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: DesignSystem.Spacing.sm) {
+                ForEach(pendingDocuments) { doc in
+                    HStack(spacing: 6) {
+                        if doc.isExtracting {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        } else if doc.extractionError != nil {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                                .font(.caption)
+                        } else {
+                            Image(systemName: "doc.fill")
+                                .foregroundStyle(DesignSystem.Colors.accent)
+                                .font(.caption)
+                        }
+
+                        Text(doc.filename)
+                            .font(DesignSystem.Typography.caption)
+                            .lineLimit(1)
+
+                        Button {
+                            removePendingDocument(doc)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(DesignSystem.Colors.cardBackground)
+                    )
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(
+                                doc.extractionError != nil ? Color.orange.opacity(0.5) : DesignSystem.Colors.textTertiary.opacity(0.3),
+                                lineWidth: 1
+                            )
+                    )
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, DesignSystem.Spacing.sm)
         }
     }
 
@@ -335,20 +516,35 @@ struct UnifiedInputView: View {
     }
 
     private func sendMessage(_ text: String) {
-        guard !text.isEmpty else { return }
+        // Allow sending with just documents attached
+        guard !text.isEmpty || !pendingDocuments.isEmpty else { return }
 
-        let userMessage = AgentChatMessage(role: .user, content: text)
+        // Build message content including document info
+        let messageText = text.isEmpty ? "I've attached some documents for you to analyze." : text
+        let docNames = pendingDocuments.map { $0.filename }
+        let displayText = docNames.isEmpty ? messageText : "\(messageText)\n📎 \(docNames.joined(separator: ", "))"
+
+        let userMessage = AgentChatMessage(role: .user, content: displayText)
         messages.append(userMessage)
         inputText = ""
         isInputFocused = false
 
         Task {
             do {
-                // Build context from current data
+                // Build context from current data (includes pending documents)
                 let context = buildContext()
 
+                // Move documents to project queue (will be attached if a project is created)
+                // Clear pending documents after building context
+                await MainActor.run {
+                    if !pendingDocuments.isEmpty {
+                        documentsForProject = pendingDocuments
+                    }
+                    pendingDocuments = []
+                }
+
                 // Send to backend
-                let response = try await agentService.chat(message: text, context: context)
+                let response = try await agentService.chat(message: messageText, context: context)
 
                 // Add assistant response
                 let assistantMessage = AgentChatMessage(role: .assistant, content: response.message)
@@ -391,11 +587,76 @@ struct UnifiedInputView: View {
         }
         let freeHours = max(0, 8.0 - Double(stoneMinutes) / 60.0)
 
+        // Build document contexts from pending documents
+        let documentContexts = pendingDocuments.compactMap { doc -> AgentService.DocumentContext? in
+            guard let text = doc.extractedText, !text.isEmpty else { return nil }
+            return AgentService.DocumentContext(
+                filename: doc.filename,
+                extractedText: String(text.prefix(15000)) // Truncate for API limits
+            )
+        }
+
         return AgentService.buildContext(
             projects: Array(activeProjects),
             stonesForToday: stonesForToday,
-            freeHours: freeHours
+            freeHours: freeHours,
+            documents: documentContexts,
+            focusedProject: focusedProject
         )
+    }
+
+    // MARK: - Document Handling
+
+    /// Handle document picker selection result
+    private func handleDocumentSelection(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            for url in urls {
+                addPendingDocument(url: url)
+            }
+        case .failure(let error):
+            errorMessage = "Failed to select document: \(error.localizedDescription)"
+        }
+    }
+
+    /// Add a document to pending attachments and extract its text
+    private func addPendingDocument(url: URL) {
+        let filename = url.lastPathComponent
+        let doc = PendingDocument(filename: filename, url: url, isExtracting: true)
+
+        // Check for duplicate
+        if pendingDocuments.contains(where: { $0.filename == filename }) {
+            return
+        }
+
+        pendingDocuments.append(doc)
+
+        // Extract text asynchronously
+        Task {
+            do {
+                let text = try await documentExtractor.extractText(from: url)
+                let truncatedText = await documentExtractor.truncateForContext(text, maxCharacters: 15000)
+
+                // Update the document with extracted text
+                if let index = pendingDocuments.firstIndex(where: { $0.id == doc.id }) {
+                    pendingDocuments[index].extractedText = truncatedText
+                    pendingDocuments[index].isExtracting = false
+                }
+            } catch {
+                // Update with error
+                if let index = pendingDocuments.firstIndex(where: { $0.id == doc.id }) {
+                    pendingDocuments[index].extractionError = error.localizedDescription
+                    pendingDocuments[index].isExtracting = false
+                }
+            }
+        }
+    }
+
+    /// Remove a pending document
+    private func removePendingDocument(_ doc: PendingDocument) {
+        withAnimation {
+            pendingDocuments.removeAll { $0.id == doc.id }
+        }
     }
 
     private func processActions(_ actions: [AgentService.AgentAction]) async {
@@ -699,6 +960,25 @@ struct UnifiedInputView: View {
 
         modelContext.insert(project)
 
+        // Attach documents that were sent with this project
+        for pendingDoc in documentsForProject {
+            if let extractedText = pendingDoc.extractedText {
+                let fileType = UTType(filenameExtension: pendingDoc.url.pathExtension)?.identifier ?? "public.data"
+                let bookmarkData = ProjectDocument.createBookmark(from: pendingDoc.url)
+
+                let projectDoc = ProjectDocument(
+                    filename: pendingDoc.filename,
+                    fileType: fileType,
+                    bookmarkData: bookmarkData,
+                    extractedText: extractedText
+                )
+                projectDoc.project = project
+                modelContext.insert(projectDoc)
+            }
+        }
+        // Clear documents after attaching
+        documentsForProject = []
+
         // Create phases (for phase mode)
         if pending.isPhaseMode {
             for (phaseIndex, pendingPhase) in pending.phases.enumerated() {
@@ -773,6 +1053,9 @@ struct UnifiedInputView: View {
         suggestions = []
         conversationState = .initial
         hasUserEdits = false
+        pendingDocuments = []
+        documentsForProject = []
+        focusedProject = nil
 
         Task {
             await checkBackendAndLoadBriefing()

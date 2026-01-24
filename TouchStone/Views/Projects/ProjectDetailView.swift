@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct ProjectDetailView: View {
     @Environment(\.modelContext) private var modelContext
@@ -10,6 +11,9 @@ struct ProjectDetailView: View {
     @State private var showingLogSheet = false
     @State private var showingDeleteConfirmation = false
     @State private var showingMenu = false
+    @State private var showingDocumentPicker = false
+    @State private var isExtractingDocument = false
+    private let documentExtractor = DocumentTextExtractor()
 
     // MARK: - Computed Properties
 
@@ -79,6 +83,14 @@ struct ProjectDetailView: View {
                         // Project vitality card
                         vitalityCard
 
+                        // Documents section
+                        if !project.documents.isEmpty {
+                            documentsSection
+                        }
+
+                        // Add Document button
+                        addDocumentButton
+
                         // Log Touch button
                         logTouchButton
 
@@ -117,6 +129,130 @@ struct ProjectDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
+        .fileImporter(
+            isPresented: $showingDocumentPicker,
+            allowedContentTypes: [
+                .pdf,
+                .plainText,
+                .rtf,
+                .text,
+                UTType("org.openxmlformats.wordprocessingml.document") ?? .data, // .docx
+                .png,
+                .jpeg,
+                .heic
+            ],
+            allowsMultipleSelection: true
+        ) { result in
+            handleDocumentSelection(result)
+        }
+    }
+
+    // MARK: - Documents Section
+
+    private var documentsSection: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            HStack(spacing: DesignSystem.Spacing.sm) {
+                Image(systemName: "doc.text.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+
+                Text("Attached Documents")
+                    .font(DesignSystem.Typography.body)
+                    .fontWeight(.medium)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+            }
+            .padding(.top, DesignSystem.Spacing.sm)
+
+            ForEach(project.documents) { document in
+                DocumentRow(document: document) {
+                    deleteDocument(document)
+                }
+            }
+        }
+    }
+
+    // MARK: - Add Document Button
+
+    private var addDocumentButton: some View {
+        Button {
+            showingDocumentPicker = true
+        } label: {
+            HStack(spacing: DesignSystem.Spacing.md) {
+                if isExtractingDocument {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 20))
+                }
+
+                Text(isExtractingDocument ? "Processing..." : "Add Document")
+                    .font(DesignSystem.Typography.headline)
+            }
+            .foregroundStyle(DesignSystem.Colors.accent)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, DesignSystem.Spacing.lg)
+            .background(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                    .fill(DesignSystem.Colors.cardBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card, style: .continuous)
+                    .strokeBorder(DesignSystem.Colors.accent.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .disabled(isExtractingDocument)
+    }
+
+    // MARK: - Document Handling
+
+    private func handleDocumentSelection(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            for url in urls {
+                addDocument(url: url)
+            }
+        case .failure(let error):
+            print("Failed to select document: \(error.localizedDescription)")
+        }
+    }
+
+    private func addDocument(url: URL) {
+        isExtractingDocument = true
+
+        Task {
+            do {
+                let text = try await documentExtractor.extractText(from: url)
+                let truncatedText = await documentExtractor.truncateForContext(text, maxCharacters: 15000)
+
+                let filename = url.lastPathComponent
+                let fileType = UTType(filenameExtension: url.pathExtension)?.identifier ?? "public.data"
+                let bookmarkData = ProjectDocument.createBookmark(from: url)
+
+                await MainActor.run {
+                    let projectDoc = ProjectDocument(
+                        filename: filename,
+                        fileType: fileType,
+                        bookmarkData: bookmarkData,
+                        extractedText: truncatedText
+                    )
+                    projectDoc.project = project
+                    modelContext.insert(projectDoc)
+                    try? modelContext.save()
+                    isExtractingDocument = false
+                }
+            } catch {
+                await MainActor.run {
+                    print("Failed to extract text: \(error.localizedDescription)")
+                    isExtractingDocument = false
+                }
+            }
+        }
+    }
+
+    private func deleteDocument(_ document: ProjectDocument) {
+        modelContext.delete(document)
+        try? modelContext.save()
     }
 
     // MARK: - Header View
@@ -455,6 +591,67 @@ struct TouchLogRow: View {
         .background(
             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
                 .fill(DesignSystem.Colors.cardBackground)
+        )
+    }
+}
+
+struct DocumentRow: View {
+    let document: ProjectDocument
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: DesignSystem.Spacing.md) {
+            // Document icon
+            Image(systemName: document.iconName)
+                .font(.system(size: 24))
+                .foregroundStyle(DesignSystem.Colors.accent)
+                .frame(width: 40, height: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small, style: .continuous)
+                        .fill(DesignSystem.Colors.accent.opacity(0.1))
+                )
+
+            // Document info
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                Text(document.filename)
+                    .font(DesignSystem.Typography.body)
+                    .fontWeight(.medium)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    .lineLimit(1)
+
+                HStack(spacing: DesignSystem.Spacing.sm) {
+                    if document.hasExtractedText {
+                        Label("Text extracted", systemImage: "checkmark.circle.fill")
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundStyle(DesignSystem.Colors.success)
+                    } else {
+                        Label("No text", systemImage: "exclamationmark.circle")
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    }
+                }
+            }
+
+            Spacer()
+
+            // Delete button
+            Button {
+                onDelete()
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 16))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+            }
+        }
+        .padding(.vertical, DesignSystem.Spacing.sm)
+        .padding(.horizontal, DesignSystem.Spacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                .fill(DesignSystem.Colors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
         )
     }
 }
