@@ -10,50 +10,51 @@ struct WorkTodayPromptView: View {
     let onDeclineWork: () -> Void
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: DesignSystem.Spacing.xl) {
             Text("Do you want to work today?")
-                .font(.headline)
-                .foregroundStyle(.white)
+                .font(DesignSystem.Typography.headline)
+                .foregroundStyle(DesignSystem.Colors.textPrimary)
 
-            HStack(spacing: 16) {
+            HStack(spacing: DesignSystem.Spacing.lg) {
                 // Decline button
                 Button(action: onDeclineWork) {
                     Text("Not today")
-                        .font(.subheadline)
+                        .font(DesignSystem.Typography.callout)
                         .fontWeight(.medium)
-                        .foregroundStyle(.white.opacity(0.7))
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(Color.white.opacity(0.1))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+                        .padding(.horizontal, DesignSystem.Spacing.xl)
+                        .padding(.vertical, DesignSystem.Spacing.md)
+                        .background(DesignSystem.Colors.cardBackgroundLight)
                         .clipShape(Capsule())
                 }
 
                 // Confirm button
                 Button(action: onConfirmWork) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: DesignSystem.Spacing.sm) {
                         Image(systemName: "play.fill")
                             .font(.caption)
                         Text("Let's go")
                             .fontWeight(.semibold)
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(UserPreferences.shared.accentColor)
+                    .font(DesignSystem.Typography.callout)
+                    .foregroundStyle(DesignSystem.Colors.background)
+                    .padding(.horizontal, DesignSystem.Spacing.xl)
+                    .padding(.vertical, DesignSystem.Spacing.md)
+                    .background(DesignSystem.Colors.accent)
                     .clipShape(Capsule())
                 }
             }
         }
-        .padding(.vertical, 24)
-        .padding(.horizontal, 20)
+        .padding(.vertical, DesignSystem.Spacing.xl)
+        .padding(.horizontal, DesignSystem.Spacing.lg)
         .frame(maxWidth: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color(uiColor: UIColor(red: 0.18, green: 0.20, blue: 0.22, alpha: 0.95)))
-                .shadow(color: .black.opacity(0.3), radius: 10, y: -5)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.extraLarge)
+                .fill(DesignSystem.Colors.cardBackground)
+                .shadow(color: .black.opacity(0.2), radius: 10, y: -5)
         )
-        .padding(.horizontal, 16)
-        .padding(.bottom, 16)
+        .padding(.horizontal, DesignSystem.Spacing.lg)
+        .padding(.bottom, DesignSystem.Spacing.lg)
     }
 }
 
@@ -61,7 +62,7 @@ struct WorkTodayPromptView: View {
 
 #Preview {
     ZStack {
-        Color(uiColor: UIColor(red: 0.12, green: 0.14, blue: 0.15, alpha: 1.0))
+        DesignSystem.Colors.background
             .ignoresSafeArea()
 
         VStack {
@@ -72,5 +73,4 @@ struct WorkTodayPromptView: View {
             )
         }
     }
-    .preferredColorScheme(.dark)
 }
