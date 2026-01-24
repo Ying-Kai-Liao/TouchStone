@@ -1,0 +1,43 @@
+[
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "7D9AC279-9DA0-4EA6-8EB5-3E91ED45E7DB",
+        "deviceName" : "iPhone 16",
+        "exportedFileName" : "799614E7-A4C6-4B0C-BDF0-6E89475358B0.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "04-Me_0_424998E6-A4C3-4D9A-BA15-05CDD63FCCF1.png",
+        "timestamp" : 1769266653.696
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "7D9AC279-9DA0-4EA6-8EB5-3E91ED45E7DB",
+        "deviceName" : "iPhone 16",
+        "exportedFileName" : "240ABC4A-4DEB-4BBF-B0C5-4B015E52924E.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "03-Plan_0_AF6DF65E-1311-4ABE-9577-6BDDC68D1A5D.png",
+        "timestamp" : 1769266649.704
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "7D9AC279-9DA0-4EA6-8EB5-3E91ED45E7DB",
+        "deviceName" : "iPhone 16",
+        "exportedFileName" : "FB1B4C34-15CD-4110-A8FD-A33C61DE6A54.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "02-Calendar_0_2D145D63-B482-4CD5-B44E-5B8A5D71F7F5.png",
+        "timestamp" : 1769266646.013
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "7D9AC279-9DA0-4EA6-8EB5-3E91ED45E7DB",
+        "deviceName" : "iPhone 16",
+        "exportedFileName" : "EC6DA5E2-18AA-413F-A78F-C5D2EC1841F4.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "01-Flow_0_96D82797-5C5B-48BE-B304-3B3B75A6BD72.png",
+        "timestamp" : 1769266636.911
+      }
+    ],
+    "testIdentifier" : "ScreenshotTests/testCaptureAllScreenshots()"
+  }
+]
