@@ -820,6 +820,10 @@ struct UnifiedInputView: View {
                 if let log = action.touchLog {
                     await createTouchLog(from: log)
                 }
+            case "add_context":
+                if let context = action.dayContext {
+                    await createDayContext(from: context)
+                }
             default:
                 break
             }
@@ -978,6 +982,35 @@ struct UnifiedInputView: View {
         log.project = targetProject
 
         modelContext.insert(log)
+        try? modelContext.save()
+    }
+
+    /// Create a DayContext from pending data
+    private func createDayContext(from pending: AgentService.PendingDayContext) async {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        guard let startDate = formatter.date(from: pending.startDate),
+              let endDate = formatter.date(from: pending.endDate) else {
+            print("ERROR: Invalid date format in pending context")
+            return
+        }
+
+        // Parse type and workMode from strings
+        let contextType = DayContextType(rawValue: pending.type) ?? .custom
+        let workMode = DayContextWorkMode(rawValue: pending.workMode) ?? .normal
+
+        let context = DayContext(
+            name: pending.name,
+            startDate: startDate,
+            endDate: endDate,
+            type: contextType,
+            workMode: workMode,
+            capacityPercent: pending.capacityPercent
+        )
+        context.fixedTaskDescription = pending.fixedTaskDescription
+
+        modelContext.insert(context)
         try? modelContext.save()
     }
 

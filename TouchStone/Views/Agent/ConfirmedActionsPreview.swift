@@ -29,6 +29,12 @@ struct ConfirmedActionsPreview: View {
                 if !logs.isEmpty {
                     confirmedLogsSection(logs)
                 }
+
+                // Confirmed day contexts
+                let contexts = confirmedActions.compactMap { $0.dayContext }
+                if !contexts.isEmpty {
+                    confirmedContextsSection(contexts)
+                }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
@@ -125,6 +131,16 @@ struct ConfirmedActionsPreview: View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
             ForEach(logs) { log in
                 ConfirmedLogRow(log: log)
+            }
+        }
+    }
+
+    // MARK: - Contexts Section
+
+    private func confirmedContextsSection(_ contexts: [AgentService.PendingDayContext]) -> some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+            ForEach(contexts) { context in
+                ConfirmedContextRow(context: context)
             }
         }
     }
@@ -360,6 +376,92 @@ struct ConfirmedLogRow: View {
             return "\(hours)h logged"
         }
         return "\(mins)m logged"
+    }
+}
+
+// MARK: - Confirmed Context Row
+
+struct ConfirmedContextRow: View {
+    let context: AgentService.PendingDayContext
+
+    private var contextColor: Color {
+        switch context.type.lowercased() {
+        case "vacation", "holiday": return .orange
+        case "travel": return .blue
+        case "event": return .purple
+        case "personal": return .pink
+        default: return .gray
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: DesignSystem.Spacing.md) {
+            // Success checkmark with context-colored background
+            ZStack {
+                Circle()
+                    .fill(contextColor.opacity(0.15))
+                    .frame(width: 36, height: 36)
+
+                Image(systemName: "checkmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(contextColor)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(context.name)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                HStack(spacing: 8) {
+                    Text(dateRangeText)
+                        .font(.system(size: 12))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+
+                    Text("·")
+                        .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.5))
+
+                    Text(workModeBadge)
+                        .font(.system(size: 12))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                .fill(contextColor.opacity(0.05))
+        )
+    }
+
+    private var dateRangeText: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        if let start = formatter.date(from: context.startDate),
+           let end = formatter.date(from: context.endDate) {
+            let displayFormatter = DateFormatter()
+            displayFormatter.dateFormat = "MMM d"
+
+            if Calendar.current.isDate(start, inSameDayAs: end) {
+                return displayFormatter.string(from: start)
+            } else {
+                return "\(displayFormatter.string(from: start)) - \(displayFormatter.string(from: end))"
+            }
+        }
+        return context.startDate
+    }
+
+    private var workModeBadge: String {
+        switch context.workMode.lowercased() {
+        case "none": return "No work"
+        case "reduced": return "\(context.capacityPercent)% capacity"
+        case "fixed": return "Fixed task"
+        case "normal": return "Normal"
+        default: return context.workMode
+        }
     }
 }
 

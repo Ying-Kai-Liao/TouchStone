@@ -349,14 +349,60 @@ class AgentService: ObservableObject {
         }
     }
 
+    struct PendingDayContext: Codable, Identifiable {
+        let tempId: String
+        let name: String
+        let startDate: String
+        let endDate: String
+        let type: String
+        let workMode: String
+        let capacityPercent: Int
+        let fixedTaskDescription: String?
+
+        var id: String { tempId }
+
+        // Memberwise initializer
+        init(
+            tempId: String,
+            name: String,
+            startDate: String,
+            endDate: String,
+            type: String,
+            workMode: String,
+            capacityPercent: Int = 50,
+            fixedTaskDescription: String? = nil
+        ) {
+            self.tempId = tempId
+            self.name = name
+            self.startDate = startDate
+            self.endDate = endDate
+            self.type = type
+            self.workMode = workMode
+            self.capacityPercent = capacityPercent
+            self.fixedTaskDescription = fixedTaskDescription
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case tempId = "temp_id"
+            case name
+            case startDate = "start_date"
+            case endDate = "end_date"
+            case type
+            case workMode = "work_mode"
+            case capacityPercent = "capacity_percent"
+            case fixedTaskDescription = "fixed_task_description"
+        }
+    }
+
     struct PendingAction: Codable, Identifiable {
         let actionType: String
         let stone: PendingStone?
         let project: PendingProject?
         let touchLog: PendingTouchLog?
+        let dayContext: PendingDayContext?
 
         var id: String {
-            stone?.id ?? project?.id ?? touchLog?.id ?? UUID().uuidString
+            stone?.id ?? project?.id ?? touchLog?.id ?? dayContext?.id ?? UUID().uuidString
         }
 
         // Memberwise initializer
@@ -364,12 +410,14 @@ class AgentService: ObservableObject {
             actionType: String,
             stone: PendingStone? = nil,
             project: PendingProject? = nil,
-            touchLog: PendingTouchLog? = nil
+            touchLog: PendingTouchLog? = nil,
+            dayContext: PendingDayContext? = nil
         ) {
             self.actionType = actionType
             self.stone = stone
             self.project = project
             self.touchLog = touchLog
+            self.dayContext = dayContext
         }
 
         enum CodingKeys: String, CodingKey {
@@ -377,6 +425,7 @@ class AgentService: ObservableObject {
             case stone
             case project
             case touchLog = "touch_log"
+            case dayContext = "day_context"
         }
     }
 
