@@ -12,12 +12,16 @@ struct CalendarView: View {
 
     @State private var currentMonthDate = Date()
     @State private var monthsToDisplay: [Date] = []
-    @State private var currentPageIndex = 1
+    @State private var currentPageIndex = 2  // Start at center of 5-month window
     @State private var isUpdatingPage = false
     @State private var selectedDay: SelectedDay?
     @State private var showingAddStone = false
     @State private var addStoneDate: Date?
     @State private var showingWorkloadLegend = false
+
+    // Buffer size: 5 months (2 before, current, 2 after)
+    private let monthBufferSize = 5
+    private let centerIndex = 2
 
     private let calendar = Calendar.current
     private let daysOfWeek = ["S", "M", "T", "W", "T", "F", "S"]
@@ -213,7 +217,6 @@ struct CalendarView: View {
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
-        .animation(.default, value: currentMonthDate)
         .onChange(of: currentPageIndex) { oldValue, newValue in
             handlePageChange(from: oldValue, to: newValue)
         }
@@ -255,79 +258,75 @@ struct CalendarView: View {
 
     private func initializeMonthsToDisplay() {
         updateMonthsWindow(centerMonth: currentMonthDate)
+        currentPageIndex = centerIndex
     }
 
     private func updateMonthsWindow(centerMonth: Date) {
-        guard let prevMonth = calendar.date(byAdding: .month, value: -1, to: centerMonth),
-              let nextMonth = calendar.date(byAdding: .month, value: 1, to: centerMonth) else {
-            return
+        // Generate 5 months: -2, -1, center, +1, +2
+        var months: [Date] = []
+        for offset in -2...2 {
+            if let month = calendar.date(byAdding: .month, value: offset, to: centerMonth) {
+                months.append(month)
+            }
         }
-        monthsToDisplay = [prevMonth, centerMonth, nextMonth]
+        monthsToDisplay = months
     }
 
     private func handlePageChange(from oldIndex: Int, to newIndex: Int) {
         guard !monthsToDisplay.isEmpty, !isUpdatingPage else { return }
-        guard newIndex != 1 else { return } // Already on center page
 
-        isUpdatingPage = true
+        // Update the displayed month in header based on current page
+        if newIndex >= 0 && newIndex < monthsToDisplay.count {
+            currentMonthDate = monthsToDisplay[newIndex]
+        }
 
-        if newIndex == 0 {
-            // Swiped to previous month
-            if let newCenterMonth = calendar.date(byAdding: .month, value: -1, to: currentMonthDate) {
-                currentMonthDate = newCenterMonth
-                updateMonthsWindow(centerMonth: newCenterMonth)
+        // Only rebalance when we're getting close to the edges (0 or 4)
+        // This gives us a buffer so the reset happens less frequently
+        if newIndex <= 0 || newIndex >= monthBufferSize - 1 {
+            isUpdatingPage = true
 
-                // Reset to center without animation
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    currentPageIndex = 1
-                }
-
-                // Small delay before allowing next update
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    isUpdatingPage = false
-                }
-            } else {
-                isUpdatingPage = false
-            }
-        } else if newIndex == 2 {
-            // Swiped to next month
-            if let newCenterMonth = calendar.date(byAdding: .month, value: 1, to: currentMonthDate) {
-                currentMonthDate = newCenterMonth
-                updateMonthsWindow(centerMonth: newCenterMonth)
-
-                // Reset to center without animation
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    currentPageIndex = 1
-                }
-
-                // Small delay before allowing next update
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    isUpdatingPage = false
-                }
-            } else {
-                isUpdatingPage = false
+            // Wait for the swipe animation to fully complete before rebalancing
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                rebalanceMonthsWindow()
             }
         }
     }
 
+    private func rebalanceMonthsWindow() {
+        // Regenerate months centered on current month
+        updateMonthsWindow(centerMonth: currentMonthDate)
+
+        // Reset to center without animation
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            currentPageIndex = centerIndex
+        }
+
+        // Allow next update after a brief delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isUpdatingPage = false
+        }
+    }
+
     private func navigateToPreviousMonth() {
-        guard !isUpdatingPage else { return }
-        currentPageIndex = 0
+        guard !isUpdatingPage, currentPageIndex > 0 else { return }
+        withAnimation(.easeInOut(duration: 0.3)) {
+            currentPageIndex -= 1
+        }
     }
 
     private func navigateToNextMonth() {
-        guard !isUpdatingPage else { return }
-        currentPageIndex = 2
+        guard !isUpdatingPage, currentPageIndex < monthsToDisplay.count - 1 else { return }
+        withAnimation(.easeInOut(duration: 0.3)) {
+            currentPageIndex += 1
+        }
     }
 
     private func jumpToMonth(_ date: Date) {
         currentMonthDate = date
         updateMonthsWindow(centerMonth: date)
-        currentPageIndex = 1
+        currentPageIndex = centerIndex
     }
 
     // MARK: - Workload Legend
