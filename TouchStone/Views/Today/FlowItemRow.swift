@@ -195,6 +195,8 @@ struct WaterFlowRow: View {
     let item: WorkflowItem
     let onTouch: (() -> Void)?
     let onFocus: (() -> Void)?
+    /// Pre-computed "touched today" status (optional, falls back to computed if nil)
+    var precomputedHasTouchedToday: Bool?
 
     @State private var isExpanded: Bool = false
 
@@ -205,6 +207,10 @@ struct WaterFlowRow: View {
 
     /// Check if this project was touched today
     private var hasTouchedToday: Bool {
+        if let touched = precomputedHasTouchedToday {
+            return touched
+        }
+        // Fallback: compute on demand
         guard let project = item.project else { return false }
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
@@ -626,9 +632,15 @@ struct AdditionalProjectRow: View {
     let project: Project
     let onTouch: () -> Void
     let onFocus: () -> Void
+    /// Pre-computed touch count for today (optional, falls back to computed if nil)
+    var precomputedTouchCount: Int?
 
     /// Count how many times this project was touched today
     private var touchCountToday: Int {
+        if let count = precomputedTouchCount {
+            return count
+        }
+        // Fallback: compute on demand
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         return project.touchLogs.filter { log in

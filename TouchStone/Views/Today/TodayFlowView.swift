@@ -37,6 +37,13 @@ struct TodayFlowView: View {
     @State private var showCelebration = false
     @State private var showResetConfirmation = false
     @State private var lastHapticProgress: Int = 0
+    @State private var isLoadingDayState = true
+
+    // Cached expensive computations
+    @State private var cachedTodayTouchLogs: [TouchLog] = []
+    @State private var cachedTodayTotalMinutes: Int = 0
+    @State private var cachedAdditionalProjects: [Project] = []
+    @State private var cachedProjectTouchCounts: [UUID: Int] = [:]
 
     private let calendar = Calendar.current
     private let resetThreshold: CGFloat = 100
@@ -65,27 +72,47 @@ struct TodayFlowView: View {
         todaysPlan?.isRestDay == true
     }
 
-    /// All active, non-completed projects available for touching anytime
+    /// All active, non-completed projects available for touching anytime (cached)
     private var additionalProjects: [Project] {
-        activeProjects.filter { project in
-            // If project has planned hours, check if there's remaining work
+        cachedAdditionalProjects
+    }
+
+    /// Today's touch logs (cached)
+    private var todayTouchLogs: [TouchLog] {
+        cachedTodayTouchLogs
+    }
+
+    /// Total touched minutes today (cached)
+    private var todayTotalMinutes: Int {
+        cachedTodayTotalMinutes
+    }
+
+    /// Update all cached computations
+    private func updateCachedProperties() {
+        let today = calendar.startOfDay(for: Date())
+
+        // Cache today's touch logs
+        cachedTodayTouchLogs = allTouchLogs.filter { calendar.isDate($0.timestamp, inSameDayAs: today) }
+
+        // Cache total minutes (derived from touch logs)
+        cachedTodayTotalMinutes = cachedTodayTouchLogs.reduce(0) { $0 + $1.durationMinutes }
+
+        // Cache additional projects
+        cachedAdditionalProjects = activeProjects.filter { project in
             if project.totalPlannedMinutes > 0 {
                 return project.remainingHours > 0
             }
-            // Projects without planned hours are always included
             return true
         }
-    }
 
-    /// Today's touch logs
-    private var todayTouchLogs: [TouchLog] {
-        let today = calendar.startOfDay(for: Date())
-        return allTouchLogs.filter { calendar.isDate($0.timestamp, inSameDayAs: today) }
-    }
-
-    /// Total touched minutes today
-    private var todayTotalMinutes: Int {
-        todayTouchLogs.reduce(0) { $0 + $1.durationMinutes }
+        // Cache project touch counts for row-level optimization
+        var touchCounts: [UUID: Int] = [:]
+        for project in activeProjects {
+            touchCounts[project.id] = project.touchLogs.filter { log in
+                calendar.startOfDay(for: log.timestamp) == today
+            }.count
+        }
+        cachedProjectTouchCounts = touchCounts
     }
 
     var body: some View {
@@ -106,7 +133,12 @@ struct TodayFlowView: View {
                         .padding(.top, DesignSystem.Spacing.lg)
 
                     // Main content
-                    scrollContent
+                    if isLoadingDayState && dayState.workflowItems.isEmpty {
+                        // Show skeleton while loading
+                        loadingPlaceholder
+                    } else {
+                        scrollContent
+                    }
                 }
 
                 // Work prompt overlay at bottom
@@ -150,12 +182,17 @@ struct TodayFlowView: View {
                 )
             }
             .navigationBarHidden(true)
-            .onAppear { computeDayState() }
+            .onAppear {
+                updateCachedProperties()
+                computeDayStateAsync()
+            }
             .onChange(of: allStones.count) { rescheduleIfNeeded() }
             .onChange(of: selectedDate) {
                 initialScrollY = nil  // Reset scroll tracking for new date
-                computeDayState()
+                computeDayStateAsync()
             }
+            .onChange(of: allTouchLogs.count) { updateCachedProperties() }
+            .onChange(of: activeProjects.count) { updateCachedProperties() }
             .overlay(alignment: .bottom) { undoToast }
             .alert("Great work today!", isPresented: $showCapacityAlert) {
                 Button("Take a break") {
@@ -247,6 +284,25 @@ struct TodayFlowView: View {
         }
     }
 
+    // MARK: - Loading Placeholder
+
+    private var loadingPlaceholder: some View {
+        VStack(spacing: DesignSystem.Spacing.lg) {
+            Spacer()
+                .frame(height: 40)
+
+            // Skeleton cards
+            ForEach(0..<3, id: \.self) { index in
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                    .fill(DesignSystem.Colors.cardBackground.opacity(0.6))
+                    .frame(height: 80)
+                    .padding(.horizontal, DesignSystem.Spacing.lg)
+            }
+
+            Spacer()
+        }
+    }
+
     // MARK: - Scroll Content
 
     private var scrollContent: some View {
@@ -285,7 +341,8 @@ struct TodayFlowView: View {
                         onFocus: { project in focusProject = project },
                         onDelete: deleteHandler,
                         onDeleteStone: { stone in deleteStone(stone) },
-                        onEditMode: nil
+                        onEditMode: nil,
+                        projectTouchCounts: cachedProjectTouchCounts
                     )
                     .padding(.top, 16)
                     .padding(.bottom, bottomPadding)
@@ -422,7 +479,35 @@ struct TodayFlowView: View {
 
     // MARK: - Actions
 
-    private func computeDayState() {
+    /// Async wrapper that allows UI to render before heavy computation
+    private func computeDayStateAsync() {
+        isLoadingDayState = true
+
+        // Use Task to yield back to UI before computing
+        // This allows the skeleton UI to appear while computation runs
+        Task { @MainActor in
+            // Yield to allow UI to update with loading state
+            await Task.yield()
+
+            let newState = DayState(date: selectedDate)
+            if isRestDay && calendar.isDateInToday(selectedDate) {
+                newState.computeStonesOnly(stones: Array(allStones))
+            } else {
+                newState.compute(
+                    stones: Array(allStones),
+                    projects: Array(activeProjects),
+                    rules: Array(activeRules),
+                    contexts: Array(dayContexts)
+                )
+            }
+
+            dayState = newState
+            isLoadingDayState = false
+        }
+    }
+
+    /// Synchronous version for immediate updates (used in animations)
+    private func computeDayStateSync() {
         dayState = DayState(date: selectedDate)
 
         if isRestDay && calendar.isDateInToday(selectedDate) {
@@ -455,7 +540,7 @@ struct TodayFlowView: View {
         )
 
         withAnimation(.easeInOut(duration: 0.3)) {
-            computeDayState()
+            computeDayStateSync()
         }
     }
 
@@ -466,7 +551,7 @@ struct TodayFlowView: View {
         plan.wantsToWork = false
 
         withAnimation(.easeInOut(duration: 0.3)) {
-            computeDayState()
+            computeDayStateSync()
         }
     }
 
@@ -478,7 +563,7 @@ struct TodayFlowView: View {
         }
 
         withAnimation(.easeInOut(duration: 0.3)) {
-            computeDayState()
+            computeDayStateSync()
         }
     }
 
@@ -496,7 +581,7 @@ struct TodayFlowView: View {
     private func rescheduleIfNeeded() {
         // Simply recompute the day state - suggestions are generated dynamically
         withAnimation(.easeInOut(duration: 0.3)) {
-            computeDayState()
+            computeDayStateSync()
         }
     }
 
@@ -559,14 +644,14 @@ struct TodayFlowView: View {
         // Suggestions are computed dynamically, no persisted sessions to delete
         // Just recompute the day state
         withAnimation(.easeInOut(duration: 0.3)) {
-            computeDayState()
+            computeDayStateSync()
         }
     }
 
     private func deleteStone(_ stone: StoneEvent) {
         modelContext.delete(stone)
         withAnimation(.easeInOut(duration: 0.3)) {
-            computeDayState()
+            computeDayStateSync()
         }
     }
 
