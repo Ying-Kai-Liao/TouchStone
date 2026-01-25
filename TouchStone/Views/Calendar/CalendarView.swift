@@ -21,6 +21,8 @@ struct CalendarView: View {
 
     // Pre-computed day data cache to avoid expensive calculations during swipe
     @State private var dayDataCache: [Date: CachedDayData] = [:]
+    @State private var isLoadingCalendarData = true
+    @State private var pendingLoadTask: Task<Void, Never>?
 
     // Buffer size: 5 months (2 before, current, 2 after)
     private let monthBufferSize = 5
@@ -69,13 +71,13 @@ struct CalendarView: View {
                 initializeMonthsToDisplay()
             }
             .onChange(of: stones.count) { _, _ in
-                precomputeDayDataCache()
+                precomputeDayDataCacheAsync()
             }
             .onChange(of: activeProjects.count) { _, _ in
-                precomputeDayDataCache()
+                precomputeDayDataCacheAsync()
             }
             .onChange(of: dayContexts.count) { _, _ in
-                precomputeDayDataCache()
+                precomputeDayDataCacheAsync()
             }
             .sheet(item: $selectedDay) { day in
                 DayDetailView(
@@ -233,14 +235,34 @@ struct CalendarView: View {
     private var calendarPager: some View {
         TabView(selection: $currentPageIndex) {
             ForEach(Array(monthsToDisplay.enumerated()), id: \.offset) { index, monthDate in
-                calendarGrid(for: monthDate)
-                    .tag(index)
+                if isLoadingCalendarData && dayDataCache.isEmpty {
+                    skeletonCalendarGrid
+                        .tag(index)
+                } else {
+                    calendarGrid(for: monthDate)
+                        .tag(index)
+                }
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
         .onChange(of: currentPageIndex) { oldValue, newValue in
             handlePageChange(from: oldValue, to: newValue)
         }
+    }
+
+    /// Skeleton grid shown while data loads
+    private var skeletonCalendarGrid: some View {
+        let cellHeight: CGFloat = prefs.calendarDetailMode ? 110 : 60
+
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DesignSystem.Spacing.sm), count: 7), spacing: DesignSystem.Spacing.md) {
+            ForEach(0..<35, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                    .fill(DesignSystem.Colors.cardBackground.opacity(0.5))
+                    .frame(height: cellHeight)
+            }
+        }
+        .padding(.horizontal, DesignSystem.Spacing.xl)
+        .padding(.bottom, DesignSystem.Spacing.lg)
     }
 
     private func calendarGrid(for monthDate: Date) -> some View {
@@ -283,8 +305,15 @@ struct CalendarView: View {
         if let cached = dayDataCache[dateKey] {
             return cached
         }
-        // Fallback: compute on demand if not cached (shouldn't happen normally)
-        return computeDayData(for: date)
+        // Return empty placeholder to avoid blocking UI
+        // Data will be filled in when async cache completes
+        return CachedDayData(
+            stones: [],
+            contexts: [],
+            touchCount: 0,
+            dayLoad: 0,
+            hasDeadline: false
+        )
     }
 
     private func computeDayData(for date: Date) -> CachedDayData {
@@ -298,12 +327,13 @@ struct CalendarView: View {
     }
 
     private func precomputeDayDataCache() {
-        var newCache: [Date: CachedDayData] = [:]
+        var newCache = dayDataCache  // Start with existing cache
 
         for monthDate in monthsToDisplay {
             let days = generateCalendarDays(for: monthDate)
             for dayData in days where dayData.day != nil {
                 let dateKey = calendar.startOfDay(for: dayData.date)
+                // Only compute if not already cached
                 if newCache[dateKey] == nil {
                     newCache[dateKey] = computeDayData(for: dayData.date)
                 }
@@ -313,12 +343,45 @@ struct CalendarView: View {
         dayDataCache = newCache
     }
 
+    /// Async wrapper for cache precomputation
+    private func precomputeDayDataCacheAsync() {
+        Task { @MainActor in
+            await Task.yield()
+            precomputeDayDataCache()
+        }
+    }
+
+    /// Prefetch a single month's data in background (for smoother swiping)
+    private func prefetchMonthData(for monthDate: Date) {
+        Task { @MainActor in
+            await Task.yield()
+            let days = generateCalendarDays(for: monthDate)
+            var updatedCache = dayDataCache
+
+            for dayData in days where dayData.day != nil {
+                let dateKey = calendar.startOfDay(for: dayData.date)
+                if updatedCache[dateKey] == nil {
+                    updatedCache[dateKey] = computeDayData(for: dayData.date)
+                }
+            }
+
+            dayDataCache = updatedCache
+        }
+    }
+
     // MARK: - Month Navigation
 
     private func initializeMonthsToDisplay() {
+        // Show calendar structure immediately
         updateMonthsWindow(centerMonth: currentMonthDate)
         currentPageIndex = centerIndex
-        precomputeDayDataCache()
+
+        // Load data asynchronously
+        Task { @MainActor in
+            await Task.yield()  // Allow UI to render first
+            precomputeDayDataCache()
+            isLoadingCalendarData = false
+        }
     }
 
     private func updateMonthsWindow(centerMonth: Date) {
@@ -340,6 +403,10 @@ struct CalendarView: View {
             currentMonthDate = monthsToDisplay[newIndex]
         }
 
+        // Don't load data during swipe - wait for swipe to finish
+        // Load data for current month after a short delay (swipe settled)
+        loadDataAfterSwipe(for: newIndex)
+
         // Only rebalance when we're getting close to the edges (0 or 4)
         // This gives us a buffer so the reset happens less frequently
         if newIndex <= 0 || newIndex >= monthBufferSize - 1 {
@@ -352,10 +419,26 @@ struct CalendarView: View {
         }
     }
 
+    /// Debounced data loading - only loads after swipe settles
+    private func loadDataAfterSwipe(for pageIndex: Int) {
+        // Cancel any pending load
+        pendingLoadTask?.cancel()
+
+        // Wait for swipe to settle before loading
+        pendingLoadTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 150_000_000)  // 150ms debounce
+
+            guard !Task.isCancelled else { return }
+            guard pageIndex >= 0 && pageIndex < monthsToDisplay.count else { return }
+
+            // Load data for the settled month
+            prefetchMonthData(for: monthsToDisplay[pageIndex])
+        }
+    }
+
     private func rebalanceMonthsWindow() {
         // Regenerate months centered on current month
         updateMonthsWindow(centerMonth: currentMonthDate)
-        precomputeDayDataCache()
 
         // Reset to center without animation
         var transaction = Transaction()
@@ -364,8 +447,10 @@ struct CalendarView: View {
             currentPageIndex = centerIndex
         }
 
-        // Allow next update after a brief delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        // Precompute cache async and allow next update after
+        Task { @MainActor in
+            await Task.yield()
+            precomputeDayDataCache()
             isUpdatingPage = false
         }
     }

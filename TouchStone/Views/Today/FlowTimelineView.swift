@@ -14,6 +14,8 @@ struct FlowTimelineView: View {
     let onDelete: ((WorkflowItem) -> Void)?
     let onDeleteStone: ((StoneEvent) -> Void)?
     let onEditMode: (() -> Void)?
+    /// Pre-computed touch counts by project ID (optional optimization)
+    var projectTouchCounts: [UUID: Int] = [:]
 
     @State private var showMoreToTouch = false  // Collapsed by default
 
@@ -125,7 +127,8 @@ struct FlowTimelineView: View {
                         AdditionalProjectRow(
                             project: project,
                             onTouch: { onTouch(project) },
-                            onFocus: { onFocus(project) }
+                            onFocus: { onFocus(project) },
+                            precomputedTouchCount: projectTouchCounts[project.id]
                         )
                         .padding(.horizontal, 20)
                     }
