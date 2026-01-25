@@ -21,6 +21,7 @@ struct CalendarView: View {
 
     // Pre-computed day data cache to avoid expensive calculations during swipe
     @State private var dayDataCache: [Date: CachedDayData] = [:]
+    @State private var isLoadingCalendarData = true
 
     // Buffer size: 5 months (2 before, current, 2 after)
     private let monthBufferSize = 5
@@ -69,13 +70,13 @@ struct CalendarView: View {
                 initializeMonthsToDisplay()
             }
             .onChange(of: stones.count) { _, _ in
-                precomputeDayDataCache()
+                precomputeDayDataCacheAsync()
             }
             .onChange(of: activeProjects.count) { _, _ in
-                precomputeDayDataCache()
+                precomputeDayDataCacheAsync()
             }
             .onChange(of: dayContexts.count) { _, _ in
-                precomputeDayDataCache()
+                precomputeDayDataCacheAsync()
             }
             .sheet(item: $selectedDay) { day in
                 DayDetailView(
@@ -233,14 +234,34 @@ struct CalendarView: View {
     private var calendarPager: some View {
         TabView(selection: $currentPageIndex) {
             ForEach(Array(monthsToDisplay.enumerated()), id: \.offset) { index, monthDate in
-                calendarGrid(for: monthDate)
-                    .tag(index)
+                if isLoadingCalendarData && dayDataCache.isEmpty {
+                    skeletonCalendarGrid
+                        .tag(index)
+                } else {
+                    calendarGrid(for: monthDate)
+                        .tag(index)
+                }
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
         .onChange(of: currentPageIndex) { oldValue, newValue in
             handlePageChange(from: oldValue, to: newValue)
         }
+    }
+
+    /// Skeleton grid shown while data loads
+    private var skeletonCalendarGrid: some View {
+        let cellHeight: CGFloat = prefs.calendarDetailMode ? 110 : 60
+
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DesignSystem.Spacing.sm), count: 7), spacing: DesignSystem.Spacing.md) {
+            ForEach(0..<35, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                    .fill(DesignSystem.Colors.cardBackground.opacity(0.5))
+                    .frame(height: cellHeight)
+            }
+        }
+        .padding(.horizontal, DesignSystem.Spacing.xl)
+        .padding(.bottom, DesignSystem.Spacing.lg)
     }
 
     private func calendarGrid(for monthDate: Date) -> some View {
@@ -313,12 +334,27 @@ struct CalendarView: View {
         dayDataCache = newCache
     }
 
+    /// Async wrapper for cache precomputation
+    private func precomputeDayDataCacheAsync() {
+        Task { @MainActor in
+            await Task.yield()
+            precomputeDayDataCache()
+        }
+    }
+
     // MARK: - Month Navigation
 
     private func initializeMonthsToDisplay() {
+        // Show calendar structure immediately
         updateMonthsWindow(centerMonth: currentMonthDate)
         currentPageIndex = centerIndex
-        precomputeDayDataCache()
+
+        // Load data asynchronously
+        Task { @MainActor in
+            await Task.yield()  // Allow UI to render first
+            precomputeDayDataCache()
+            isLoadingCalendarData = false
+        }
     }
 
     private func updateMonthsWindow(centerMonth: Date) {
@@ -355,7 +391,6 @@ struct CalendarView: View {
     private func rebalanceMonthsWindow() {
         // Regenerate months centered on current month
         updateMonthsWindow(centerMonth: currentMonthDate)
-        precomputeDayDataCache()
 
         // Reset to center without animation
         var transaction = Transaction()
@@ -364,8 +399,10 @@ struct CalendarView: View {
             currentPageIndex = centerIndex
         }
 
-        // Allow next update after a brief delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        // Precompute cache async and allow next update after
+        Task { @MainActor in
+            await Task.yield()
+            precomputeDayDataCache()
             isUpdatingPage = false
         }
     }
