@@ -1091,6 +1091,8 @@ struct DocumentPill: View {
     let document: AgentChatMessage.AttachedDocument
     let messageRole: AgentChatMessage.Role
 
+    @Environment(\.colorScheme) private var colorScheme
+
     private var iconName: String {
         switch document.fileType {
         case "pdf":
@@ -1112,29 +1114,52 @@ struct DocumentPill: View {
         document.filename
     }
 
+    private var backgroundColor: Color {
+        if messageRole == .user {
+            // For user messages (accent color bubble), use adaptive overlay
+            return colorScheme == .dark ? Color.black.opacity(0.2) : Color.white.opacity(0.25)
+        } else {
+            // For assistant messages, use card background
+            return DesignSystem.Colors.cardBackground
+        }
+    }
+
+    private var borderColor: Color {
+        if messageRole == .user {
+            return colorScheme == .dark ? Color.white.opacity(0.3) : Color.white.opacity(0.5)
+        } else {
+            return DesignSystem.Colors.textTertiary.opacity(0.3)
+        }
+    }
+
+    private var textColor: Color {
+        if messageRole == .user {
+            return .white
+        } else {
+            return DesignSystem.Colors.textSecondary
+        }
+    }
+
     var body: some View {
         HStack(spacing: DesignSystem.Spacing.xs) {
             Image(systemName: iconName)
                 .font(.caption)
-                .foregroundStyle(messageRole == .user ? .white : DesignSystem.Colors.textSecondary)
+                .foregroundStyle(textColor)
 
             Text(displayName)
                 .font(DesignSystem.Typography.caption)
-                .foregroundStyle(messageRole == .user ? .white : DesignSystem.Colors.textSecondary)
+                .foregroundStyle(textColor)
                 .lineLimit(1)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
         .background(
             Capsule()
-                .fill(messageRole == .user ? Color.black.opacity(0.15) : DesignSystem.Colors.cardBackground)
+                .fill(backgroundColor)
         )
         .overlay(
             Capsule()
-                .strokeBorder(
-                    messageRole == .user ? Color.white.opacity(0.5) : DesignSystem.Colors.textTertiary.opacity(0.3),
-                    lineWidth: 1
-                )
+                .strokeBorder(borderColor, lineWidth: 1)
         )
     }
 }
