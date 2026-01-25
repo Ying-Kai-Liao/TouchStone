@@ -12,6 +12,13 @@ struct PendingDocument: Identifiable {
     var extractionError: String?
 }
 
+/// A batch of confirmed actions to display in chat history
+struct ConfirmedActionBatch: Identifiable {
+    let id = UUID()
+    let actions: [AgentService.PendingAction]
+    let timestamp = Date()
+}
+
 /// Unified conversational input view for AI-powered productivity assistance.
 /// Users can type or speak naturally, and the AI routes to appropriate actions.
 struct UnifiedInputView: View {
@@ -39,8 +46,8 @@ struct UnifiedInputView: View {
     @State private var conversationState: AgentService.ConversationState = .initial
     @State private var hasUserEdits: Bool = false  // Track if user made local edits
 
-    // Confirmed actions (displayed after commit, cleared when user types)
-    @State private var confirmedActions: [AgentService.PendingAction] = []
+    // Confirmed action batches (displayed in chat history)
+    @State private var confirmedActionBatches: [ConfirmedActionBatch] = []
 
     // Recently confirmed actions (sent with next message for context continuity)
     @State private var recentlyConfirmedActions: [AgentService.PendingAction] = []
@@ -149,15 +156,15 @@ struct UnifiedInputView: View {
                         .id("pending-actions")
                     }
 
-                    // Confirmed actions preview (shown after user confirms)
-                    if !confirmedActions.isEmpty {
-                        ConfirmedActionsPreview(confirmedActions: confirmedActions)
+                    // Confirmed actions history (all confirmed batches in chat)
+                    ForEach(confirmedActionBatches) { batch in
+                        ConfirmedActionsPreview(confirmedActions: batch.actions)
                             .padding(.horizontal)
                             .transition(.asymmetric(
                                 insertion: .scale(scale: 0.95).combined(with: .opacity),
                                 removal: .opacity
                             ))
-                            .id("confirmed-actions")
+                            .id(batch.id)
                     }
 
                     // Streaming response
@@ -317,12 +324,8 @@ struct UnifiedInputView: View {
                         }
                     }
                     .onChange(of: inputText) {
-                        // Clear confirmed actions when user starts typing
-                        if !inputText.isEmpty && !confirmedActions.isEmpty {
-                            withAnimation {
-                                confirmedActions = []
-                            }
-                        }
+                        // Confirmed actions now persist in chat history
+                        // No need to clear them when user types
                     }
 
                 // Voice input button
@@ -516,9 +519,9 @@ struct UnifiedInputView: View {
                     // Commit to local storage
                     await commitActions(response.confirmedActions)
 
-                    // Show confirmed preview (stays until user types)
+                    // Add to chat history
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        confirmedActions = response.confirmedActions
+                        confirmedActionBatches.append(ConfirmedActionBatch(actions: response.confirmedActions))
                     }
                 }
 
@@ -657,16 +660,9 @@ struct UnifiedInputView: View {
             // Store for next message context (so AI knows what was confirmed)
             recentlyConfirmedActions = actionsToConfirm
 
-            // Show confirmed preview temporarily
+            // Add to chat history as a persistent card
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                confirmedActions = actionsToConfirm
-            }
-
-            // Auto-dismiss confirmed preview after 2 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                withAnimation(.easeOut(duration: 0.3)) {
-                    confirmedActions = []
-                }
+                confirmedActionBatches.append(ConfirmedActionBatch(actions: actionsToConfirm))
             }
         }
     }
@@ -748,6 +744,7 @@ struct UnifiedInputView: View {
 
     /// Create SwiftData objects from pending actions (iOS-as-authority pattern)
     /// This version uses the current pendingActions state
+    /// NOTE: This function is currently unused - confirmPendingActions() is used instead
     private func commitPendingActions() async {
         // Store actions for confirmed preview before processing
         let actionsToConfirm = pendingActions
@@ -760,9 +757,9 @@ struct UnifiedInputView: View {
         suggestions = []
         conversationState = .initial
 
-        // Show confirmed actions preview
+        // Add to chat history
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            confirmedActions = actionsToConfirm
+            confirmedActionBatches.append(ConfirmedActionBatch(actions: actionsToConfirm))
         }
     }
 
@@ -993,7 +990,7 @@ struct UnifiedInputView: View {
         agentService.startNewSession()
         messages = []
         pendingActions = []
-        confirmedActions = []
+        confirmedActionBatches = []
         suggestions = []
         conversationState = .initial
         hasUserEdits = false
