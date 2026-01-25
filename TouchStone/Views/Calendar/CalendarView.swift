@@ -19,9 +19,21 @@ struct CalendarView: View {
     @State private var addStoneDate: Date?
     @State private var showingWorkloadLegend = false
 
+    // Pre-computed day data cache to avoid expensive calculations during swipe
+    @State private var dayDataCache: [Date: CachedDayData] = [:]
+
     // Buffer size: 5 months (2 before, current, 2 after)
     private let monthBufferSize = 5
     private let centerIndex = 2
+
+    // Cached data for each day to avoid recalculation during swipe
+    struct CachedDayData {
+        let stones: [StoneEvent]
+        let contexts: [DayContext]
+        let touchCount: Int
+        let dayLoad: Double
+        let hasDeadline: Bool
+    }
 
     private let calendar = Calendar.current
     private let daysOfWeek = ["S", "M", "T", "W", "T", "F", "S"]
@@ -55,6 +67,15 @@ struct CalendarView: View {
             .navigationBarHidden(true)
             .onAppear {
                 initializeMonthsToDisplay()
+            }
+            .onChange(of: stones.count) { _, _ in
+                precomputeDayDataCache()
+            }
+            .onChange(of: activeProjects.count) { _, _ in
+                precomputeDayDataCache()
+            }
+            .onChange(of: dayContexts.count) { _, _ in
+                precomputeDayDataCache()
             }
             .sheet(item: $selectedDay) { day in
                 DayDetailView(
@@ -229,20 +250,21 @@ struct CalendarView: View {
 
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DesignSystem.Spacing.sm), count: 7), spacing: cellSpacing) {
             ForEach(days) { dayData in
+                let cached = getCachedDayData(for: dayData.date)
                 DayCell(
                     dayData: dayData,
-                    stones: stonesForDay(dayData.date),
-                    contexts: contextsForDay(dayData.date),
-                    touchCount: touchCountForDay(dayData.date),
-                    dayLoad: loadForDay(dayData.date),
-                    hasDeadline: hasDeadlineOnDay(dayData.date),
+                    stones: cached.stones,
+                    contexts: cached.contexts,
+                    touchCount: cached.touchCount,
+                    dayLoad: cached.dayLoad,
+                    hasDeadline: cached.hasDeadline,
                     showDetails: prefs.calendarDetailMode,
                     cellHeight: cellHeight,
                     onTap: {
                         if dayData.isCurrentMonth {
                             selectedDay = SelectedDay(
                                 date: dayData.date,
-                                stones: stonesForDay(dayData.date)
+                                stones: cached.stones
                             )
                         }
                     }
@@ -254,11 +276,49 @@ struct CalendarView: View {
         .animation(.easeInOut(duration: 0.2), value: prefs.calendarDetailMode)
     }
 
+    // MARK: - Day Data Cache
+
+    private func getCachedDayData(for date: Date) -> CachedDayData {
+        let dateKey = calendar.startOfDay(for: date)
+        if let cached = dayDataCache[dateKey] {
+            return cached
+        }
+        // Fallback: compute on demand if not cached (shouldn't happen normally)
+        return computeDayData(for: date)
+    }
+
+    private func computeDayData(for date: Date) -> CachedDayData {
+        CachedDayData(
+            stones: stonesForDay(date),
+            contexts: contextsForDay(date),
+            touchCount: touchCountForDay(date),
+            dayLoad: loadForDay(date),
+            hasDeadline: hasDeadlineOnDay(date)
+        )
+    }
+
+    private func precomputeDayDataCache() {
+        var newCache: [Date: CachedDayData] = [:]
+
+        for monthDate in monthsToDisplay {
+            let days = generateCalendarDays(for: monthDate)
+            for dayData in days where dayData.day != nil {
+                let dateKey = calendar.startOfDay(for: dayData.date)
+                if newCache[dateKey] == nil {
+                    newCache[dateKey] = computeDayData(for: dayData.date)
+                }
+            }
+        }
+
+        dayDataCache = newCache
+    }
+
     // MARK: - Month Navigation
 
     private func initializeMonthsToDisplay() {
         updateMonthsWindow(centerMonth: currentMonthDate)
         currentPageIndex = centerIndex
+        precomputeDayDataCache()
     }
 
     private func updateMonthsWindow(centerMonth: Date) {
@@ -295,6 +355,7 @@ struct CalendarView: View {
     private func rebalanceMonthsWindow() {
         // Regenerate months centered on current month
         updateMonthsWindow(centerMonth: currentMonthDate)
+        precomputeDayDataCache()
 
         // Reset to center without animation
         var transaction = Transaction()
