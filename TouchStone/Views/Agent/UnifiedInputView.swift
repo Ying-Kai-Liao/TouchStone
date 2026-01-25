@@ -1116,23 +1116,23 @@ struct DocumentPill: View {
         HStack(spacing: DesignSystem.Spacing.xs) {
             Image(systemName: iconName)
                 .font(.caption)
-                .foregroundStyle(messageRole == .user ? .white.opacity(0.9) : DesignSystem.Colors.textSecondary)
+                .foregroundStyle(messageRole == .user ? .white : DesignSystem.Colors.textSecondary)
 
             Text(displayName)
                 .font(DesignSystem.Typography.caption)
-                .foregroundStyle(messageRole == .user ? .white.opacity(0.9) : DesignSystem.Colors.textSecondary)
+                .foregroundStyle(messageRole == .user ? .white : DesignSystem.Colors.textSecondary)
                 .lineLimit(1)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.vertical, 7)
         .background(
             Capsule()
-                .fill(messageRole == .user ? Color.white.opacity(0.2) : DesignSystem.Colors.cardBackground.opacity(0.5))
+                .fill(messageRole == .user ? Color.black.opacity(0.15) : DesignSystem.Colors.cardBackground)
         )
         .overlay(
             Capsule()
                 .strokeBorder(
-                    messageRole == .user ? Color.white.opacity(0.3) : DesignSystem.Colors.textTertiary.opacity(0.2),
+                    messageRole == .user ? Color.white.opacity(0.5) : DesignSystem.Colors.textTertiary.opacity(0.3),
                     lineWidth: 1
                 )
         )
