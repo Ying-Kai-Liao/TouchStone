@@ -22,6 +22,7 @@ struct CalendarView: View {
     // Pre-computed day data cache to avoid expensive calculations during swipe
     @State private var dayDataCache: [Date: CachedDayData] = [:]
     @State private var isLoadingCalendarData = true
+    @State private var pendingLoadTask: Task<Void, Never>?
 
     // Buffer size: 5 months (2 before, current, 2 after)
     private let monthBufferSize = 5
@@ -402,15 +403,9 @@ struct CalendarView: View {
             currentMonthDate = monthsToDisplay[newIndex]
         }
 
-        // Prefetch the next month in swipe direction for smoother experience
-        let swipeDirection = newIndex - oldIndex
-        if swipeDirection > 0 && newIndex + 1 < monthsToDisplay.count {
-            // Swiping forward - prefetch next month
-            prefetchMonthData(for: monthsToDisplay[newIndex + 1])
-        } else if swipeDirection < 0 && newIndex - 1 >= 0 {
-            // Swiping backward - prefetch previous month
-            prefetchMonthData(for: monthsToDisplay[newIndex - 1])
-        }
+        // Don't load data during swipe - wait for swipe to finish
+        // Load data for current month after a short delay (swipe settled)
+        loadDataAfterSwipe(for: newIndex)
 
         // Only rebalance when we're getting close to the edges (0 or 4)
         // This gives us a buffer so the reset happens less frequently
@@ -421,6 +416,23 @@ struct CalendarView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                 rebalanceMonthsWindow()
             }
+        }
+    }
+
+    /// Debounced data loading - only loads after swipe settles
+    private func loadDataAfterSwipe(for pageIndex: Int) {
+        // Cancel any pending load
+        pendingLoadTask?.cancel()
+
+        // Wait for swipe to settle before loading
+        pendingLoadTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 150_000_000)  // 150ms debounce
+
+            guard !Task.isCancelled else { return }
+            guard pageIndex >= 0 && pageIndex < monthsToDisplay.count else { return }
+
+            // Load data for the settled month
+            prefetchMonthData(for: monthsToDisplay[pageIndex])
         }
     }
 
