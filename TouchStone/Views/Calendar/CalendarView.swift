@@ -13,6 +13,7 @@ struct CalendarView: View {
     @State private var currentMonthDate = Date()
     @State private var monthsToDisplay: [Date] = []
     @State private var currentPageIndex = 1
+    @State private var isUpdatingPage = false
     @State private var selectedDay: SelectedDay?
     @State private var showingAddStone = false
     @State private var addStoneDate: Date?
@@ -212,6 +213,7 @@ struct CalendarView: View {
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
+        .animation(.default, value: currentMonthDate)
         .onChange(of: currentPageIndex) { oldValue, newValue in
             handlePageChange(from: oldValue, to: newValue)
         }
@@ -264,38 +266,62 @@ struct CalendarView: View {
     }
 
     private func handlePageChange(from oldIndex: Int, to newIndex: Int) {
-        guard !monthsToDisplay.isEmpty else { return }
+        guard !monthsToDisplay.isEmpty, !isUpdatingPage else { return }
+        guard newIndex != 1 else { return } // Already on center page
+
+        isUpdatingPage = true
 
         if newIndex == 0 {
             // Swiped to previous month
             if let newCenterMonth = calendar.date(byAdding: .month, value: -1, to: currentMonthDate) {
                 currentMonthDate = newCenterMonth
                 updateMonthsWindow(centerMonth: newCenterMonth)
-                currentPageIndex = 1
+
+                // Reset to center without animation
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    currentPageIndex = 1
+                }
+
+                // Small delay before allowing next update
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    isUpdatingPage = false
+                }
+            } else {
+                isUpdatingPage = false
             }
         } else if newIndex == 2 {
             // Swiped to next month
             if let newCenterMonth = calendar.date(byAdding: .month, value: 1, to: currentMonthDate) {
                 currentMonthDate = newCenterMonth
                 updateMonthsWindow(centerMonth: newCenterMonth)
-                currentPageIndex = 1
+
+                // Reset to center without animation
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    currentPageIndex = 1
+                }
+
+                // Small delay before allowing next update
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    isUpdatingPage = false
+                }
+            } else {
+                isUpdatingPage = false
             }
-        } else {
-            // Stayed on current month (index 1)
-            currentMonthDate = monthsToDisplay[1]
         }
     }
 
     private func navigateToPreviousMonth() {
-        withAnimation(.spring(response: 0.3)) {
-            currentPageIndex = 0
-        }
+        guard !isUpdatingPage else { return }
+        currentPageIndex = 0
     }
 
     private func navigateToNextMonth() {
-        withAnimation(.spring(response: 0.3)) {
-            currentPageIndex = 2
-        }
+        guard !isUpdatingPage else { return }
+        currentPageIndex = 2
     }
 
     private func jumpToMonth(_ date: Date) {
