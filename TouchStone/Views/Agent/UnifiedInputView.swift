@@ -277,7 +277,12 @@ struct UnifiedInputView: View {
                 focusedProjectIndicator
             }
 
-            // Pending documents indicator
+            // Text preview pill (shown when typing)
+            if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                textPreviewPill
+            }
+
+            // Document attachments preview (shown when documents attached)
             if !pendingDocuments.isEmpty {
                 pendingDocumentsView
             }
@@ -443,6 +448,37 @@ struct UnifiedInputView: View {
         .padding(.vertical, DesignSystem.Spacing.sm)
     }
 
+    /// Text preview pill showing what will be sent (before send button is pressed)
+    private var textPreviewPill: some View {
+        HStack(spacing: DesignSystem.Spacing.sm) {
+            HStack(spacing: 6) {
+                Image(systemName: "text.bubble")
+                    .font(.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+
+                Text(inputText.trimmingCharacters(in: .whitespacesAndNewlines))
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    .lineLimit(2)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(DesignSystem.Colors.cardBackground)
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(DesignSystem.Colors.accent.opacity(0.3), lineWidth: 1)
+            )
+
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.vertical, DesignSystem.Spacing.sm)
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
     /// View showing pending document attachments
     private var pendingDocumentsView: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -468,12 +504,16 @@ struct UnifiedInputView: View {
         // Allow sending with just documents attached
         guard !text.isEmpty || !pendingDocuments.isEmpty else { return }
 
-        // Build message content including document info
+        // Build message content (text only, no document names embedded)
         let messageText = text.isEmpty ? "I've attached some documents for you to analyze." : text
-        let docNames = pendingDocuments.map { $0.filename }
-        let displayText = docNames.isEmpty ? messageText : "\(messageText)\n📎 \(docNames.joined(separator: ", "))"
 
-        let userMessage = AgentChatMessage(role: .user, content: displayText)
+        // Convert pending documents to attached documents for message
+        let attachedDocs = pendingDocuments.map { doc in
+            let ext = doc.url.pathExtension.lowercased()
+            return AgentChatMessage.AttachedDocument(filename: doc.filename, fileType: ext)
+        }
+
+        let userMessage = AgentChatMessage(role: .user, content: messageText, attachedDocuments: attachedDocs)
         messages.append(userMessage)
         inputText = ""
         isInputFocused = false
@@ -1019,10 +1059,77 @@ struct AgentChatMessage: Identifiable {
     let role: Role
     let content: String
     let timestamp = Date()
+    let attachedDocuments: [AttachedDocument]
+
+    init(role: Role, content: String, attachedDocuments: [AttachedDocument] = []) {
+        self.role = role
+        self.content = content
+        self.attachedDocuments = attachedDocuments
+    }
 
     enum Role {
         case user
         case assistant
+    }
+
+    struct AttachedDocument: Identifiable {
+        let id = UUID()
+        let filename: String
+        let fileType: String  // File extension like "pdf", "docx", etc.
+    }
+}
+
+// MARK: - Document Pill
+
+struct DocumentPill: View {
+    let document: AgentChatMessage.AttachedDocument
+    let messageRole: AgentChatMessage.Role
+
+    private var iconName: String {
+        switch document.fileType {
+        case "pdf":
+            return "doc.richtext.fill"
+        case "txt", "text", "md", "markdown":
+            return "doc.text.fill"
+        case "rtf", "rtfd":
+            return "doc.richtext.fill"
+        case "docx", "doc":
+            return "doc.text.fill"
+        case "png", "jpg", "jpeg", "heic", "heif":
+            return "photo.fill"
+        default:
+            return "doc.fill"
+        }
+    }
+
+    private var displayName: String {
+        document.filename
+    }
+
+    var body: some View {
+        HStack(spacing: DesignSystem.Spacing.xs) {
+            Image(systemName: iconName)
+                .font(.caption)
+                .foregroundStyle(messageRole == .user ? .white.opacity(0.9) : DesignSystem.Colors.textSecondary)
+
+            Text(displayName)
+                .font(DesignSystem.Typography.caption)
+                .foregroundStyle(messageRole == .user ? .white.opacity(0.9) : DesignSystem.Colors.textSecondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(messageRole == .user ? Color.white.opacity(0.2) : DesignSystem.Colors.cardBackground.opacity(0.5))
+        )
+        .overlay(
+            Capsule()
+                .strokeBorder(
+                    messageRole == .user ? Color.white.opacity(0.3) : DesignSystem.Colors.textTertiary.opacity(0.2),
+                    lineWidth: 1
+                )
+        )
     }
 }
 
@@ -1037,7 +1144,8 @@ struct AgentMessageBubble: View {
                 Spacer()
             }
 
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
+            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: DesignSystem.Spacing.sm) {
+                // Message bubble
                 Text(displayContent)
                     .font(DesignSystem.Typography.body)
                     .foregroundStyle(message.role == .user ? .white : DesignSystem.Colors.textPrimary)
@@ -1048,6 +1156,14 @@ struct AgentMessageBubble: View {
                             .fill(message.role == .user ? DesignSystem.Colors.accent : DesignSystem.Colors.cardBackground)
                     )
 
+                // Document pills (if any)
+                if !message.attachedDocuments.isEmpty {
+                    ForEach(message.attachedDocuments) { doc in
+                        DocumentPill(document: doc, messageRole: message.role)
+                    }
+                }
+
+                // Timestamp
                 Text(timeString)
                     .font(DesignSystem.Typography.caption)
                     .foregroundStyle(DesignSystem.Colors.textTertiary)
