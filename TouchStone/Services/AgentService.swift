@@ -57,6 +57,7 @@ class AgentService: ObservableObject {
         let freeHoursToday: Double
         let documentContexts: [DocumentContext]
         let dayContexts: [DayContextSummary]
+        let recentlyConfirmedActions: [PendingAction]
 
         enum CodingKeys: String, CodingKey {
             case today
@@ -66,6 +67,7 @@ class AgentService: ObservableObject {
             case freeHoursToday = "free_hours_today"
             case documentContexts = "document_contexts"
             case dayContexts = "day_contexts"
+            case recentlyConfirmedActions = "recently_confirmed_actions"
         }
 
         init(
@@ -75,7 +77,8 @@ class AgentService: ObservableObject {
             stonesToday: [StoneSummary],
             freeHoursToday: Double,
             documentContexts: [DocumentContext] = [],
-            dayContexts: [DayContextSummary] = []
+            dayContexts: [DayContextSummary] = [],
+            recentlyConfirmedActions: [PendingAction] = []
         ) {
             self.today = today
             self.currentTime = currentTime
@@ -84,6 +87,7 @@ class AgentService: ObservableObject {
             self.freeHoursToday = freeHoursToday
             self.documentContexts = documentContexts
             self.dayContexts = dayContexts
+            self.recentlyConfirmedActions = recentlyConfirmedActions
         }
     }
 
@@ -349,14 +353,60 @@ class AgentService: ObservableObject {
         }
     }
 
+    struct PendingDayContext: Codable, Identifiable {
+        let tempId: String
+        let name: String
+        let startDate: String
+        let endDate: String
+        let type: String
+        let workMode: String
+        let capacityPercent: Int
+        let fixedTaskDescription: String?
+
+        var id: String { tempId }
+
+        // Memberwise initializer
+        init(
+            tempId: String,
+            name: String,
+            startDate: String,
+            endDate: String,
+            type: String,
+            workMode: String,
+            capacityPercent: Int = 50,
+            fixedTaskDescription: String? = nil
+        ) {
+            self.tempId = tempId
+            self.name = name
+            self.startDate = startDate
+            self.endDate = endDate
+            self.type = type
+            self.workMode = workMode
+            self.capacityPercent = capacityPercent
+            self.fixedTaskDescription = fixedTaskDescription
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case tempId = "temp_id"
+            case name
+            case startDate = "start_date"
+            case endDate = "end_date"
+            case type
+            case workMode = "work_mode"
+            case capacityPercent = "capacity_percent"
+            case fixedTaskDescription = "fixed_task_description"
+        }
+    }
+
     struct PendingAction: Codable, Identifiable {
         let actionType: String
         let stone: PendingStone?
         let project: PendingProject?
         let touchLog: PendingTouchLog?
+        let dayContext: PendingDayContext?
 
         var id: String {
-            stone?.id ?? project?.id ?? touchLog?.id ?? UUID().uuidString
+            stone?.id ?? project?.id ?? touchLog?.id ?? dayContext?.id ?? UUID().uuidString
         }
 
         // Memberwise initializer
@@ -364,12 +414,14 @@ class AgentService: ObservableObject {
             actionType: String,
             stone: PendingStone? = nil,
             project: PendingProject? = nil,
-            touchLog: PendingTouchLog? = nil
+            touchLog: PendingTouchLog? = nil,
+            dayContext: PendingDayContext? = nil
         ) {
             self.actionType = actionType
             self.stone = stone
             self.project = project
             self.touchLog = touchLog
+            self.dayContext = dayContext
         }
 
         enum CodingKeys: String, CodingKey {
@@ -377,6 +429,7 @@ class AgentService: ObservableObject {
             case stone
             case project
             case touchLog = "touch_log"
+            case dayContext = "day_context"
         }
     }
 
@@ -766,13 +819,15 @@ extension AgentService {
     ///   - documents: Documents attached to the current message
     ///   - focusedProject: Optional project being discussed - its documents will be included
     ///   - dayContexts: Day contexts (holidays, vacations, etc.) affecting today's scheduling
+    ///   - recentlyConfirmedActions: Actions that were just confirmed (for context continuity)
     static func buildContext(
         projects: [Project],
         stonesForToday: [StoneEvent],
         freeHours: Double,
         documents: [DocumentContext] = [],
         focusedProject: Project? = nil,
-        dayContexts: [DayContext] = []
+        dayContexts: [DayContext] = [],
+        recentlyConfirmedActions: [PendingAction] = []
     ) -> UserContext {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -837,7 +892,8 @@ extension AgentService {
             stonesToday: stoneSummaries,
             freeHoursToday: freeHours,
             documentContexts: allDocuments,
-            dayContexts: dayContextSummaries
+            dayContexts: dayContextSummaries,
+            recentlyConfirmedActions: recentlyConfirmedActions
         )
     }
 }
