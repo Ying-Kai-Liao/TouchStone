@@ -304,8 +304,15 @@ struct CalendarView: View {
         if let cached = dayDataCache[dateKey] {
             return cached
         }
-        // Fallback: compute on demand if not cached (shouldn't happen normally)
-        return computeDayData(for: date)
+        // Return empty placeholder to avoid blocking UI
+        // Data will be filled in when async cache completes
+        return CachedDayData(
+            stones: [],
+            contexts: [],
+            touchCount: 0,
+            dayLoad: 0,
+            hasDeadline: false
+        )
     }
 
     private func computeDayData(for date: Date) -> CachedDayData {
@@ -319,12 +326,13 @@ struct CalendarView: View {
     }
 
     private func precomputeDayDataCache() {
-        var newCache: [Date: CachedDayData] = [:]
+        var newCache = dayDataCache  // Start with existing cache
 
         for monthDate in monthsToDisplay {
             let days = generateCalendarDays(for: monthDate)
             for dayData in days where dayData.day != nil {
                 let dateKey = calendar.startOfDay(for: dayData.date)
+                // Only compute if not already cached
                 if newCache[dateKey] == nil {
                     newCache[dateKey] = computeDayData(for: dayData.date)
                 }
@@ -339,6 +347,24 @@ struct CalendarView: View {
         Task { @MainActor in
             await Task.yield()
             precomputeDayDataCache()
+        }
+    }
+
+    /// Prefetch a single month's data in background (for smoother swiping)
+    private func prefetchMonthData(for monthDate: Date) {
+        Task { @MainActor in
+            await Task.yield()
+            let days = generateCalendarDays(for: monthDate)
+            var updatedCache = dayDataCache
+
+            for dayData in days where dayData.day != nil {
+                let dateKey = calendar.startOfDay(for: dayData.date)
+                if updatedCache[dateKey] == nil {
+                    updatedCache[dateKey] = computeDayData(for: dayData.date)
+                }
+            }
+
+            dayDataCache = updatedCache
         }
     }
 
@@ -374,6 +400,16 @@ struct CalendarView: View {
         // Update the displayed month in header based on current page
         if newIndex >= 0 && newIndex < monthsToDisplay.count {
             currentMonthDate = monthsToDisplay[newIndex]
+        }
+
+        // Prefetch the next month in swipe direction for smoother experience
+        let swipeDirection = newIndex - oldIndex
+        if swipeDirection > 0 && newIndex + 1 < monthsToDisplay.count {
+            // Swiping forward - prefetch next month
+            prefetchMonthData(for: monthsToDisplay[newIndex + 1])
+        } else if swipeDirection < 0 && newIndex - 1 >= 0 {
+            // Swiping backward - prefetch previous month
+            prefetchMonthData(for: monthsToDisplay[newIndex - 1])
         }
 
         // Only rebalance when we're getting close to the edges (0 or 4)
