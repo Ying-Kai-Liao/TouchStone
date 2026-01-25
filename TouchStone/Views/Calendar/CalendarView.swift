@@ -10,19 +10,13 @@ struct CalendarView: View {
 
     private var prefs: UserPreferences { UserPreferences.shared }
 
-    @State private var selectedMonth = Date()
+    @State private var currentMonthDate = Date()
+    @State private var monthsToDisplay: [Date] = []
+    @State private var currentPageIndex = 1
     @State private var selectedDay: SelectedDay?
     @State private var showingAddStone = false
     @State private var addStoneDate: Date?
     @State private var showingWorkloadLegend = false
-
-    // Swipe navigation state
-    @State private var dragOffset: CGFloat = 0
-    @State private var swipeDirection: SwipeDirection = .none
-
-    private enum SwipeDirection {
-        case none, left, right
-    }
 
     private let calendar = Calendar.current
     private let daysOfWeek = ["S", "M", "T", "W", "T", "F", "S"]
@@ -45,19 +39,18 @@ struct CalendarView: View {
                         .padding(.horizontal, DesignSystem.Spacing.xl)
                         .padding(.top, DesignSystem.Spacing.sm)
 
-                    ScrollView {
-                        VStack(spacing: DesignSystem.Spacing.md) {
-                            monthNavigationHeader
-                            weekdayHeader
-                            calendarGrid
-                                .offset(x: dragOffset)
-                                .gesture(monthSwipeGesture)
-                        }
-                        .padding(.vertical, DesignSystem.Spacing.sm)
+                    VStack(spacing: DesignSystem.Spacing.md) {
+                        monthNavigationHeader
+                        weekdayHeader
+                        calendarPager
                     }
+                    .padding(.vertical, DesignSystem.Spacing.sm)
                 }
             }
             .navigationBarHidden(true)
+            .onAppear {
+                initializeMonthsToDisplay()
+            }
             .sheet(item: $selectedDay) { day in
                 DayDetailView(
                     date: day.date,
@@ -113,9 +106,7 @@ struct CalendarView: View {
             }
 
             Button {
-                withAnimation(.spring(response: 0.3)) {
-                    selectedMonth = Date()
-                }
+                jumpToMonth(Date())
             } label: {
                 Text("Today")
                     .font(.system(size: 14, weight: .medium))
@@ -162,9 +153,7 @@ struct CalendarView: View {
     private var monthNavigationHeader: some View {
         HStack(spacing: DesignSystem.Spacing.md) {
             Button {
-                withAnimation(.spring(response: 0.3)) {
-                    selectedMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
-                }
+                navigateToPreviousMonth()
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 14, weight: .medium))
@@ -178,16 +167,14 @@ struct CalendarView: View {
 
             Spacer()
 
-            Text(monthYearFormatter.string(from: selectedMonth))
+            Text(monthYearFormatter.string(from: currentMonthDate))
                 .font(DesignSystem.Typography.headline)
                 .foregroundStyle(DesignSystem.Colors.textPrimary)
 
             Spacer()
 
             Button {
-                withAnimation(.spring(response: 0.3)) {
-                    selectedMonth = calendar.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
-                }
+                navigateToNextMonth()
             } label: {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .medium))
@@ -217,8 +204,21 @@ struct CalendarView: View {
         .padding(.bottom, DesignSystem.Spacing.sm)
     }
 
-    private var calendarGrid: some View {
-        let days = generateCalendarDays()
+    private var calendarPager: some View {
+        TabView(selection: $currentPageIndex) {
+            ForEach(Array(monthsToDisplay.enumerated()), id: \.offset) { index, monthDate in
+                calendarGrid(for: monthDate)
+                    .tag(index)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .onChange(of: currentPageIndex) { oldValue, newValue in
+            handlePageChange(from: oldValue, to: newValue)
+        }
+    }
+
+    private func calendarGrid(for monthDate: Date) -> some View {
+        let days = generateCalendarDays(for: monthDate)
         let cellSpacing = prefs.calendarDetailMode ? DesignSystem.Spacing.sm : DesignSystem.Spacing.md
         let cellHeight: CGFloat = prefs.calendarDetailMode ? 110 : 60
 
@@ -249,66 +249,59 @@ struct CalendarView: View {
         .animation(.easeInOut(duration: 0.2), value: prefs.calendarDetailMode)
     }
 
-    // MARK: - Swipe Gesture
+    // MARK: - Month Navigation
 
-    private var monthSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 30)
-            .onChanged { value in
-                // Only track horizontal swipes
-                let horizontalAmount = abs(value.translation.width)
-                let verticalAmount = abs(value.translation.height)
+    private func initializeMonthsToDisplay() {
+        updateMonthsWindow(centerMonth: currentMonthDate)
+    }
 
-                if horizontalAmount > verticalAmount {
-                    // Limit drag offset for visual feedback
-                    dragOffset = value.translation.width * 0.3
-                }
+    private func updateMonthsWindow(centerMonth: Date) {
+        guard let prevMonth = calendar.date(byAdding: .month, value: -1, to: centerMonth),
+              let nextMonth = calendar.date(byAdding: .month, value: 1, to: centerMonth) else {
+            return
+        }
+        monthsToDisplay = [prevMonth, centerMonth, nextMonth]
+    }
+
+    private func handlePageChange(from oldIndex: Int, to newIndex: Int) {
+        guard !monthsToDisplay.isEmpty else { return }
+
+        if newIndex == 0 {
+            // Swiped to previous month
+            if let newCenterMonth = calendar.date(byAdding: .month, value: -1, to: currentMonthDate) {
+                currentMonthDate = newCenterMonth
+                updateMonthsWindow(centerMonth: newCenterMonth)
+                currentPageIndex = 1
             }
-            .onEnded { value in
-                let horizontalAmount = abs(value.translation.width)
-                let verticalAmount = abs(value.translation.height)
-                let swipeThreshold: CGFloat = 50
-
-                // Only process horizontal swipes
-                guard horizontalAmount > verticalAmount else {
-                    withAnimation(.spring(response: 0.3)) {
-                        dragOffset = 0
-                    }
-                    return
-                }
-
-                if value.translation.width < -swipeThreshold {
-                    // Swiped left - go to next month
-                    swipeDirection = .left
-                    withAnimation(.spring(response: 0.3)) {
-                        dragOffset = -UIScreen.main.bounds.width * 0.3
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        selectedMonth = calendar.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
-                        dragOffset = UIScreen.main.bounds.width * 0.3
-                        withAnimation(.spring(response: 0.3)) {
-                            dragOffset = 0
-                        }
-                    }
-                } else if value.translation.width > swipeThreshold {
-                    // Swiped right - go to previous month
-                    swipeDirection = .right
-                    withAnimation(.spring(response: 0.3)) {
-                        dragOffset = UIScreen.main.bounds.width * 0.3
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        selectedMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
-                        dragOffset = -UIScreen.main.bounds.width * 0.3
-                        withAnimation(.spring(response: 0.3)) {
-                            dragOffset = 0
-                        }
-                    }
-                } else {
-                    // Swipe wasn't significant enough
-                    withAnimation(.spring(response: 0.3)) {
-                        dragOffset = 0
-                    }
-                }
+        } else if newIndex == 2 {
+            // Swiped to next month
+            if let newCenterMonth = calendar.date(byAdding: .month, value: 1, to: currentMonthDate) {
+                currentMonthDate = newCenterMonth
+                updateMonthsWindow(centerMonth: newCenterMonth)
+                currentPageIndex = 1
             }
+        } else {
+            // Stayed on current month (index 1)
+            currentMonthDate = monthsToDisplay[1]
+        }
+    }
+
+    private func navigateToPreviousMonth() {
+        withAnimation(.spring(response: 0.3)) {
+            currentPageIndex = 0
+        }
+    }
+
+    private func navigateToNextMonth() {
+        withAnimation(.spring(response: 0.3)) {
+            currentPageIndex = 2
+        }
+    }
+
+    private func jumpToMonth(_ date: Date) {
+        currentMonthDate = date
+        updateMonthsWindow(centerMonth: date)
+        currentPageIndex = 1
     }
 
     // MARK: - Workload Legend
@@ -392,8 +385,8 @@ struct CalendarView: View {
         }
     }
 
-    private func generateCalendarDays() -> [DayData] {
-        guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: selectedMonth)),
+    private func generateCalendarDays(for monthDate: Date) -> [DayData] {
+        guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: monthDate)),
               let monthEnd = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: monthStart) else {
             return []
         }
@@ -411,7 +404,7 @@ struct CalendarView: View {
         // Days of the month
         for day in 1...daysInMonth {
             if let date = calendar.date(byAdding: .day, value: day - 1, to: monthStart) {
-                let isCurrentMonth = calendar.isDate(date, equalTo: selectedMonth, toGranularity: .month)
+                let isCurrentMonth = calendar.isDate(date, equalTo: monthDate, toGranularity: .month)
                 days.append(DayData(date: date, day: day, isCurrentMonth: isCurrentMonth))
             }
         }
