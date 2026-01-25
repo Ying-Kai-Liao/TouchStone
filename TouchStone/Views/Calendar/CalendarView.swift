@@ -594,7 +594,7 @@ struct DayCell: View {
                     .fill(cellBackgroundColor)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableDayCellStyle())
     }
 
     // MARK: - Compact View (Original)
@@ -776,6 +776,24 @@ struct DayCell: View {
     private var isWeekend: Bool {
         let weekday = calendar.component(.weekday, from: dayData.date)
         return weekday == 1 || weekday == 7  // Sunday or Saturday
+    }
+}
+
+/// Button style for pressable calendar day cells with scale, highlight, and haptic feedback
+struct PressableDayCellStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                    .fill(DesignSystem.Colors.accent.opacity(configuration.isPressed ? 0.15 : 0))
+            )
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { wasPressed, isPressed in
+                if isPressed && !wasPressed {
+                    HapticService.selection()
+                }
+            }
     }
 }
 
