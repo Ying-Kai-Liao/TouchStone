@@ -57,6 +57,7 @@ class AgentService: ObservableObject {
         let freeHoursToday: Double
         let documentContexts: [DocumentContext]
         let dayContexts: [DayContextSummary]
+        let recentlyConfirmedActions: [PendingAction]
 
         enum CodingKeys: String, CodingKey {
             case today
@@ -66,6 +67,7 @@ class AgentService: ObservableObject {
             case freeHoursToday = "free_hours_today"
             case documentContexts = "document_contexts"
             case dayContexts = "day_contexts"
+            case recentlyConfirmedActions = "recently_confirmed_actions"
         }
 
         init(
@@ -75,7 +77,8 @@ class AgentService: ObservableObject {
             stonesToday: [StoneSummary],
             freeHoursToday: Double,
             documentContexts: [DocumentContext] = [],
-            dayContexts: [DayContextSummary] = []
+            dayContexts: [DayContextSummary] = [],
+            recentlyConfirmedActions: [PendingAction] = []
         ) {
             self.today = today
             self.currentTime = currentTime
@@ -84,6 +87,7 @@ class AgentService: ObservableObject {
             self.freeHoursToday = freeHoursToday
             self.documentContexts = documentContexts
             self.dayContexts = dayContexts
+            self.recentlyConfirmedActions = recentlyConfirmedActions
         }
     }
 
@@ -815,13 +819,15 @@ extension AgentService {
     ///   - documents: Documents attached to the current message
     ///   - focusedProject: Optional project being discussed - its documents will be included
     ///   - dayContexts: Day contexts (holidays, vacations, etc.) affecting today's scheduling
+    ///   - recentlyConfirmedActions: Actions that were just confirmed (for context continuity)
     static func buildContext(
         projects: [Project],
         stonesForToday: [StoneEvent],
         freeHours: Double,
         documents: [DocumentContext] = [],
         focusedProject: Project? = nil,
-        dayContexts: [DayContext] = []
+        dayContexts: [DayContext] = [],
+        recentlyConfirmedActions: [PendingAction] = []
     ) -> UserContext {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -886,7 +892,8 @@ extension AgentService {
             stonesToday: stoneSummaries,
             freeHoursToday: freeHours,
             documentContexts: allDocuments,
-            dayContexts: dayContextSummaries
+            dayContexts: dayContextSummaries,
+            recentlyConfirmedActions: recentlyConfirmedActions
         )
     }
 }

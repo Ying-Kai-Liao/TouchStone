@@ -42,6 +42,9 @@ struct UnifiedInputView: View {
     // Confirmed actions (displayed after commit, cleared when user types)
     @State private var confirmedActions: [AgentService.PendingAction] = []
 
+    // Recently confirmed actions (sent with next message for context continuity)
+    @State private var recentlyConfirmedActions: [AgentService.PendingAction] = []
+
     // Document attachment state
     @State private var pendingDocuments: [PendingDocument] = []
     @State private var showingDocumentPicker = false
@@ -505,6 +508,9 @@ struct UnifiedInputView: View {
                 conversationState = response.conversationState
                 hasUserEdits = false  // Reset when new actions come from backend
 
+                // Clear recently confirmed actions after they've been sent in context
+                recentlyConfirmedActions = []
+
                 // Handle confirmed actions from backend (multi-task flow)
                 if !response.confirmedActions.isEmpty {
                     // Commit to local storage
@@ -551,7 +557,8 @@ struct UnifiedInputView: View {
             freeHours: freeHours,
             documents: documentContexts,
             focusedProject: focusedProject,
-            dayContexts: Array(dayContexts)
+            dayContexts: Array(dayContexts),
+            recentlyConfirmedActions: recentlyConfirmedActions
         )
     }
 
@@ -631,80 +638,35 @@ struct UnifiedInputView: View {
 
     /// User confirmed pending actions - send confirmation to backend or commit locally if edited
     /// Uses optimistic UI: hides genui block immediately, restores on failure
+    /// Confirms pending actions by committing them locally and storing for next message context
     private func confirmPendingActions() {
-        // Store pending actions before clearing (for potential rollback)
         let actionsToConfirm = pendingActions
-        let userMadeEdits = hasUserEdits
 
-        // Optimistic UI: Hide genui block immediately
+        // Clear UI immediately
         withAnimation(.easeOut(duration: 0.2)) {
             pendingActions = []
             suggestions = []
             hasUserEdits = false
+            conversationState = .initial
         }
-
-        // If user made local edits, commit directly without backend roundtrip
-        if userMadeEdits {
-            let userMessage = AgentChatMessage(role: .user, content: "Save changes")
-            messages.append(userMessage)
-            inputText = ""
-            isInputFocused = false
-
-            Task {
-                // Commit local edited actions directly
-                await commitActions(actionsToConfirm)
-
-                // Add confirmation message
-                let assistantMessage = AgentChatMessage(role: .assistant, content: "Done! I've saved your changes.")
-                messages.append(assistantMessage)
-
-                // Show confirmed preview
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    confirmedActions = actionsToConfirm
-                }
-                conversationState = .initial
-            }
-            return
-        }
-
-        // No edits - send confirmation to backend
-        let userMessage = AgentChatMessage(role: .user, content: "Looks good")
-        messages.append(userMessage)
-        inputText = ""
-        isInputFocused = false
 
         Task {
-            do {
-                let context = buildContext()
-                let response = try await agentService.chat(message: "Looks good", context: context)
+            // Commit to local storage
+            await commitActions(actionsToConfirm)
 
-                // Add assistant response
-                let assistantMessage = AgentChatMessage(role: .assistant, content: response.message)
-                messages.append(assistantMessage)
+            // Store for next message context (so AI knows what was confirmed)
+            recentlyConfirmedActions = actionsToConfirm
 
-                // Update state from response
-                pendingActions = response.pendingActions
-                self.suggestions = response.suggestions
-                conversationState = response.conversationState
-                hasUserEdits = false
+            // Show confirmed preview temporarily
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                confirmedActions = actionsToConfirm
+            }
 
-                // Handle confirmed actions from backend (multi-task flow)
-                if !response.confirmedActions.isEmpty {
-                    // Commit to local storage
-                    await commitActions(response.confirmedActions)
-
-                    // Show confirmed preview (stays until user types)
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        confirmedActions = response.confirmedActions
-                    }
+            // Auto-dismiss confirmed preview after 2 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    confirmedActions = []
                 }
-            } catch {
-                // Rollback on failure: restore the pending actions
-                withAnimation(.easeIn(duration: 0.2)) {
-                    pendingActions = actionsToConfirm
-                    hasUserEdits = userMadeEdits
-                }
-                errorMessage = error.localizedDescription
             }
         }
     }
