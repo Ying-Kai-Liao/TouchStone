@@ -57,6 +57,11 @@ struct DayDetailView: View {
         activeContexts.fixedTask(for: date)
     }
 
+    // Projects with deadlines on this day
+    private var projectsDue: [Project] {
+        PressureCalculator.projectsWithDeadline(on: date, projects: Array(activeProjects))
+    }
+
     var body: some View {
         NavigationStack {
             mainContent
@@ -126,6 +131,10 @@ struct DayDetailView: View {
                 emptyScheduleHint
             }
 
+            if !projectsDue.isEmpty {
+                projectsDueSection
+            }
+
             if !suggestedSessions.isEmpty && !shouldSuppressWork {
                 suggestedWorkSection
             } else if shouldSuppressWork && !activeContexts.isEmpty {
@@ -187,6 +196,33 @@ struct DayDetailView: View {
             contexts: Array(allContexts)
         )
         dayState = state
+    }
+
+    // MARK: - Projects Due Section
+
+    private var projectsDueSection: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            HStack {
+                Text("DUE TODAY")
+                    .font(DesignSystem.Typography.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    .tracking(1)
+
+                Spacer()
+
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(DesignSystem.Colors.accent)
+            }
+            .padding(.horizontal, DesignSystem.Spacing.xl)
+
+            ForEach(projectsDue) { project in
+                ProjectDueRow(project: project)
+                    .padding(.horizontal, DesignSystem.Spacing.xl)
+            }
+        }
+        .padding(.bottom, DesignSystem.Spacing.xl)
     }
 
     // MARK: - Suggested Work Section
@@ -765,6 +801,70 @@ struct SuggestedWorkRow: View {
             .background(
                 RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
                     .fill(DesignSystem.Colors.accent.opacity(0.1))
+            )
+        }
+    }
+}
+
+// MARK: - Project Due Row
+
+struct ProjectDueRow: View {
+    let project: Project
+
+    private var formattedDeadline: String {
+        guard let deadline = project.deadline else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: deadline)
+    }
+
+    var body: some View {
+        HStack(spacing: DesignSystem.Spacing.md) {
+            // Deadline indicator
+            VStack(alignment: .center, spacing: 2) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(DesignSystem.Colors.accent)
+                Text("DUE")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(DesignSystem.Colors.accent)
+            }
+            .frame(width: 70)
+
+            // Project card
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+                Text(project.title)
+                    .font(DesignSystem.Typography.body)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                HStack(spacing: DesignSystem.Spacing.sm) {
+                    Image(systemName: "clock.fill")
+                        .font(.caption)
+                    Text(formattedDeadline)
+                        .font(DesignSystem.Typography.caption)
+
+                    if let phase = project.activePhase {
+                        Text("•")
+                        Text(phase.title)
+                            .font(DesignSystem.Typography.caption)
+                    } else if let phase = project.currentPhase {
+                        Text("•")
+                        Text(phase)
+                            .font(DesignSystem.Typography.caption)
+                    }
+                }
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(DesignSystem.Spacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                    .fill(DesignSystem.Colors.accent.opacity(0.15))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                    .strokeBorder(DesignSystem.Colors.accent.opacity(0.3), lineWidth: 1.5)
             )
         }
     }
