@@ -12,6 +12,13 @@ struct PendingDocument: Identifiable {
     var extractionError: String?
 }
 
+/// A batch of confirmed actions to display in chat history
+struct ConfirmedActionBatch: Identifiable {
+    let id = UUID()
+    let actions: [AgentService.PendingAction]
+    let timestamp = Date()
+}
+
 /// Unified conversational input view for AI-powered productivity assistance.
 /// Users can type or speak naturally, and the AI routes to appropriate actions.
 struct UnifiedInputView: View {
@@ -39,8 +46,11 @@ struct UnifiedInputView: View {
     @State private var conversationState: AgentService.ConversationState = .initial
     @State private var hasUserEdits: Bool = false  // Track if user made local edits
 
-    // Confirmed actions (displayed after commit, cleared when user types)
-    @State private var confirmedActions: [AgentService.PendingAction] = []
+    // Confirmed action batches (displayed in chat history)
+    @State private var confirmedActionBatches: [ConfirmedActionBatch] = []
+
+    // Recently confirmed actions (sent with next message for context continuity)
+    @State private var recentlyConfirmedActions: [AgentService.PendingAction] = []
 
     // Document attachment state
     @State private var pendingDocuments: [PendingDocument] = []
@@ -146,15 +156,15 @@ struct UnifiedInputView: View {
                         .id("pending-actions")
                     }
 
-                    // Confirmed actions preview (shown after user confirms)
-                    if !confirmedActions.isEmpty {
-                        ConfirmedActionsPreview(confirmedActions: confirmedActions)
+                    // Confirmed actions history (all confirmed batches in chat)
+                    ForEach(confirmedActionBatches) { batch in
+                        ConfirmedActionsPreview(confirmedActions: batch.actions)
                             .padding(.horizontal)
                             .transition(.asymmetric(
                                 insertion: .scale(scale: 0.95).combined(with: .opacity),
                                 removal: .opacity
                             ))
-                            .id("confirmed-actions")
+                            .id(batch.id)
                     }
 
                     // Streaming response
@@ -314,12 +324,8 @@ struct UnifiedInputView: View {
                         }
                     }
                     .onChange(of: inputText) {
-                        // Clear confirmed actions when user starts typing
-                        if !inputText.isEmpty && !confirmedActions.isEmpty {
-                            withAnimation {
-                                confirmedActions = []
-                            }
-                        }
+                        // Confirmed actions now persist in chat history
+                        // No need to clear them when user types
                     }
 
                 // Voice input button
@@ -505,14 +511,17 @@ struct UnifiedInputView: View {
                 conversationState = response.conversationState
                 hasUserEdits = false  // Reset when new actions come from backend
 
+                // Clear recently confirmed actions after they've been sent in context
+                recentlyConfirmedActions = []
+
                 // Handle confirmed actions from backend (multi-task flow)
                 if !response.confirmedActions.isEmpty {
                     // Commit to local storage
                     await commitActions(response.confirmedActions)
 
-                    // Show confirmed preview (stays until user types)
+                    // Add to chat history
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        confirmedActions = response.confirmedActions
+                        confirmedActionBatches.append(ConfirmedActionBatch(actions: response.confirmedActions))
                     }
                 }
 
@@ -551,7 +560,8 @@ struct UnifiedInputView: View {
             freeHours: freeHours,
             documents: documentContexts,
             focusedProject: focusedProject,
-            dayContexts: Array(dayContexts)
+            dayContexts: Array(dayContexts),
+            recentlyConfirmedActions: recentlyConfirmedActions
         )
     }
 
@@ -631,80 +641,28 @@ struct UnifiedInputView: View {
 
     /// User confirmed pending actions - send confirmation to backend or commit locally if edited
     /// Uses optimistic UI: hides genui block immediately, restores on failure
+    /// Confirms pending actions by committing them locally and storing for next message context
     private func confirmPendingActions() {
-        // Store pending actions before clearing (for potential rollback)
         let actionsToConfirm = pendingActions
-        let userMadeEdits = hasUserEdits
 
-        // Optimistic UI: Hide genui block immediately
+        // Clear UI immediately
         withAnimation(.easeOut(duration: 0.2)) {
             pendingActions = []
             suggestions = []
             hasUserEdits = false
+            conversationState = .initial
         }
-
-        // If user made local edits, commit directly without backend roundtrip
-        if userMadeEdits {
-            let userMessage = AgentChatMessage(role: .user, content: "Save changes")
-            messages.append(userMessage)
-            inputText = ""
-            isInputFocused = false
-
-            Task {
-                // Commit local edited actions directly
-                await commitActions(actionsToConfirm)
-
-                // Add confirmation message
-                let assistantMessage = AgentChatMessage(role: .assistant, content: "Done! I've saved your changes.")
-                messages.append(assistantMessage)
-
-                // Show confirmed preview
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    confirmedActions = actionsToConfirm
-                }
-                conversationState = .initial
-            }
-            return
-        }
-
-        // No edits - send confirmation to backend
-        let userMessage = AgentChatMessage(role: .user, content: "Looks good")
-        messages.append(userMessage)
-        inputText = ""
-        isInputFocused = false
 
         Task {
-            do {
-                let context = buildContext()
-                let response = try await agentService.chat(message: "Looks good", context: context)
+            // Commit to local storage
+            await commitActions(actionsToConfirm)
 
-                // Add assistant response
-                let assistantMessage = AgentChatMessage(role: .assistant, content: response.message)
-                messages.append(assistantMessage)
+            // Store for next message context (so AI knows what was confirmed)
+            recentlyConfirmedActions = actionsToConfirm
 
-                // Update state from response
-                pendingActions = response.pendingActions
-                self.suggestions = response.suggestions
-                conversationState = response.conversationState
-                hasUserEdits = false
-
-                // Handle confirmed actions from backend (multi-task flow)
-                if !response.confirmedActions.isEmpty {
-                    // Commit to local storage
-                    await commitActions(response.confirmedActions)
-
-                    // Show confirmed preview (stays until user types)
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        confirmedActions = response.confirmedActions
-                    }
-                }
-            } catch {
-                // Rollback on failure: restore the pending actions
-                withAnimation(.easeIn(duration: 0.2)) {
-                    pendingActions = actionsToConfirm
-                    hasUserEdits = userMadeEdits
-                }
-                errorMessage = error.localizedDescription
+            // Add to chat history as a persistent card
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                confirmedActionBatches.append(ConfirmedActionBatch(actions: actionsToConfirm))
             }
         }
     }
@@ -786,6 +744,7 @@ struct UnifiedInputView: View {
 
     /// Create SwiftData objects from pending actions (iOS-as-authority pattern)
     /// This version uses the current pendingActions state
+    /// NOTE: This function is currently unused - confirmPendingActions() is used instead
     private func commitPendingActions() async {
         // Store actions for confirmed preview before processing
         let actionsToConfirm = pendingActions
@@ -798,9 +757,9 @@ struct UnifiedInputView: View {
         suggestions = []
         conversationState = .initial
 
-        // Show confirmed actions preview
+        // Add to chat history
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            confirmedActions = actionsToConfirm
+            confirmedActionBatches.append(ConfirmedActionBatch(actions: actionsToConfirm))
         }
     }
 
@@ -819,6 +778,10 @@ struct UnifiedInputView: View {
             case "log_work":
                 if let log = action.touchLog {
                     await createTouchLog(from: log)
+                }
+            case "add_context":
+                if let context = action.dayContext {
+                    await createDayContext(from: context)
                 }
             default:
                 break
@@ -981,6 +944,35 @@ struct UnifiedInputView: View {
         try? modelContext.save()
     }
 
+    /// Create a DayContext from pending data
+    private func createDayContext(from pending: AgentService.PendingDayContext) async {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        guard let startDate = formatter.date(from: pending.startDate),
+              let endDate = formatter.date(from: pending.endDate) else {
+            print("ERROR: Invalid date format in pending context")
+            return
+        }
+
+        // Parse type and workMode from strings
+        let contextType = DayContextType(rawValue: pending.type) ?? .custom
+        let workMode = DayContextWorkMode(rawValue: pending.workMode) ?? .normal
+
+        let context = DayContext(
+            name: pending.name,
+            startDate: startDate,
+            endDate: endDate,
+            type: contextType,
+            workMode: workMode,
+            capacityPercent: pending.capacityPercent
+        )
+        context.fixedTaskDescription = pending.fixedTaskDescription
+
+        modelContext.insert(context)
+        try? modelContext.save()
+    }
+
     /// Parse phase type string to enum
     private func parsePhaseType(_ typeStr: String) -> PhaseType {
         switch typeStr.lowercased() {
@@ -998,7 +990,7 @@ struct UnifiedInputView: View {
         agentService.startNewSession()
         messages = []
         pendingActions = []
-        confirmedActions = []
+        confirmedActionBatches = []
         suggestions = []
         conversationState = .initial
         hasUserEdits = false

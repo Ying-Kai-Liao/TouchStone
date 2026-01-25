@@ -20,6 +20,7 @@ struct PendingActionsPreview: View {
     @State private var selectedStoneIndex: Int?
     @State private var selectedProjectIndex: Int?
     @State private var selectedLogIndex: Int?
+    @State private var selectedContextIndex: Int?
 
     /// Words/phrases that indicate confirmation-like suggestions which duplicate the confirm/cancel buttons
     private static let confirmationKeywords: Set<String> = [
@@ -53,6 +54,12 @@ struct PendingActionsPreview: View {
             let logs = pendingActions.compactMap { $0.touchLog }
             if !logs.isEmpty {
                 pendingLogsSection(logs)
+            }
+
+            // Pending day contexts
+            let contexts = pendingActions.compactMap { $0.dayContext }
+            if !contexts.isEmpty {
+                pendingContextsSection(contexts)
             }
 
             // Quick suggestions (filtered to remove confirmation-like duplicates)
@@ -220,6 +227,54 @@ struct PendingActionsPreview: View {
     /// Find the index of an action containing a specific log
     private func findActionIndex(for log: AgentService.PendingTouchLog) -> Int? {
         pendingActions.firstIndex { $0.touchLog?.id == log.id }
+    }
+
+    // MARK: - Contexts Section
+
+    private func pendingContextsSection(_ contexts: [AgentService.PendingDayContext]) -> some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+            Label("Day Plans to Add", systemImage: "calendar.badge.plus")
+                .font(DesignSystem.Typography.captionBold)
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
+
+            ForEach(Array(contexts.enumerated()), id: \.element.id) { index, context in
+                PendingContextRow(context: context)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if let actionIndex = findActionIndex(for: context) {
+                            selectedContextIndex = actionIndex
+                        }
+                    }
+            }
+        }
+        .sheet(item: Binding(
+            get: { selectedContextIndex.map { ContextSheetItem(index: $0) } },
+            set: { selectedContextIndex = $0?.index }
+        )) { item in
+            if let context = pendingActions[safe: item.index]?.dayContext {
+                PendingContextDetailSheet(
+                    context: context,
+                    onSave: { updatedContext in
+                        let updatedAction = AgentService.PendingAction(
+                            actionType: "add_context",
+                            stone: nil,
+                            project: nil,
+                            touchLog: nil,
+                            dayContext: updatedContext
+                        )
+                        onActionUpdate?(item.index, updatedAction)
+                    },
+                    onDelete: {
+                        onActionDelete?(item.index)
+                    }
+                )
+            }
+        }
+    }
+
+    /// Find the index of an action containing a specific context
+    private func findActionIndex(for context: AgentService.PendingDayContext) -> Int? {
+        pendingActions.firstIndex { $0.dayContext?.id == context.id }
     }
 
     // MARK: - Suggestion Buttons
@@ -1037,6 +1092,102 @@ struct PendingLogRow: View {
     }
 }
 
+struct PendingContextRow: View {
+    let context: AgentService.PendingDayContext
+
+    var body: some View {
+        HStack(spacing: DesignSystem.Spacing.md) {
+            // Context icon based on type
+            ZStack {
+                Circle()
+                    .fill(contextColor.opacity(0.15))
+                    .frame(width: 40, height: 40)
+
+                Image(systemName: contextIcon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(contextColor)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(context.name)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+
+                HStack(spacing: 8) {
+                    Text(dateRangeText)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+
+                    Text("·")
+                        .foregroundStyle(DesignSystem.Colors.textTertiary.opacity(0.5))
+
+                    Text(workModeBadge)
+                        .font(.system(size: 13))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                .fill(DesignSystem.Colors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                .strokeBorder(contextColor.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    private var contextIcon: String {
+        switch context.type.lowercased() {
+        case "vacation": return "airplane"
+        case "holiday": return "party.popper"
+        case "travel": return "map"
+        case "event": return "calendar.badge.clock"
+        case "personal": return "person"
+        default: return "calendar.badge.plus"
+        }
+    }
+
+    private var contextColor: Color {
+        switch context.type.lowercased() {
+        case "vacation", "holiday": return .orange
+        case "travel": return .blue
+        case "event": return .purple
+        case "personal": return .pink
+        default: return .gray
+        }
+    }
+
+    private var dateRangeText: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+
+        if let start = formatter.date(from: context.startDate),
+           let end = formatter.date(from: context.endDate) {
+            if Calendar.current.isDate(start, inSameDayAs: end) {
+                return formatter.string(from: start)
+            } else {
+                return "\(formatter.string(from: start)) - \(formatter.string(from: end))"
+            }
+        }
+        return context.startDate
+    }
+
+    private var workModeBadge: String {
+        switch context.workMode.lowercased() {
+        case "none": return "No work"
+        case "reduced": return "\(context.capacityPercent)% capacity"
+        case "fixed": return "Fixed task"
+        case "normal": return "Normal"
+        default: return context.workMode
+        }
+    }
+}
+
 // MARK: - Legacy Support (kept for backward compatibility)
 
 struct PendingProjectRow: View {
@@ -1088,6 +1239,11 @@ private struct ProjectSheetItem: Identifiable {
 
 /// Identifiable wrapper for log sheet presentation
 private struct LogSheetItem: Identifiable {
+    let index: Int
+    var id: Int { index }
+}
+
+private struct ContextSheetItem: Identifiable {
     let index: Int
     var id: Int { index }
 }
