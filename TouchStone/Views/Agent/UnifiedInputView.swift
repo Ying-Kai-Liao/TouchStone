@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import PDFKit
 
 /// A document pending attachment to a chat message
 struct PendingDocument: Identifiable {
@@ -287,7 +288,12 @@ struct UnifiedInputView: View {
                 focusedProjectIndicator
             }
 
-            // Pending documents indicator
+            // Text preview pill (shown when typing)
+            if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                textPreviewPill
+            }
+
+            // Document attachments preview (shown when documents attached)
             if !pendingDocuments.isEmpty {
                 pendingDocumentsView
             }
@@ -449,19 +455,55 @@ struct UnifiedInputView: View {
         .padding(.vertical, DesignSystem.Spacing.sm)
     }
 
+    /// Text preview pill showing what will be sent (before send button is pressed)
+    private var textPreviewPill: some View {
+        HStack(spacing: DesignSystem.Spacing.sm) {
+            HStack(spacing: 6) {
+                Image(systemName: "text.bubble")
+                    .font(.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+
+                Text(inputText.trimmingCharacters(in: .whitespacesAndNewlines))
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    .lineLimit(2)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(DesignSystem.Colors.cardBackground)
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(DesignSystem.Colors.accent.opacity(0.3), lineWidth: 1)
+            )
+
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.vertical, DesignSystem.Spacing.sm)
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
     /// View showing pending document attachments
     private var pendingDocumentsView: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: DesignSystem.Spacing.md) {
+            HStack(spacing: 12) {
                 ForEach(pendingDocuments) { doc in
                     DocumentCard(document: doc) {
                         removePendingDocument(doc)
                     }
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                        removal: .scale(scale: 0.8).combined(with: .opacity)
+                    ))
                 }
             }
             .padding(.horizontal)
-            .padding(.vertical, DesignSystem.Spacing.sm)
+            .padding(.vertical, 12)
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: pendingDocuments.count)
     }
 
     // MARK: - Actions
@@ -474,12 +516,16 @@ struct UnifiedInputView: View {
         // Allow sending with just documents attached
         guard !text.isEmpty || !pendingDocuments.isEmpty else { return }
 
-        // Build message content including document info
+        // Build message content (text only, no document names embedded)
         let messageText = text.isEmpty ? "I've attached some documents for you to analyze." : text
-        let docNames = pendingDocuments.map { $0.filename }
-        let displayText = docNames.isEmpty ? messageText : "\(messageText)\n📎 \(docNames.joined(separator: ", "))"
 
-        let userMessage = AgentChatMessage(role: .user, content: displayText)
+        // Convert pending documents to attached documents for message
+        let attachedDocs = pendingDocuments.map { doc in
+            let ext = doc.url.pathExtension.lowercased()
+            return AgentChatMessage.AttachedDocument(filename: doc.filename, fileType: ext)
+        }
+
+        let userMessage = AgentChatMessage(role: .user, content: messageText, attachedDocuments: attachedDocs)
         messages.append(userMessage)
         inputText = ""
         isInputFocused = false
@@ -614,7 +660,7 @@ struct UnifiedInputView: View {
 
     /// Remove a pending document
     private func removePendingDocument(_ doc: PendingDocument) {
-        withAnimation {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             pendingDocuments.removeAll { $0.id == doc.id }
         }
     }
@@ -1011,10 +1057,77 @@ struct AgentChatMessage: Identifiable {
     let role: Role
     let content: String
     let timestamp = Date()
+    let attachedDocuments: [AttachedDocument]
+
+    init(role: Role, content: String, attachedDocuments: [AttachedDocument] = []) {
+        self.role = role
+        self.content = content
+        self.attachedDocuments = attachedDocuments
+    }
 
     enum Role {
         case user
         case assistant
+    }
+
+    struct AttachedDocument: Identifiable {
+        let id = UUID()
+        let filename: String
+        let fileType: String  // File extension like "pdf", "docx", etc.
+    }
+}
+
+// MARK: - Document Pill
+
+struct DocumentPill: View {
+    let document: AgentChatMessage.AttachedDocument
+    let messageRole: AgentChatMessage.Role
+
+    private var iconName: String {
+        switch document.fileType {
+        case "pdf":
+            return "doc.richtext.fill"
+        case "txt", "text", "md", "markdown":
+            return "doc.text.fill"
+        case "rtf", "rtfd":
+            return "doc.richtext.fill"
+        case "docx", "doc":
+            return "doc.text.fill"
+        case "png", "jpg", "jpeg", "heic", "heif":
+            return "photo.fill"
+        default:
+            return "doc.fill"
+        }
+    }
+
+    private var displayName: String {
+        document.filename
+    }
+
+    var body: some View {
+        HStack(spacing: DesignSystem.Spacing.xs) {
+            Image(systemName: iconName)
+                .font(.caption)
+                .foregroundStyle(messageRole == .user ? .white : DesignSystem.Colors.textSecondary)
+
+            Text(displayName)
+                .font(DesignSystem.Typography.caption)
+                .foregroundStyle(messageRole == .user ? .white : DesignSystem.Colors.textSecondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(
+            Capsule()
+                .fill(messageRole == .user ? DesignSystem.Colors.badgeBackground : DesignSystem.Colors.cardBackground)
+        )
+        .overlay(
+            Capsule()
+                .strokeBorder(
+                    messageRole == .user ? DesignSystem.Colors.badgeBorder : DesignSystem.Colors.border,
+                    lineWidth: 1
+                )
+        )
     }
 }
 
@@ -1029,7 +1142,8 @@ struct AgentMessageBubble: View {
                 Spacer()
             }
 
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
+            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: DesignSystem.Spacing.sm) {
+                // Message bubble
                 Text(displayContent)
                     .font(DesignSystem.Typography.body)
                     .foregroundStyle(message.role == .user ? .white : DesignSystem.Colors.textPrimary)
@@ -1040,6 +1154,14 @@ struct AgentMessageBubble: View {
                             .fill(message.role == .user ? DesignSystem.Colors.accent : DesignSystem.Colors.cardBackground)
                     )
 
+                // Document pills (if any)
+                if !message.attachedDocuments.isEmpty {
+                    ForEach(message.attachedDocuments) { doc in
+                        DocumentPill(document: doc, messageRole: message.role)
+                    }
+                }
+
+                // Timestamp
                 Text(timeString)
                     .font(DesignSystem.Typography.caption)
                     .foregroundStyle(DesignSystem.Colors.textTertiary)
@@ -1141,6 +1263,8 @@ struct DocumentCard: View {
     let document: PendingDocument
     let onRemove: () -> Void
 
+    @State private var pdfThumbnail: UIImage?
+
     private var fileExtension: String {
         document.url.pathExtension.uppercased()
     }
@@ -1163,10 +1287,18 @@ struct DocumentCard: View {
         }
     }
 
-    private let cardWidth: CGFloat = 64
-    private let cardHeight: CGFloat = 80
-    private let foldSize: CGFloat = 14
-    private let cornerRadius: CGFloat = 6
+    private var isPDF: Bool {
+        document.url.pathExtension.lowercased() == "pdf"
+    }
+
+    private var isImage: Bool {
+        ["png", "jpg", "jpeg", "heic", "heif"].contains(document.url.pathExtension.lowercased())
+    }
+
+    private let cardWidth: CGFloat = 72
+    private let cardHeight: CGFloat = 96
+    private let foldSize: CGFloat = 16
+    private let cornerRadius: CGFloat = 8
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -1174,7 +1306,17 @@ struct DocumentCard: View {
                 // Card background with folded corner
                 FoldedDocumentShape(cornerRadius: cornerRadius, foldSize: foldSize)
                     .fill(DesignSystem.Colors.cardBackground)
-                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+
+                // PDF/Image preview thumbnail
+                if let thumbnail = pdfThumbnail, isPDF {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: cardWidth - 4, height: cardHeight - 4)
+                        .clipShape(FoldedDocumentShape(cornerRadius: cornerRadius - 2, foldSize: foldSize - 2))
+                        .opacity(0.9)
+                }
 
                 // Fold triangle overlay (darker shade)
                 Path { path in
@@ -1183,50 +1325,106 @@ struct DocumentCard: View {
                     path.addLine(to: CGPoint(x: cardWidth - foldSize, y: foldSize))
                     path.closeSubpath()
                 }
-                .fill(DesignSystem.Colors.textTertiary.opacity(0.2))
+                .fill(isPDF && pdfThumbnail != nil ? Color.white.opacity(0.8) : DesignSystem.Colors.textTertiary.opacity(0.2))
 
-                // Content
-                VStack(spacing: DesignSystem.Spacing.sm) {
-                    Spacer()
+                // Content overlay (icon and text on top of preview)
+                if !isPDF || pdfThumbnail == nil {
+                    VStack(spacing: DesignSystem.Spacing.sm) {
+                        Spacer()
 
-                    if document.isExtracting {
-                        ProgressView()
-                            .frame(width: 32, height: 32)
-                    } else if document.extractionError != nil {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(.orange)
-                    } else {
-                        Image(systemName: iconName)
-                            .font(.system(size: 28))
+                        if document.isExtracting {
+                            ProgressView()
+                                .frame(width: 32, height: 32)
+                        } else if document.extractionError != nil {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 32))
+                                .foregroundStyle(.orange)
+                        } else {
+                            Image(systemName: iconName)
+                                .font(.system(size: 32))
+                                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                        }
+
+                        Text(fileExtension)
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(DesignSystem.Colors.textSecondary)
+
+                        Spacer()
                     }
-
-                    Text(fileExtension)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(DesignSystem.Colors.textSecondary)
-
-                    Spacer()
+                    .padding(.top, foldSize / 2)
                 }
-                .padding(.top, foldSize / 2)
+
+                // File type badge (only for PDFs with preview)
+                if isPDF && pdfThumbnail != nil {
+                    VStack {
+                        Spacer()
+                        Text(fileExtension)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(DesignSystem.Colors.accent.opacity(0.9))
+                            )
+                            .padding(.bottom, 6)
+                    }
+                }
             }
             .frame(width: cardWidth, height: cardHeight)
             .overlay(
                 FoldedDocumentShape(cornerRadius: cornerRadius, foldSize: foldSize)
                     .stroke(
-                        document.extractionError != nil ? Color.orange.opacity(0.5) : DesignSystem.Colors.textTertiary.opacity(0.3),
-                        lineWidth: 1
+                        document.extractionError != nil ? Color.orange.opacity(0.5) : DesignSystem.Colors.textTertiary.opacity(0.2),
+                        lineWidth: 1.5
                     )
             )
 
             // Remove button
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 18))
-                    .foregroundStyle(DesignSystem.Colors.textTertiary)
-                    .background(Circle().fill(DesignSystem.Colors.background))
+                    .font(.system(size: 20))
+                    .foregroundStyle(.white)
+                    .background(
+                        Circle()
+                            .fill(DesignSystem.Colors.textTertiary)
+                            .frame(width: 20, height: 20)
+                    )
             }
-            .offset(x: 6, y: -6)
+            .offset(x: 8, y: -8)
+        }
+        .task {
+            if isPDF {
+                await generatePDFThumbnail()
+            }
+        }
+    }
+
+    private func generatePDFThumbnail() async {
+        guard let pdfDocument = PDFDocument(url: document.url),
+              let pdfPage = pdfDocument.page(at: 0) else {
+            return
+        }
+
+        let pageBounds = pdfPage.bounds(for: .mediaBox)
+        let thumbnailSize = CGSize(width: cardWidth * 2, height: cardHeight * 2) // 2x for retina
+        let scale = min(thumbnailSize.width / pageBounds.width, thumbnailSize.height / pageBounds.height)
+
+        let renderer = UIGraphicsImageRenderer(size: CGSize(
+            width: pageBounds.width * scale,
+            height: pageBounds.height * scale
+        ))
+
+        let thumbnail = renderer.image { context in
+            context.cgContext.translateBy(x: 0, y: pageBounds.height * scale)
+            context.cgContext.scaleBy(x: scale, y: -scale)
+            pdfPage.draw(with: .mediaBox, to: context.cgContext)
+        }
+
+        await MainActor.run {
+            withAnimation(.easeOut(duration: 0.2)) {
+                self.pdfThumbnail = thumbnail
+            }
         }
     }
 }

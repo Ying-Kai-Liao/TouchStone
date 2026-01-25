@@ -31,8 +31,15 @@ struct TodayFlowView: View {
     @State private var showSpeechInput = false
     @State private var showCapacityAlert = false
     @State private var pendingTouchProject: Project?
+    @State private var pullOffset: CGFloat = 0
+    @State private var initialScrollY: CGFloat?
+    @State private var isResetting = false
+    @State private var showCelebration = false
+    @State private var showResetConfirmation = false
+    @State private var lastHapticProgress: Int = 0
 
     private let calendar = Calendar.current
+    private let resetThreshold: CGFloat = 100
 
     // MARK: - Day Plan Computed Properties
 
@@ -135,11 +142,20 @@ struct TodayFlowView: View {
                     }
                     .transition(.opacity)
                 }
+
+                // Touch celebration overlay
+                TouchCelebrationView(
+                    isShowing: showCelebration,
+                    accentColor: DesignSystem.Colors.accent
+                )
             }
             .navigationBarHidden(true)
             .onAppear { computeDayState() }
             .onChange(of: allStones.count) { rescheduleIfNeeded() }
-            .onChange(of: selectedDate) { computeDayState() }
+            .onChange(of: selectedDate) {
+                initialScrollY = nil  // Reset scroll tracking for new date
+                computeDayState()
+            }
             .overlay(alignment: .bottom) { undoToast }
             .alert("Great work today!", isPresented: $showCapacityAlert) {
                 Button("Take a break") {
@@ -153,6 +169,14 @@ struct TodayFlowView: View {
                 }
             } message: {
                 Text("You've reached your daily goal. Consider doing something else, or continue if you'd like.")
+            }
+            .alert("Reset Today?", isPresented: $showResetConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Reset Day", role: .destructive) {
+                    performDayReset()
+                }
+            } message: {
+                Text("This will clear all \(todayTouchLogs.count) touch log\(todayTouchLogs.count == 1 ? "" : "s") and reset your day. This cannot be undone.")
             }
             .sheet(isPresented: $showAddStone) {
                 StoneEventFormView(onSave: { stone in
@@ -230,19 +254,142 @@ struct TodayFlowView: View {
         let bottomPadding: CGFloat = showWorkPrompt ? 140 : 0
 
         return ScrollView(.vertical, showsIndicators: true) {
-            FlowTimelineView(
-                items: dayState.workflowItems,
-                additionalProjects: additionalProjects,
-                isToday: calendar.isDateInToday(selectedDate),
-                onTouch: touchProject,
-                onFocus: { project in focusProject = project },
-                onDelete: deleteHandler,
-                onDeleteStone: { stone in deleteStone(stone) },
-                onEditMode: nil
-            )
-            .padding(.top, 16)
-            .padding(.bottom, bottomPadding)
+            VStack(spacing: 0) {
+                // Pull detector - measures position to detect over-scroll
+                Color.clear
+                    .frame(height: 1)
+                    .background(
+                        GeometryReader { geometry in
+                            Color.clear
+                                .preference(
+                                    key: ScrollOffsetKey.self,
+                                    value: geometry.frame(in: .global).minY
+                                )
+                        }
+                    )
+
+                // Hidden reset indicator - revealed when pulling
+                ZStack {
+                    if pullOffset > 0 {
+                        pullToResetIndicator
+                    }
+                }
+                .frame(height: pullOffset > 0 ? pullOffset : 0)
+                .clipped()
+
+                FlowTimelineView(
+                        items: dayState.workflowItems,
+                        additionalProjects: additionalProjects,
+                        isToday: calendar.isDateInToday(selectedDate),
+                        onTouch: touchProject,
+                        onFocus: { project in focusProject = project },
+                        onDelete: deleteHandler,
+                        onDeleteStone: { stone in deleteStone(stone) },
+                        onEditMode: nil
+                    )
+                    .padding(.top, 16)
+                    .padding(.bottom, bottomPadding)
+            }
         }
+        .onPreferenceChange(ScrollOffsetKey.self) { minY in
+            if initialScrollY == nil {
+                initialScrollY = minY
+            }
+
+            guard let initial = initialScrollY else { return }
+
+            // Only track over-scroll (pulling past the top)
+            let pulled = max(0, minY - initial)
+            pullOffset = pulled
+
+            // Progressive haptic feedback every 30pt
+            let currentProgress = Int(pullOffset / 30)
+            if currentProgress > lastHapticProgress && pullOffset < resetThreshold {
+                HapticService.lightTap()
+                lastHapticProgress = currentProgress
+            }
+
+            // Trigger reset logic
+            if !isResetting && pullOffset >= resetThreshold {
+                isResetting = true
+                HapticService.mediumTap()
+            } else if isResetting && pullOffset < 10 {
+                showResetConfirmation = true
+                isResetting = false
+                lastHapticProgress = 0
+            } else if pullOffset < 10 {
+                lastHapticProgress = 0
+            }
+        }
+    }
+
+    // MARK: - Pull to Reset Indicator (Hidden behind content)
+
+    private var pullToResetIndicator: some View {
+        let progress = min(pullOffset / resetThreshold, 1.0)
+        let isPastThreshold = pullOffset >= resetThreshold
+        let accentColor = DesignSystem.Colors.accent
+
+        return VStack {
+            Spacer()
+
+            VStack(spacing: DesignSystem.Spacing.sm) {
+                // Progress ring with icon
+                ZStack {
+                    // Background ring
+                    Circle()
+                        .stroke(DesignSystem.Colors.textTertiary.opacity(0.3), lineWidth: 2.5)
+                        .frame(width: 40, height: 40)
+
+                    // Progress ring
+                    Circle()
+                        .trim(from: 0, to: progress)
+                        .stroke(
+                            accentColor,
+                            style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+                        )
+                        .frame(width: 40, height: 40)
+                        .rotationEffect(.degrees(-90))
+
+                    // Icon
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(accentColor)
+                        .rotationEffect(.degrees(-360 * progress))
+                }
+                .scaleEffect(isPastThreshold ? 1.15 : 0.8 + (0.2 * progress))
+                .animation(.spring(response: 0.25, dampingFraction: 0.65), value: isPastThreshold)
+                .animation(.spring(response: 0.25, dampingFraction: 0.65), value: progress)
+
+                // Text - only show when pulled enough
+                Text(isPastThreshold ? "Release to reset" : "Reset day")
+                    .font(DesignSystem.Typography.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(isPastThreshold ? accentColor : DesignSystem.Colors.textSecondary)
+                    .opacity(pullOffset > 40 ? min((pullOffset - 40) / 30, 1.0) : 0)
+            }
+            .padding(.bottom, DesignSystem.Spacing.md)
+        }
+        .frame(maxWidth: .infinity)
+        .background(DesignSystem.Colors.background)
+    }
+
+    private func performDayReset() {
+        // Delete all touch logs for today
+        let logsToDelete = todayTouchLogs
+        for touchLog in logsToDelete {
+            modelContext.delete(touchLog)
+        }
+
+        // Clear undo state
+        lastTouch = nil
+        showUndoToast = false
+
+        // Reset the day plan
+        resetTodayPlan()
+
+        // Success feedback after reset
+        HapticService.success()
     }
 
     // MARK: - Undo Toast
@@ -265,8 +412,8 @@ struct TodayFlowView: View {
             .background(
                 RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                     .fill(DesignSystem.Colors.cardBackground)
+                    .shadow(radius: 4)
             )
-            .shadow(radius: 4)
             .padding(DesignSystem.Spacing.lg)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
@@ -374,7 +521,7 @@ struct TodayFlowView: View {
 
     /// Actually perform the touch (called directly or after user confirms)
     private func performTouch(_ project: Project) {
-        HapticService.touch()
+        HapticService.success()
         let touch = TouchLog(project: project)
 
         // If project is in phase mode, link touch to active phase
@@ -384,6 +531,12 @@ struct TodayFlowView: View {
 
         modelContext.insert(touch)
         lastTouch = touch
+
+        // Trigger celebration
+        showCelebration = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            showCelebration = false
+        }
 
         withAnimation {
             showUndoToast = true
@@ -473,6 +626,15 @@ struct DateTabButton: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
         return formatter.string(from: date)
+    }
+}
+
+// MARK: - Scroll Offset Preference Key
+
+private struct ScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

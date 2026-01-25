@@ -10,18 +10,29 @@ struct CalendarView: View {
 
     private var prefs: UserPreferences { UserPreferences.shared }
 
-    @State private var selectedMonth = Date()
+    @State private var currentMonthDate = Date()
+    @State private var monthsToDisplay: [Date] = []
+    @State private var currentPageIndex = 2  // Start at center of 5-month window
+    @State private var isUpdatingPage = false
     @State private var selectedDay: SelectedDay?
     @State private var showingAddStone = false
     @State private var addStoneDate: Date?
     @State private var showingWorkloadLegend = false
 
-    // Swipe navigation state
-    @State private var dragOffset: CGFloat = 0
-    @State private var swipeDirection: SwipeDirection = .none
+    // Pre-computed day data cache to avoid expensive calculations during swipe
+    @State private var dayDataCache: [Date: CachedDayData] = [:]
 
-    private enum SwipeDirection {
-        case none, left, right
+    // Buffer size: 5 months (2 before, current, 2 after)
+    private let monthBufferSize = 5
+    private let centerIndex = 2
+
+    // Cached data for each day to avoid recalculation during swipe
+    struct CachedDayData {
+        let stones: [StoneEvent]
+        let contexts: [DayContext]
+        let touchCount: Int
+        let dayLoad: Double
+        let hasDeadline: Bool
     }
 
     private let calendar = Calendar.current
@@ -45,19 +56,27 @@ struct CalendarView: View {
                         .padding(.horizontal, DesignSystem.Spacing.xl)
                         .padding(.top, DesignSystem.Spacing.sm)
 
-                    ScrollView {
-                        VStack(spacing: DesignSystem.Spacing.md) {
-                            monthNavigationHeader
-                            weekdayHeader
-                            calendarGrid
-                                .offset(x: dragOffset)
-                                .gesture(monthSwipeGesture)
-                        }
-                        .padding(.vertical, DesignSystem.Spacing.sm)
+                    VStack(spacing: DesignSystem.Spacing.md) {
+                        monthNavigationHeader
+                        weekdayHeader
+                        calendarPager
                     }
+                    .padding(.vertical, DesignSystem.Spacing.sm)
                 }
             }
             .navigationBarHidden(true)
+            .onAppear {
+                initializeMonthsToDisplay()
+            }
+            .onChange(of: stones.count) { _, _ in
+                precomputeDayDataCache()
+            }
+            .onChange(of: activeProjects.count) { _, _ in
+                precomputeDayDataCache()
+            }
+            .onChange(of: dayContexts.count) { _, _ in
+                precomputeDayDataCache()
+            }
             .sheet(item: $selectedDay) { day in
                 DayDetailView(
                     date: day.date,
@@ -113,9 +132,7 @@ struct CalendarView: View {
             }
 
             Button {
-                withAnimation(.spring(response: 0.3)) {
-                    selectedMonth = Date()
-                }
+                jumpToMonth(Date())
             } label: {
                 Text("Today")
                     .font(.system(size: 14, weight: .medium))
@@ -162,9 +179,7 @@ struct CalendarView: View {
     private var monthNavigationHeader: some View {
         HStack(spacing: DesignSystem.Spacing.md) {
             Button {
-                withAnimation(.spring(response: 0.3)) {
-                    selectedMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
-                }
+                navigateToPreviousMonth()
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 14, weight: .medium))
@@ -178,16 +193,14 @@ struct CalendarView: View {
 
             Spacer()
 
-            Text(monthYearFormatter.string(from: selectedMonth))
+            Text(monthYearFormatter.string(from: currentMonthDate))
                 .font(DesignSystem.Typography.headline)
                 .foregroundStyle(DesignSystem.Colors.textPrimary)
 
             Spacer()
 
             Button {
-                withAnimation(.spring(response: 0.3)) {
-                    selectedMonth = calendar.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
-                }
+                navigateToNextMonth()
             } label: {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .medium))
@@ -217,27 +230,41 @@ struct CalendarView: View {
         .padding(.bottom, DesignSystem.Spacing.sm)
     }
 
-    private var calendarGrid: some View {
-        let days = generateCalendarDays()
+    private var calendarPager: some View {
+        TabView(selection: $currentPageIndex) {
+            ForEach(Array(monthsToDisplay.enumerated()), id: \.offset) { index, monthDate in
+                calendarGrid(for: monthDate)
+                    .tag(index)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .onChange(of: currentPageIndex) { oldValue, newValue in
+            handlePageChange(from: oldValue, to: newValue)
+        }
+    }
+
+    private func calendarGrid(for monthDate: Date) -> some View {
+        let days = generateCalendarDays(for: monthDate)
         let cellSpacing = prefs.calendarDetailMode ? DesignSystem.Spacing.sm : DesignSystem.Spacing.md
         let cellHeight: CGFloat = prefs.calendarDetailMode ? 110 : 60
 
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DesignSystem.Spacing.sm), count: 7), spacing: cellSpacing) {
             ForEach(days) { dayData in
+                let cached = getCachedDayData(for: dayData.date)
                 DayCell(
                     dayData: dayData,
-                    stones: stonesForDay(dayData.date),
-                    contexts: contextsForDay(dayData.date),
-                    touchCount: touchCountForDay(dayData.date),
-                    dayLoad: loadForDay(dayData.date),
-                    hasDeadline: hasDeadlineOnDay(dayData.date),
+                    stones: cached.stones,
+                    contexts: cached.contexts,
+                    touchCount: cached.touchCount,
+                    dayLoad: cached.dayLoad,
+                    hasDeadline: cached.hasDeadline,
                     showDetails: prefs.calendarDetailMode,
                     cellHeight: cellHeight,
                     onTap: {
                         if dayData.isCurrentMonth {
                             selectedDay = SelectedDay(
                                 date: dayData.date,
-                                stones: stonesForDay(dayData.date)
+                                stones: cached.stones
                             )
                         }
                     }
@@ -249,66 +276,118 @@ struct CalendarView: View {
         .animation(.easeInOut(duration: 0.2), value: prefs.calendarDetailMode)
     }
 
-    // MARK: - Swipe Gesture
+    // MARK: - Day Data Cache
 
-    private var monthSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 30)
-            .onChanged { value in
-                // Only track horizontal swipes
-                let horizontalAmount = abs(value.translation.width)
-                let verticalAmount = abs(value.translation.height)
+    private func getCachedDayData(for date: Date) -> CachedDayData {
+        let dateKey = calendar.startOfDay(for: date)
+        if let cached = dayDataCache[dateKey] {
+            return cached
+        }
+        // Fallback: compute on demand if not cached (shouldn't happen normally)
+        return computeDayData(for: date)
+    }
 
-                if horizontalAmount > verticalAmount {
-                    // Limit drag offset for visual feedback
-                    dragOffset = value.translation.width * 0.3
+    private func computeDayData(for date: Date) -> CachedDayData {
+        CachedDayData(
+            stones: stonesForDay(date),
+            contexts: contextsForDay(date),
+            touchCount: touchCountForDay(date),
+            dayLoad: loadForDay(date),
+            hasDeadline: hasDeadlineOnDay(date)
+        )
+    }
+
+    private func precomputeDayDataCache() {
+        var newCache: [Date: CachedDayData] = [:]
+
+        for monthDate in monthsToDisplay {
+            let days = generateCalendarDays(for: monthDate)
+            for dayData in days where dayData.day != nil {
+                let dateKey = calendar.startOfDay(for: dayData.date)
+                if newCache[dateKey] == nil {
+                    newCache[dateKey] = computeDayData(for: dayData.date)
                 }
             }
-            .onEnded { value in
-                let horizontalAmount = abs(value.translation.width)
-                let verticalAmount = abs(value.translation.height)
-                let swipeThreshold: CGFloat = 50
+        }
 
-                // Only process horizontal swipes
-                guard horizontalAmount > verticalAmount else {
-                    withAnimation(.spring(response: 0.3)) {
-                        dragOffset = 0
-                    }
-                    return
-                }
+        dayDataCache = newCache
+    }
 
-                if value.translation.width < -swipeThreshold {
-                    // Swiped left - go to next month
-                    swipeDirection = .left
-                    withAnimation(.spring(response: 0.3)) {
-                        dragOffset = -UIScreen.main.bounds.width * 0.3
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        selectedMonth = calendar.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
-                        dragOffset = UIScreen.main.bounds.width * 0.3
-                        withAnimation(.spring(response: 0.3)) {
-                            dragOffset = 0
-                        }
-                    }
-                } else if value.translation.width > swipeThreshold {
-                    // Swiped right - go to previous month
-                    swipeDirection = .right
-                    withAnimation(.spring(response: 0.3)) {
-                        dragOffset = UIScreen.main.bounds.width * 0.3
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        selectedMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
-                        dragOffset = -UIScreen.main.bounds.width * 0.3
-                        withAnimation(.spring(response: 0.3)) {
-                            dragOffset = 0
-                        }
-                    }
-                } else {
-                    // Swipe wasn't significant enough
-                    withAnimation(.spring(response: 0.3)) {
-                        dragOffset = 0
-                    }
-                }
+    // MARK: - Month Navigation
+
+    private func initializeMonthsToDisplay() {
+        updateMonthsWindow(centerMonth: currentMonthDate)
+        currentPageIndex = centerIndex
+        precomputeDayDataCache()
+    }
+
+    private func updateMonthsWindow(centerMonth: Date) {
+        // Generate 5 months: -2, -1, center, +1, +2
+        var months: [Date] = []
+        for offset in -2...2 {
+            if let month = calendar.date(byAdding: .month, value: offset, to: centerMonth) {
+                months.append(month)
             }
+        }
+        monthsToDisplay = months
+    }
+
+    private func handlePageChange(from oldIndex: Int, to newIndex: Int) {
+        guard !monthsToDisplay.isEmpty, !isUpdatingPage else { return }
+
+        // Update the displayed month in header based on current page
+        if newIndex >= 0 && newIndex < monthsToDisplay.count {
+            currentMonthDate = monthsToDisplay[newIndex]
+        }
+
+        // Only rebalance when we're getting close to the edges (0 or 4)
+        // This gives us a buffer so the reset happens less frequently
+        if newIndex <= 0 || newIndex >= monthBufferSize - 1 {
+            isUpdatingPage = true
+
+            // Wait for the swipe animation to fully complete before rebalancing
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                rebalanceMonthsWindow()
+            }
+        }
+    }
+
+    private func rebalanceMonthsWindow() {
+        // Regenerate months centered on current month
+        updateMonthsWindow(centerMonth: currentMonthDate)
+        precomputeDayDataCache()
+
+        // Reset to center without animation
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            currentPageIndex = centerIndex
+        }
+
+        // Allow next update after a brief delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isUpdatingPage = false
+        }
+    }
+
+    private func navigateToPreviousMonth() {
+        guard !isUpdatingPage, currentPageIndex > 0 else { return }
+        withAnimation(.easeInOut(duration: 0.3)) {
+            currentPageIndex -= 1
+        }
+    }
+
+    private func navigateToNextMonth() {
+        guard !isUpdatingPage, currentPageIndex < monthsToDisplay.count - 1 else { return }
+        withAnimation(.easeInOut(duration: 0.3)) {
+            currentPageIndex += 1
+        }
+    }
+
+    private func jumpToMonth(_ date: Date) {
+        currentMonthDate = date
+        updateMonthsWindow(centerMonth: date)
+        currentPageIndex = centerIndex
     }
 
     // MARK: - Workload Legend
@@ -392,8 +471,8 @@ struct CalendarView: View {
         }
     }
 
-    private func generateCalendarDays() -> [DayData] {
-        guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: selectedMonth)),
+    private func generateCalendarDays(for monthDate: Date) -> [DayData] {
+        guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: monthDate)),
               let monthEnd = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: monthStart) else {
             return []
         }
@@ -411,7 +490,7 @@ struct CalendarView: View {
         // Days of the month
         for day in 1...daysInMonth {
             if let date = calendar.date(byAdding: .day, value: day - 1, to: monthStart) {
-                let isCurrentMonth = calendar.isDate(date, equalTo: selectedMonth, toGranularity: .month)
+                let isCurrentMonth = calendar.isDate(date, equalTo: monthDate, toGranularity: .month)
                 days.append(DayData(date: date, day: day, isCurrentMonth: isCurrentMonth))
             }
         }
@@ -515,7 +594,7 @@ struct DayCell: View {
                     .fill(cellBackgroundColor)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableDayCellStyle())
     }
 
     // MARK: - Compact View (Original)
@@ -697,6 +776,24 @@ struct DayCell: View {
     private var isWeekend: Bool {
         let weekday = calendar.component(.weekday, from: dayData.date)
         return weekday == 1 || weekday == 7  // Sunday or Saturday
+    }
+}
+
+/// Button style for pressable calendar day cells with scale, highlight, and haptic feedback
+struct PressableDayCellStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                    .fill(DesignSystem.Colors.accent.opacity(configuration.isPressed ? 0.15 : 0))
+            )
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { wasPressed, isPressed in
+                if isPressed && !wasPressed {
+                    HapticService.selection()
+                }
+            }
     }
 }
 
