@@ -122,16 +122,24 @@ struct CalendarView: View {
                 workloadLegendPopover
             }
 
-            // Calendar detail mode toggle
+            // Calendar detail mode toggle - clean icon button
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                HapticService.selection()
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     prefs.calendarDetailMode.toggle()
                 }
             } label: {
-                Image(systemName: prefs.calendarDetailMode ? "list.bullet.rectangle" : "square.grid.2x2")
-                    .font(.system(size: 18))
-                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                Image(systemName: prefs.calendarDetailMode ? "list.bullet" : "square.grid.2x2")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(prefs.calendarDetailMode ? DesignSystem.Colors.accent : DesignSystem.Colors.textTertiary)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        Circle()
+                            .fill(prefs.calendarDetailMode ? DesignSystem.Colors.accent.opacity(0.15) : Color.clear)
+                    )
+                    .contentShape(Circle())
             }
+            .accessibilityLabel(prefs.calendarDetailMode ? "Switch to compact view" : "Switch to detail view")
 
             Button {
                 jumpToMonth(Date())
@@ -252,7 +260,7 @@ struct CalendarView: View {
 
     /// Skeleton grid shown while data loads
     private var skeletonCalendarGrid: some View {
-        let cellHeight: CGFloat = prefs.calendarDetailMode ? 110 : 60
+        let cellHeight: CGFloat = prefs.calendarDetailMode ? 100 : 60
 
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DesignSystem.Spacing.sm), count: 7), spacing: DesignSystem.Spacing.md) {
             ForEach(0..<35, id: \.self) { _ in
@@ -268,7 +276,7 @@ struct CalendarView: View {
     private func calendarGrid(for monthDate: Date) -> some View {
         let days = generateCalendarDays(for: monthDate)
         let cellSpacing = prefs.calendarDetailMode ? DesignSystem.Spacing.sm : DesignSystem.Spacing.md
-        let cellHeight: CGFloat = prefs.calendarDetailMode ? 110 : 60
+        let cellHeight: CGFloat = prefs.calendarDetailMode ? 100 : 60
 
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DesignSystem.Spacing.sm), count: 7), spacing: cellSpacing) {
             ForEach(days) { dayData in
@@ -295,7 +303,7 @@ struct CalendarView: View {
         }
         .padding(.horizontal, DesignSystem.Spacing.xl)
         .padding(.bottom, DesignSystem.Spacing.lg)
-        .animation(.easeInOut(duration: 0.2), value: prefs.calendarDetailMode)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: prefs.calendarDetailMode)
     }
 
     // MARK: - Day Data Cache
@@ -644,6 +652,23 @@ struct DayCell: View {
 
     private let calendar = Calendar.current
 
+    // TimeTree-style event color palette
+    private static let eventColors: [Color] = [
+        .red.opacity(0.85),
+        .green.opacity(0.75),
+        .orange.opacity(0.85),
+        .yellow.opacity(0.85),
+        .pink.opacity(0.75),
+        .cyan.opacity(0.75),
+        .purple.opacity(0.75)
+    ]
+
+    /// Get a consistent color for a stone based on its ID
+    private func eventColor(for stone: StoneEvent) -> Color {
+        let index = abs(stone.id.hashValue) % Self.eventColors.count
+        return Self.eventColors[index]
+    }
+
     private var sortedStones: [StoneEvent] {
         stones.sorted { ($0.startHour * 60 + $0.startMinute) < ($1.startHour * 60 + $1.startMinute) }
     }
@@ -680,6 +705,8 @@ struct DayCell: View {
             )
         }
         .buttonStyle(PressableDayCellStyle())
+        .accessibilityLabel(accessibilityDayLabel)
+        .accessibilityHint("Tap to view day details")
     }
 
     // MARK: - Compact View (Original)
@@ -732,109 +759,116 @@ struct DayCell: View {
         }
         .frame(height: 6)
 
-        // DUE tag or context label for deadline days
+        // DUE tag or OFF label
         if hasDeadline {
             Text("DUE")
-                .font(.system(size: 7, weight: .bold))
-                .foregroundStyle(DesignSystem.Colors.background)
-                .padding(.horizontal, 4)
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 5)
                 .padding(.vertical, 2)
                 .background(
                     Capsule()
-                        .fill(loadColor)
+                        .fill(DesignSystem.Colors.accent)
                 )
         } else if isNoWorkDay {
             Text("OFF")
-                .font(.system(size: 7, weight: .bold))
-                .foregroundStyle(DesignSystem.Colors.textSecondary)
-                .padding(.horizontal, 4)
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .padding(.horizontal, 5)
                 .padding(.vertical, 2)
                 .background(
                     Capsule()
-                        .fill(DesignSystem.Colors.cardBackground)
+                        .strokeBorder(DesignSystem.Colors.textTertiary.opacity(0.3), lineWidth: 1)
                 )
         } else {
             Color.clear
-                .frame(height: 14)
+                .frame(height: 16)
         }
 
         Spacer()
             .frame(height: 4)
     }
 
-    // MARK: - Detailed View
+    // MARK: - Detailed View (TimeTree Style)
+
+    /// Day number color based on weekday (TimeTree style)
+    private var dayNumberColor: Color {
+        guard dayData.isCurrentMonth else {
+            return DesignSystem.Colors.textTertiary.opacity(0.3)
+        }
+        let weekday = calendar.component(.weekday, from: dayData.date)
+        switch weekday {
+        case 1: // Sunday
+            return .red
+        case 7: // Saturday
+            return .blue
+        default: // Weekdays
+            return DesignSystem.Colors.textPrimary
+        }
+    }
 
     @ViewBuilder
     private func detailedContent(day: Int) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            // Day number row
-            HStack {
-                Text("\(day)")
-                    .font(.system(size: 12, weight: isToday ? .bold : .medium))
-                    .foregroundColor(dayData.isCurrentMonth ? DesignSystem.Colors.textPrimary : DesignSystem.Colors.textTertiary.opacity(0.3))
-                    .frame(width: 20, height: 20)
-                    .background(
-                        Circle()
-                            .fill(isToday ? DesignSystem.Colors.accent.opacity(0.2) : Color.clear)
-                    )
-                    .overlay(
-                        Circle()
-                            .strokeBorder(isToday ? DesignSystem.Colors.accent : Color.clear, lineWidth: 1)
-                    )
+        VStack(alignment: .leading, spacing: 1) {
+            // Day number (TimeTree style - colored by weekday, filled circle for today)
+            Text("\(day)")
+                .font(.system(size: 11, weight: isToday ? .bold : .medium))
+                .foregroundColor(isToday ? .white : dayNumberColor)
+                .frame(width: 18, height: 18)
+                .background(
+                    Circle()
+                        .fill(isToday ? Color(white: 0.25) : Color.clear)
+                )
+                .padding(.leading, 1)
+                .padding(.top, 2)
 
-                Spacer()
-
-                // DUE tag
-                if hasDeadline {
-                    Text("DUE")
-                        .font(.system(size: 6, weight: .bold))
-                        .foregroundStyle(DesignSystem.Colors.background)
-                        .padding(.horizontal, 3)
-                        .padding(.vertical, 1)
-                        .background(
-                            Capsule()
-                                .fill(loadColor)
-                        )
-                }
-            }
-            .padding(.horizontal, 4)
-            .padding(.top, 4)
-
-            // Event list
+            // Event list as colored pills (edge-to-edge for max title space)
             if stones.isEmpty {
                 Spacer()
             } else {
                 VStack(alignment: .leading, spacing: 1) {
                     ForEach(sortedStones.prefix(3)) { stone in
-                        HStack(spacing: 2) {
-                            Text(stone.startTimeString)
-                                .font(.system(size: 8, weight: .medium))
-                                .foregroundStyle(DesignSystem.Colors.textSecondary)
-                                .frame(width: 28, alignment: .leading)
-
-                            Text(stone.title)
-                                .font(.system(size: 8, weight: .regular))
-                                .foregroundStyle(DesignSystem.Colors.textPrimary)
-                                .lineLimit(1)
-                        }
+                        eventPill(stone: stone)
                     }
 
                     if stones.count > 3 {
-                        Text("+\(stones.count - 3) more")
+                        Text("+\(stones.count - 3)")
                             .font(.system(size: 7, weight: .medium))
                             .foregroundStyle(DesignSystem.Colors.textTertiary)
+                            .padding(.leading, 1)
                     }
                 }
-                .padding(.horizontal, 4)
 
                 Spacer()
             }
         }
     }
 
-    /// Color based on workload - smooth accent gradient
-    /// No-work days get a special muted background
+    /// Single event as a colored pill (TimeTree style)
+    @ViewBuilder
+    private func eventPill(stone: StoneEvent) -> some View {
+        Text(stone.title)
+            .font(.system(size: 8, weight: .medium))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .padding(.horizontal, 3)
+            .padding(.vertical, 1.5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(eventColor(for: stone))
+            )
+    }
+
+    /// Color based on workload - smooth accent gradient (compact view only)
+    /// Detail view uses clean, clear backgrounds (TimeTree style)
     private var cellBackgroundColor: Color {
+        // Detail view: no cell background (TimeTree style)
+        if showDetails {
+            return Color.clear
+        }
+
         if !dayData.isCurrentMonth {
             return Color.clear
         }
@@ -861,6 +895,17 @@ struct DayCell: View {
     private var isWeekend: Bool {
         let weekday = calendar.component(.weekday, from: dayData.date)
         return weekday == 1 || weekday == 7  // Sunday or Saturday
+    }
+
+    /// Accessibility label describing the day for VoiceOver
+    private var accessibilityDayLabel: String {
+        guard let day = dayData.day else { return "" }
+        var label = "Day \(day)"
+        if isToday { label += ", today" }
+        if !stones.isEmpty { label += ", \(stones.count) event\(stones.count == 1 ? "" : "s")" }
+        if hasDeadline { label += ", has deadline" }
+        if isNoWorkDay { label += ", day off" }
+        return label
     }
 }
 
